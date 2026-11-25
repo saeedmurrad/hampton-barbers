@@ -69,12 +69,29 @@ const jsonLd = {
       </nav>
     )}
     <script>
-      import { renderMenu, STORE_KEY } from '../lib/menu';
+      import { renderMenu, STORE_KEY, fetchLive } from '../lib/menu';
 
-      // Prices edited in the admin page (demo: stored in this browser)
+      // Price list: an unpublished draft on this device wins (so the admin can preview it),
+      // otherwise the published list from Firebase replaces the built-in one.
       const priceHost = document.querySelector<HTMLElement>('[data-menu]');
       if (priceHost) {
-        try { const saved = localStorage.getItem(STORE_KEY); if (saved) priceHost.innerHTML = renderMenu(priceHost.dataset.menu!, JSON.parse(saved)); } catch { /* keep the built-in list */ }
+        const show = (cats: unknown) => {
+          const html = renderMenu(priceHost.dataset.menu!, cats as never);
+          if (html && html !== priceHost.innerHTML) priceHost.innerHTML = html;
+        };
+        let draft: string | null = null;
+        try { draft = localStorage.getItem(STORE_KEY); } catch { /* storage blocked */ }
+        if (draft) {
+          try {
+            show(JSON.parse(draft));
+            const note = document.createElement('p');
+            note.className = 'draftnote';
+            note.textContent = 'You are seeing your unpublished draft prices.';
+            document.body.append(note);
+          } catch { /* broken draft: keep the built-in list */ }
+        } else {
+          fetchLive().then((cats) => { if (cats) show(cats); });
+        }
       }
 
       // Scroll reveals

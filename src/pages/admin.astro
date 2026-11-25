@@ -10,21 +10,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <a class="adm__back" href={`${base}/`}>← All designs</a>
         <h1>Prices and categories</h1>
       </div>
-      <p id="status" role="status" aria-live="polite">Nothing changed yet</p>
+      <div class="adm__pub">
+        <p id="status" role="status" aria-live="polite">Loading the price list…</p>
+        <button type="button" id="publish" class="primary" disabled>Publish to the website</button>
+      </div>
     </header>
 
-    <p class="adm__note"><strong>Demo mode.</strong> Changes save on this device only, so you can try it and see them on all four designs. On the live site the owner signs in with a password and every visitor sees the new prices.</p>
+    <section class="acct" id="account" aria-label="Your account"></section>
+
+    <p class="adm__note">Your edits are kept as a <strong>draft on this device</strong> until you press <strong>Publish to the website</strong>. After that every visitor sees the new prices, on any phone or computer.</p>
 
     <div id="editor"></div>
 
     <footer class="adm__foot">
       <div class="adm__see">
-        <span>See your changes on:</span>
+        <span>Preview your draft on:</span>
         {designs.map((d) => <a href={`${base}/${d.id}/#prices`}>{d.name}</a>)}
       </div>
       <div class="adm__ops">
         <button type="button" id="export">Download price list</button>
-        <button type="button" id="reset" class="danger">Reset to the original list</button>
+        <button type="button" id="reset" class="danger">Discard my draft</button>
       </div>
     </footer>
   </main>
@@ -32,25 +37,49 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <script>
   import { menu as defaults, type Category } from '../data/site';
-  import { STORE_KEY } from '../lib/menu';
+  import { STORE_KEY, fetchLive } from '../lib/menu';
+  import { initializeApp } from 'firebase/app';
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, type User } from 'firebase/auth';
+  import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
+
+  const cfg = {
+    apiKey: import.meta.env.PUBLIC_FB_API_KEY, authDomain: import.meta.env.PUBLIC_FB_AUTH_DOMAIN,
+    projectId: import.meta.env.PUBLIC_FB_PROJECT_ID, appId: import.meta.env.PUBLIC_FB_APP_ID,
+  };
+  const connected = Boolean(cfg.apiKey && cfg.projectId);
+  const app = connected ? initializeApp(cfg) : null;
+  const auth = app ? getAuth(app) : null;
+  const db = app ? getFirestore(app) : null;
 
   const root = document.getElementById('editor')!;
   const status = document.getElementById('status')!;
+  const account = document.getElementById('account')!;
+  const publishBtn = document.getElementById('publish') as HTMLButtonElement;
   const clone = (v: Category[]): Category[] => JSON.parse(JSON.stringify(v));
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  // What goes on the website: no blank rows, no empty categories.
+  const tidy = (v: Category[]): Category[] => v
+    .map((c) => ({ name: c.name.trim(), items: c.items.map((i) => ({ name: i.name.trim(), price: i.price.trim(), note: (i.note ?? '').trim() })).filter((i) => i.name) }))
+    .filter((c) => c.name && c.items.length);
 
-  let state: Category[] = (() => {
-    try { const s = localStorage.getItem(STORE_KEY); if (s) return JSON.parse(s) as Category[]; } catch { /* use defaults */ }
-    return clone(defaults);
-  })();
+  let state: Category[] = clone(defaults);
+  let live: Category[] = clone(defaults);
+  let user: User | null = null;
+  const hasDraft = () => { try { return localStorage.getItem(STORE_KEY) !== null; } catch { return false; } };
+  const canPublish = () => Boolean(user?.emailVerified);
+
+  const refresh = () => {
+    publishBtn.disabled = !canPublish();
+    publishBtn.title = canPublish() ? '' : 'Sign in first';
+  };
 
   let timer: number | undefined;
-  const save = () => {
+  const saveDraft = () => {
     clearTimeout(timer);
-    status.textContent = 'Saving…';
+    status.textContent = 'Saving draft…';
     timer = window.setTimeout(() => {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); status.textContent = 'All changes saved'; }
-      catch { status.textContent = 'Could not save on this device'; }
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); status.textContent = 'Draft saved on this device. Not published yet.'; }
+      catch { status.textContent = 'Could not save the draft on this device'; }
     }, 250);
   };
 
@@ -93,7 +122,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     const { ci, ii } = where(t);
     if (t.dataset.f === 'cname') state[ci].name = t.value;
     else if (ii > -1) (state[ci].items[ii] as Record<string, string>)[t.dataset.f!] = t.value;
-    save();
+    saveDraft();
   });
 
   // A bare number in the price box becomes pounds: 15 -> £15
@@ -104,7 +133,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     if (/^\d+([.,]\d{1,2})?$/.test(v)) {
       const { ci, ii } = where(t);
       t.value = state[ci].items[ii].price = `£${v.replace(',', '.')}`;
-      save();
+      saveDraft();
     }
   });
 
@@ -122,28 +151,153 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     else if (a === 'cup') swap(state, ci, ci - 1);
     else if (a === 'cdown') swap(state, ci, ci + 1);
     render();
-    save();
+    saveDraft();
     if (a === 'add') root.querySelector<HTMLInputElement>(`[data-c="${ci}"] .item:last-of-type input`)?.focus();
     if (a === 'cadd') { const el = root.querySelector<HTMLInputElement>('.cat:last-of-type .cat__name'); el?.focus(); el?.select(); }
   });
 
   document.getElementById('reset')!.addEventListener('click', () => {
-    if (!confirm('Throw away your changes on this device and go back to the original price list?')) return;
+    if (!confirm('Throw away your unpublished draft on this device and go back to the prices that are on the website now?')) return;
     try { localStorage.removeItem(STORE_KEY); } catch { /* nothing stored */ }
-    state = clone(defaults);
+    state = clone(live);
     render();
-    status.textContent = 'Back to the original list';
+    status.textContent = 'Draft discarded. Showing the published prices.';
   });
 
   document.getElementById('export')!.addEventListener('click', () => {
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(tidy(state), null, 2)], { type: 'application/json' }));
     a.download = 'hampton-barbers-prices.json';
     a.click();
     URL.revokeObjectURL(a.href);
   });
 
-  render();
+  // ---------- Publishing ----------
+  publishBtn.addEventListener('click', async () => {
+    if (!db || !user) return;
+    const out = tidy(state);
+    if (!out.length) { status.textContent = 'Add at least one service before publishing.'; return; }
+    publishBtn.disabled = true;
+    status.textContent = 'Publishing…';
+    try {
+      await user.getIdToken(true);
+      await setDoc(doc(db, 'site', 'menu'), { json: JSON.stringify(out), updatedAt: serverTimestamp() });
+      clearTimeout(timer);
+      try { localStorage.removeItem(STORE_KEY); } catch { /* nothing stored */ }
+      live = clone(out); state = clone(out);
+      render();
+      status.textContent = 'Published. Every visitor now sees these prices.';
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? '';
+      status.textContent = code.includes('permission')
+        ? 'This account is not allowed to change the prices. Ask the developer to add your email.'
+        : 'Publishing failed. Check your internet connection and try again.';
+    }
+    refresh();
+  });
+
+  // ---------- Account ----------
+  const authMessage = (err: unknown) => {
+    const code = (err as { code?: string }).code ?? '';
+    if (/invalid-credential|wrong-password|user-not-found/.test(code)) return 'The email or password is not right.';
+    if (code.includes('email-already-in-use')) return 'That email already has an account. Sign in instead.';
+    if (code.includes('weak-password')) return 'Choose a password with at least 6 characters.';
+    if (code.includes('invalid-email')) return 'That does not look like an email address.';
+    if (code.includes('too-many-requests')) return 'Too many tries. Wait a few minutes and try again.';
+    if (code.includes('operation-not-allowed')) return 'Email sign-in is not switched on in Firebase yet.';
+    return 'That did not work. Check your internet connection and try again.';
+  };
+
+  const drawAccount = (msg = '') => {
+    const note = msg ? `<p class="acct__msg" role="alert">${esc(msg)}</p>` : '';
+    if (!connected) {
+      account.innerHTML = '<p><strong>Not connected.</strong> This copy of the site has no Firebase settings, so drafts stay on this device and cannot be published.</p>';
+    } else if (!user) {
+      account.innerHTML = `
+        <form id="signin" novalidate>
+          <h2>Sign in to publish</h2>
+          <div class="acct__row">
+            <label>Email<input type="email" name="email" autocomplete="username" required /></label>
+            <label>Password<input type="password" name="password" autocomplete="current-password" required minlength="6" /></label>
+          </div>
+          <div class="acct__btns">
+            <button type="submit" class="primary">Sign in</button>
+            <button type="button" data-acct="create">Create my account</button>
+            <button type="button" data-acct="forgot" class="link">Forgot password</button>
+          </div>
+          ${note}
+        </form>`;
+    } else if (!user.emailVerified) {
+      account.innerHTML = `
+        <h2>Confirm your email</h2>
+        <p>We sent a link to <strong>${esc(user.email)}</strong>. Open that email, press the link, then come back and press Continue. Check your spam folder if it is not there.</p>
+        <div class="acct__btns">
+          <button type="button" class="primary" data-acct="continue">Continue</button>
+          <button type="button" data-acct="resend">Send the link again</button>
+          <button type="button" data-acct="out" class="link">Sign out</button>
+        </div>${note}`;
+    } else {
+      account.innerHTML = `<p>Signed in as <strong>${esc(user.email)}</strong>. <button type="button" data-acct="out" class="link">Sign out</button></p>${note}`;
+    }
+    refresh();
+  };
+
+  const creds = () => {
+    const f = document.getElementById('signin') as HTMLFormElement | null;
+    const d = f ? new FormData(f) : null;
+    return { email: String(d?.get('email') ?? '').trim(), password: String(d?.get('password') ?? '') };
+  };
+
+  account.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!auth) return;
+    const { email, password } = creds();
+    if (!email || !password) return drawAccount('Enter your email and password.');
+    try { await signInWithEmailAndPassword(auth, email, password); } catch (err) { drawAccount(authMessage(err)); }
+  });
+
+  account.addEventListener('click', async (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-acct]');
+    if (!b || !auth) return;
+    const act = b.dataset.acct;
+    try {
+      if (act === 'create') {
+        const { email, password } = creds();
+        if (!email || password.length < 6) return drawAccount('Enter your email and a password of at least 6 characters, then press Create my account.');
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await sendEmailVerification(cred.user);
+      } else if (act === 'forgot') {
+        const { email } = creds();
+        if (!email) return drawAccount('Type your email first, then press Forgot password.');
+        await sendPasswordResetEmail(auth, email);
+        drawAccount('If that email has an account, a reset link is on its way.');
+      } else if (act === 'continue' && user) {
+        await user.reload();
+        await user.getIdToken(true);
+        user = auth.currentUser;
+        drawAccount(user?.emailVerified ? '' : 'Not confirmed yet. Press the link in the email first.');
+      } else if (act === 'resend' && user) {
+        await sendEmailVerification(user);
+        drawAccount('Sent. Look for an email from Firebase.');
+      } else if (act === 'out') {
+        await signOut(auth);
+      }
+    } catch (err) { drawAccount(authMessage(err)); }
+  });
+
+  if (auth) onAuthStateChanged(auth, (u) => { user = u; drawAccount(); });
+  else drawAccount();
+
+  // ---------- Start: draft first, otherwise what is on the website now ----------
+  (async () => {
+    const fetched = await fetchLive();
+    if (fetched?.length) live = fetched;
+    let draft: Category[] | null = null;
+    try { const s = localStorage.getItem(STORE_KEY); if (s) draft = JSON.parse(s); } catch { /* ignore a broken draft */ }
+    state = clone(draft ?? live);
+    render();
+    status.textContent = draft ? 'You have an unpublished draft on this device.' : fetched ? 'Showing the published prices.' : 'Showing the built-in prices. Nothing has been published yet.';
+  })();
 </script>
 
 <style is:global>
@@ -152,7 +306,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .adm__top { display: flex; justify-content: space-between; align-items: end; gap: 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; background: #f4f2ee; padding-block: .75rem; border-bottom: 1px solid var(--line); }
   .adm__back { font-size: .9rem; color: #57534a; }
   .adm h1 { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.8rem); letter-spacing: -.04em; margin-top: .35rem; }
-  #status { font-size: .9rem; font-weight: 600; color: #2a7a4b; }
+  .adm h2 { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-weight: 700; font-size: 1.25rem; letter-spacing: -.02em; margin-bottom: .75rem; }
+  .adm__pub { display: grid; justify-items: end; gap: .4rem; }
+  #status { font-size: .9rem; font-weight: 600; color: #2a7a4b; text-align: right; }
   .adm__note { background: #fff7d6; border: 1px solid #e6d68a; border-radius: 10px; padding: .9rem 1.1rem; font-size: .95rem; margin-block: 1.25rem; }
   .adm input, .adm button { font: inherit; }
   .adm input { width: 100%; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; }
@@ -160,8 +316,16 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .adm button { min-height: 2.75rem; padding: .4rem .85rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; cursor: pointer; font-weight: 600; }
   .adm button:hover:not(:disabled) { border-color: #15140f; }
   .adm button:disabled { opacity: .35; cursor: default; }
+  .adm .primary { background: #15140f; color: #fff; border-color: #15140f; padding-inline: 1.2rem; }
+  .adm .primary:disabled { opacity: .4; }
+  .adm .link { border: 0; background: none; text-decoration: underline; padding-inline: .25rem; min-height: 2.75rem; }
   .adm .danger { color: #b3261e; }
   .adm .danger:hover:not(:disabled) { border-color: #b3261e; background: #fdecea; }
+  .acct { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem; margin-top: 1.25rem; }
+  .acct__row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .acct label { display: grid; gap: .3rem; font-size: .85rem; font-weight: 600; }
+  .acct__btns { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .85rem; align-items: center; }
+  .acct__msg { margin-top: .75rem; color: #8a4b00; font-weight: 600; font-size: .95rem; }
   .cat { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem; margin-bottom: 1.25rem; }
   .cat__head { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; }
   .cat__name { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-weight: 700; font-size: 1.35rem !important; letter-spacing: -.02em; }
@@ -182,5 +346,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     .item input[data-f='note'], .item .tools { grid-column: 1 / -1; }
     .item .tools { justify-content: flex-end; }
     .cat__head { flex-wrap: wrap; }
+    .acct__row { grid-template-columns: 1fr; }
+    .adm__pub { justify-items: start; width: 100%; } #status { text-align: left; }
   }
 </style>

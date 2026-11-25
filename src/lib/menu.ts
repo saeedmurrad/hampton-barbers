@@ -4,6 +4,21 @@ import type { Category } from '../data/site';
 
 export const STORE_KEY = 'hb-menu-v1';
 
+// The published price list lives in Firebase (Firestore). Reading it needs no sign-in and no SDK.
+const PROJECT_ID = import.meta.env.PUBLIC_FB_PROJECT_ID as string | undefined;
+export async function fetchLive(): Promise<Category[] | null> {
+  if (!PROJECT_ID) return null;
+  try {
+    const r = await fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/site/menu`);
+    if (!r.ok) return null;
+    const json = (await r.json())?.fields?.json?.stringValue;
+    const cats = json ? JSON.parse(json) : null;
+    return Array.isArray(cats) ? cats : null;
+  } catch {
+    return null;
+  }
+}
+
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 

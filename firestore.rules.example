@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Only these signed-in, email-verified people may change the price list.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['owner@example.com'];
+    }
+    // The published price list: anyone can read it, only admins can change it.
+    match /site/menu {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['json', 'updatedAt'])
+        && request.resource.data.json is string
+        && request.resource.data.json.size() < 20000;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
