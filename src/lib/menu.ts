@@ -1,19 +1,21 @@
 // One place that turns the price list into HTML for each design.
 // Used at build time (for SEO) and in the browser (to show prices edited in the admin page).
+import { parseVisit, type VisitSettings } from './visit';
 import type { Category } from '../data/site';
 
 export const STORE_KEY = 'hb-menu-v1';
 
 // The published price list lives in Firebase (Firestore). Reading it needs no sign-in and no SDK.
 const PROJECT_ID = import.meta.env.PUBLIC_FB_PROJECT_ID as string | undefined;
-export async function fetchLive(): Promise<Category[] | null> {
+export async function fetchLive(): Promise<{ menu: Category[]; visit: VisitSettings } | null> {
   if (!PROJECT_ID) return null;
   try {
     const r = await fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/site/menu`);
     if (!r.ok) return null;
-    const json = (await r.json())?.fields?.json?.stringValue;
+    const fields = (await r.json())?.fields;
+    const json = fields?.json?.stringValue;
     const cats = json ? JSON.parse(json) : null;
-    return Array.isArray(cats) ? cats : null;
+    return Array.isArray(cats) ? { menu: cats, visit: parseVisit(fields?.visit?.stringValue) } : null;
   } catch {
     return null;
   }
@@ -29,8 +31,14 @@ export function renderMenu(design: string, cats: Category[]): string {
       `<li><div class="row"><h4>${esc(i.name)}</h4><i></i><b>${esc(i.price)}</b></div>${i.note ? `<p>${esc(i.note)}</p>` : ''}</li>`).join('')}</ul></section>`).join('');
   }
   if (design === 'fresh') {
-    return live.map((c) => `<section class="pgroup"><h3 class="pgroup__h">${esc(c.name)}</h3><div class="cards">${c.items.map((i) =>
-      `<article class="pc"><b>${esc(i.price)}</b><h4>${esc(i.name)}</h4>${i.note ? `<p>${esc(i.note)}</p>` : ''}</article>`).join('')}</div></section>`).join('');
+    const featuredNames = ['Gents Cut', 'Skin Fade', 'Beard Trim', 'Children 5–15'];
+    const featured = featuredNames.flatMap((name) => live.flatMap((group) => group.items).filter((item) => item.name === name).slice(0, 1));
+    const cards = (items: Category['items']) => `<div class="cards">${items.map((i) =>
+      `<article class="pc"><h4>${esc(i.name)}</h4><b>${esc(i.price)}</b>${i.note ? `<p>${esc(i.note)}</p>` : ''}</article>`).join('')}</div>`;
+    const full = live.map((c) => `<section class="pgroup"><h3 class="pgroup__h">${esc(c.name)}</h3>${cards(c.items)}</section>`).join('');
+    return featured.length
+      ? `<section class="pgroup"><h3 class="pgroup__h">Popular services</h3>${cards(featured)}</section><details class="full-menu"><summary>See the full price list</summary><div>${full}</div></details>`
+      : full;
   }
   if (design === 'street') {
     let n = 0;

@@ -2,10 +2,10 @@
 import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Status from '../components/Status.astro';
+import SpecialHours from '../components/SpecialHours.astro';
 import { site, menu, fmt } from '../data/site';
 import { renderMenu } from '../lib/menu';
 import Map from '../components/Map.astro';
-import tools from '../assets/photos/tools.jpg';
 import shave from '../assets/photos/shave.jpg';
 import cut1 from '../assets/photos/cut-1.jpg';
 import cut2 from '../assets/photos/cut-2.jpg';
@@ -41,7 +41,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
           <Status />
         </div>
         <div class="hero__pic up" style="--i:3">
-          <Image src={tools} alt="Combs and scissors laid out on a towel" widths={[640, 1100, 1600]} sizes="(max-width: 800px) 100vw, 58vw" loading="eager" fetchpriority="high" />
+          <Image src={cut4} alt="A finished skin fade at Hampton Barbers" widths={[640, 1100, 1600]} sizes="(max-width: 800px) 100vw, 58vw" loading="eager" fetchpriority="high" />
           <p class="sticker" aria-hidden="true">No<br />booking<br />needed</p>
         </div>
       </div>
@@ -67,7 +67,8 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
     </section>
 
     <section class="hrs" id="hours">
-      <h2 data-reveal>Open every day</h2>
+      <h2 data-reveal>Opening hours</h2>
+      <SpecialHours />
       <ul class="week">
         {site.hours.map((h, i) => <li data-day={h.day} data-reveal style={`--d:${i}`}><span>{h.short}</span><b>{fmt(h.open)}</b><b>{fmt(h.close)}</b></li>)}
       </ul>
@@ -105,7 +106,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
     .call { display: grid; place-items: center; padding-inline: clamp(1rem, 3vw, 2.25rem); background: var(--accent); color: var(--on-accent); font-weight: 800; text-decoration: none; text-transform: uppercase; letter-spacing: .05em; font-size: .9rem; }
 
     .hero { padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 3.5vw, 3rem) clamp(3rem, 6vw, 5rem); overflow: clip; }
-    .hero h1 { font-size: min(19.5vw, 20rem); display: grid; }
+    .hero h1 { font-size: min(14.5vw, 12rem); display: grid; }
     .hero h1 span { display: block; }
     .hollow { color: transparent; -webkit-text-stroke: clamp(1.5px, .3vw, 4px) var(--accent); }
     .hero__row { display: grid; grid-template-columns: 1fr 1.4fr; gap: clamp(1.5rem, 4vw, 4rem); align-items: end; margin-top: clamp(1.5rem, 3vw, 3rem); }

@@ -16,9 +16,11 @@ service cloud.firestore {
     match /site/menu {
       allow read: if true;
       allow write: if isAdmin()
-        && request.resource.data.keys().hasOnly(['json', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['json', 'visit', 'updatedAt'])
         && request.resource.data.json is string
-        && request.resource.data.json.size() < 20000;
+        && request.resource.data.json.size() < 20000
+        && request.resource.data.get('visit', '') is string
+        && request.resource.data.get('visit', '').size() < 12000;
     }
 
     // Who owns the price list. The first signed-in person to publish creates this record

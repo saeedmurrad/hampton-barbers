@@ -3,24 +3,32 @@ import Base from '../layouts/Base.astro';
 import { designs } from '../data/site';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<Base title="Hampton Barbers admin: prices and categories" description="Edit the Hampton Barbers price list.">
+<Base title="Hampton Barbers admin: prices and shop updates" description="Edit prices, special hours and notices.">
   <main id="main" class="adm">
     <header class="adm__top">
       <div>
         <a class="adm__back" href={`${base}/`}>← All designs</a>
-        <h1>Prices and categories</h1>
+        <h1>Prices and shop updates</h1>
       </div>
       <div class="adm__pub">
-        <p id="status" role="status" aria-live="polite">Loading the price list…</p>
+        <p id="status" role="status" aria-live="polite">Loading prices and shop updates…</p>
         <button type="button" id="publish" class="primary" disabled>Publish to the website</button>
       </div>
     </header>
 
     <section class="acct" id="account" aria-label="Your account"></section>
 
-    <p class="adm__note">Your edits are kept as a <strong>draft on this device</strong> until you press <strong>Publish to the website</strong>. After that every visitor sees the new prices, on any phone or computer.</p>
+    <p class="adm__note">Your edits are kept as a <strong>draft on this device</strong> until you press <strong>Publish to the website</strong>. Visitors see the new prices and shop updates after publication.</p>
 
     <div id="editor"></div>
+
+    <section class="cat" aria-labelledby="visit-settings-title" inert>
+      <h2 id="visit-settings-title">Special hours and shop notice</h2>
+      <p class="visit-help">Add a date for a bank holiday, temporary hours or a closure. Hours use UK local time.</p>
+      <label>Shop notice <textarea id="shop-notice" maxlength="280" rows="2" placeholder="Optional message for the visit section"></textarea></label>
+      <div id="hours-editor"></div>
+      <button type="button" class="add" id="add-hours">+ Add a date</button>
+    </section>
 
     <footer class="adm__foot">
       <div class="adm__see">
@@ -29,7 +37,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       </div>
       <div class="adm__ops">
         <button type="button" id="export">Download price list</button>
-        <button type="button" id="reset" class="danger">Discard my draft</button>
+        <button type="button" id="reset" class="danger">Discard my drafts</button>
       </div>
     </footer>
   </main>
@@ -38,6 +46,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 <script>
   import { menu as defaults, type Category } from '../data/site';
   import { STORE_KEY, fetchLive } from '../lib/menu';
+  import { parseVisit, validOverride, VISIT_DRAFT_KEY, type HoursOverride } from '../lib/visit';
   import { initializeApp } from 'firebase/app';
   import { getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, type User } from 'firebase/auth';
   import { getFirestore, connectFirestoreEmulator, doc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
@@ -69,24 +78,69 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
   let state: Category[] = clone(defaults);
   let live: Category[] = clone(defaults);
+  const notice = document.getElementById('shop-notice') as HTMLTextAreaElement;
+  const hoursEditor = document.getElementById('hours-editor')!;
+  let liveVisit = parseVisit();
+  let visit = parseVisit();
   let user: User | null = null;
-  const hasDraft = () => { try { return localStorage.getItem(STORE_KEY) !== null; } catch { return false; } };
-  const canPublish = () => Boolean(user);
+  let ready = false;
+  let publishing = false;
+  const canPublish = () => Boolean(user) && ready && !publishing;
 
   const refresh = () => {
     publishBtn.disabled = !canPublish();
-    publishBtn.title = canPublish() ? '' : 'Sign in first';
+    publishBtn.title = user ? '' : 'Sign in first';
   };
 
-  let timer: number | undefined;
   const saveDraft = () => {
-    clearTimeout(timer);
-    status.textContent = 'Saving draft…';
-    timer = window.setTimeout(() => {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); status.textContent = 'Draft saved on this device. Not published yet.'; }
-      catch { status.textContent = 'Could not save the draft on this device'; }
-    }, 250);
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      localStorage.setItem(VISIT_DRAFT_KEY, JSON.stringify(visit));
+      status.textContent = 'Draft saved on this device. Not published yet.';
+    } catch {
+      status.textContent = 'Could not save the draft on this device';
+    }
   };
+
+  const drawHours = () => {
+    notice.value = visit.notice;
+    hoursEditor.innerHTML = visit.overrides.map((entry, index) => `
+      <fieldset class="special-row" data-hour-index="${index}">
+        <legend>Special date ${index + 1}</legend>
+        <label>Date<input type="date" data-hour-field="date" value="${esc(entry.date)}" /></label>
+        <label>Opens<input type="time" data-hour-field="open" value="${esc(entry.open)}" ${entry.closed ? 'disabled' : ''} /></label>
+        <label>Closes<input type="time" data-hour-field="close" value="${esc(entry.close)}" ${entry.closed ? 'disabled' : ''} /></label>
+        <label class="closed-toggle"><input type="checkbox" data-hour-field="closed" ${entry.closed ? 'checked' : ''} /> Closed all day</label>
+        <button type="button" class="danger" data-remove-hours>Remove<span class="sr"> date ${index + 1}</span></button>
+      </fieldset>`).join('');
+  };
+  notice.addEventListener('input', () => { visit.notice = notice.value; saveDraft(); });
+  document.getElementById('add-hours')!.addEventListener('click', () => {
+    visit.overrides.push({ date: '', open: '09:00', close: '20:00', closed: false });
+    drawHours();
+    saveDraft();
+    hoursEditor.querySelector<HTMLInputElement>('.special-row:last-child input')?.focus();
+  });
+  hoursEditor.addEventListener('input', (event) => {
+    const input = event.target as HTMLInputElement;
+    const row = input.closest<HTMLElement>('[data-hour-index]')!;
+    const entry = visit.overrides[Number(row.dataset.hourIndex)];
+    const field = input.dataset.hourField as keyof HoursOverride;
+    if (field === 'closed') {
+      entry.closed = input.checked;
+      row.querySelectorAll<HTMLInputElement>('input[type=time]').forEach((time) => { time.disabled = entry.closed; });
+    } else entry[field] = input.value;
+    saveDraft();
+  });
+  hoursEditor.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest('[data-remove-hours]');
+    if (!button) return;
+    const row = button.closest<HTMLElement>('[data-hour-index]')!;
+    visit.overrides.splice(Number(row.dataset.hourIndex), 1);
+    drawHours();
+    saveDraft();
+    document.getElementById('add-hours')?.focus();
+  });
 
   const render = () => {
     root.innerHTML = state.map((c, ci) => `
@@ -162,11 +216,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   });
 
   document.getElementById('reset')!.addEventListener('click', () => {
-    if (!confirm('Throw away your unpublished draft on this device and go back to the prices that are on the website now?')) return;
-    try { localStorage.removeItem(STORE_KEY); } catch { /* nothing stored */ }
+    if (!confirm('Discard unpublished changes to prices, special hours and the shop notice on this device?')) return;
+    try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(VISIT_DRAFT_KEY); } catch { /* nothing stored */ }
     state = clone(live);
+    visit = structuredClone(liveVisit);
     render();
-    status.textContent = 'Draft discarded. Showing the published prices.';
+    drawHours();
+    status.textContent = 'Drafts discarded. Showing the published prices and shop updates.';
   });
 
   document.getElementById('export')!.addEventListener('click', () => {
@@ -179,12 +235,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
   // ---------- Publishing ----------
   publishBtn.addEventListener('click', async () => {
-    if (!db || !user) return;
+    if (!db || !user || !canPublish()) return;
+    const publisher = user;
     const out = tidy(state);
     if (!out.length) { status.textContent = 'Add at least one service before publishing.'; return; }
-    publishBtn.disabled = true;
+    const nextVisit = structuredClone(visit);
+    nextVisit.notice = nextVisit.notice.trim();
+    if (!nextVisit.overrides.every(validOverride)) {
+      status.textContent = 'Enter a date and valid opening hours for each row, or mark it closed.';
+      return;
+    }
+    if (new Set(nextVisit.overrides.map(({ date }) => date)).size !== nextVisit.overrides.length) {
+      status.textContent = 'Use one entry per special date.';
+      return;
+    }
+    publishing = true;
+    refresh();
+    const locked = [root, notice.closest<HTMLElement>('section')!, document.querySelector<HTMLElement>('.adm__foot')!];
+    locked.forEach((element) => { element.inert = true; });
     status.textContent = 'Publishing…';
-    const write = () => setDoc(doc(db, 'site', 'menu'), { json: JSON.stringify(out), updatedAt: serverTimestamp() });
+    const write = () => setDoc(doc(db, 'site', 'menu'), { json: JSON.stringify(out), ...(nextVisit.notice || nextVisit.overrides.length ? { visit: JSON.stringify(nextVisit) } : {}), updatedAt: serverTimestamp() });
     const denied = (err: unknown) => String((err as { code?: string }).code ?? '').includes('permission');
     try {
       try {
@@ -192,19 +262,22 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       } catch (err) {
         if (!denied(err)) throw err;
         // Nobody owns the price list yet: claim it for this account, then publish.
-        await setDoc(doc(db, 'site', 'owner'), { uid: user.uid });
+        await setDoc(doc(db, 'site', 'owner'), { uid: publisher.uid });
         await write();
       }
-      clearTimeout(timer);
-      try { localStorage.removeItem(STORE_KEY); } catch { /* nothing stored */ }
+      try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(VISIT_DRAFT_KEY); } catch { /* nothing stored */ }
       live = clone(out); state = clone(out);
+      liveVisit = structuredClone(nextVisit); visit = structuredClone(nextVisit);
       render();
-      status.textContent = 'Published. Every visitor now sees these prices.';
+      drawHours();
+      status.textContent = 'Published prices and shop updates.';
     } catch (err) {
       status.textContent = denied(err)
         ? 'This account is not allowed to change the prices. Sign in with the account that set this up.'
         : 'Publishing failed. Check your internet connection and try again.';
     }
+    publishing = false;
+    locked.forEach((element) => { element.inert = false; });
     refresh();
   });
 
@@ -286,12 +359,25 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   // ---------- Start: draft first, otherwise what is on the website now ----------
   (async () => {
     const fetched = await fetchLive();
-    if (fetched?.length) live = fetched;
+    if (fetched?.menu.length) live = fetched.menu;
+    if (fetched) liveVisit = fetched.visit;
     let draft: Category[] | null = null;
-    try { const s = localStorage.getItem(STORE_KEY); if (s) draft = JSON.parse(s); } catch { /* ignore a broken draft */ }
+    let visitDraft: string | null = null;
+    try { const s = localStorage.getItem(STORE_KEY); if (s) draft = JSON.parse(s); visitDraft = localStorage.getItem(VISIT_DRAFT_KEY); } catch { /* ignore a broken draft */ }
     state = clone(draft ?? live);
+    visit = structuredClone(liveVisit);
+    if (visitDraft) {
+      try {
+        const saved = JSON.parse(visitDraft);
+        if (Array.isArray(saved?.overrides) && typeof saved.notice === 'string') visit = saved;
+      } catch { /* ignore a broken draft */ }
+    }
     render();
-    status.textContent = draft ? 'You have an unpublished draft on this device.' : fetched ? 'Showing the published prices.' : 'Showing the built-in prices. Nothing has been published yet.';
+    drawHours();
+    notice.closest('section')!.inert = false;
+    ready = true;
+    refresh();
+    status.textContent = draft || visitDraft ? 'You have an unpublished draft on this device.' : fetched ? 'Showing the published prices.' : 'Showing the built-in prices. Nothing has been published yet.';
   })();
 </script>
 
@@ -305,6 +391,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .adm__pub { display: grid; justify-items: end; gap: .4rem; }
   #status { font-size: .9rem; font-weight: 600; color: #2a7a4b; text-align: right; }
   .adm__note { background: #fff7d6; border: 1px solid #e6d68a; border-radius: 10px; padding: .9rem 1.1rem; font-size: .95rem; margin-block: 1.25rem; }
+  .adm textarea { width: 100%; font: inherit; padding: .75rem; border: 1px solid var(--line); border-radius: 8px; }
+  .visit-help { margin-bottom: .9rem; }
+  .special-row { display: flex; flex-wrap: wrap; gap: .7rem; align-items: end; border: 1px solid var(--line); margin: .7rem 0; }
+  .special-row label { display: grid; flex: 1 1 8rem; }
+  .special-row .closed-toggle { display: flex; align-items: center; gap: .35rem; }
+  .special-row input[type=checkbox] { width: 1rem; min-height: 1rem; }
   .adm input, .adm button { font: inherit; }
   .adm input { width: 100%; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; }
   .adm input:focus-visible { outline: 3px solid #2f6fed; outline-offset: 1px; border-color: #2f6fed; }

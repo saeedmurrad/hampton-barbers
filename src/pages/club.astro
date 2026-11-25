@@ -2,11 +2,11 @@
 import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Status from '../components/Status.astro';
+import SpecialHours from '../components/SpecialHours.astro';
 import Hours from '../components/Hours.astro';
 import { site, menu } from '../data/site';
 import { renderMenu } from '../lib/menu';
 import Map from '../components/Map.astro';
-import shave from '../assets/photos/shave.jpg';
 import shopfront from '../assets/photos/shopfront.jpg';
 import cut2 from '../assets/photos/cut-2.jpg';
 import cut4 from '../assets/photos/cut-4.jpg';
@@ -17,19 +17,19 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 <Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough" design="club" themeColor="#0f2a22">
   <header class="top wrap">
     <a class="name" href="#top">Hampton <em>Barbers</em></a>
-    <nav aria-label="Main"><a href="#about">About</a><a href="#menu">Prices</a><a href="#visit">Visit</a></nav>
+    <nav aria-label="Main"><a href="#about">About</a><a href="#prices">Prices</a><a href="#visit">Visit</a></nav>
     <a class="phone" href={site.phoneHref}>{site.phone}</a>
   </header>
 
   <main id="main">
     <section class="hero wrap">
-      <div class="hero__arch up"><Image src={shave} alt="A barber giving a customer a cut throat shave" widths={[480, 800, 1200]} sizes="(max-width: 860px) 100vw, 44vw" loading="eager" fetchpriority="high" quality={72} /></div>
+      <div class="hero__arch up"><Image src={cut4} alt="A finished skin fade" widths={[480, 800, 1200]} sizes="(max-width: 860px) 100vw, 44vw" loading="eager" fetchpriority="high" quality={72} /></div>
       <div class="hero__text">
         <p class="small-caps up" style="--i:1">Hampton Vale, Peterborough. Est. {site.since}.</p>
         <h1 class="up" style="--i:2">A proper cut, <em>every time.</em></h1>
-        <p class="up" style="--i:3">Unhurried barbering from people who have been doing it for years. There is no booking system and no waiting list. Come in when it suits you.</p>
-        <div class="btns up" style="--i:4"><a class="btn" href={site.phoneHref}>Call the shop</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Get directions</a></div>
+        <p class="up" style="--i:3">Walk in during opening hours for a haircut, skin fade or beard trim. We’ll see you as soon as a chair is free.</p>
         <Status class="up" />
+        <div class="btns up" style="--i:4"><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href="#prices">View prices</a></div>
       </div>
       <div class="stamp" aria-hidden="true">
         <svg viewBox="0 0 100 100"><defs><path id="ring" d="M50,50 m-39,0 a39,39 0 1,1 78,0 a39,39 0 1,1 -78,0" /></defs><text><textPath href="#ring">Walk-ins welcome · Seven days a week · </textPath></text></svg>
@@ -50,7 +50,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
       </div>
     </section>
 
-    <section class="menu wrap" id="menu">
+    <section class="menu wrap" id="prices">
       <div class="paper" data-reveal>
         <h2>The price list</h2>
         <div class="groups" data-menu="club" set:html={renderMenu('club', menu)} />
@@ -69,6 +69,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
         <h2>Come and see us</h2>
         <address>{site.address.street}, {site.address.locality}, {site.address.city} {site.address.postcode}</address>
         <p class="note">Public parking is directly opposite the shop.</p>
+        <SpecialHours />
         <Hours />
         <div class="btns"><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
       </div>
@@ -97,7 +98,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 
     .hero { position: relative; display: grid; grid-template-columns: .85fr 1fr; gap: clamp(2rem, 6vw, 6rem); align-items: center; padding-block: clamp(1rem, 3vw, 2.5rem) clamp(4rem, 8vw, 7rem); }
     .hero__arch { border-radius: 999px 999px 18px 18px; overflow: hidden; aspect-ratio: 4 / 5; max-height: 78svh; }
-    .hero__arch img { width: 100%; height: 100%; object-fit: cover; object-position: 40% 30%; animation: drift 18s ease-out both; }
+    .hero__arch img { width: 100%; height: 100%; object-fit: cover; object-position: 48% 42%; }
     .hero__text { display: grid; gap: 1.6rem; justify-items: start; }
     .small-caps { font-size: .8rem; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
     .hero h1 { font-size: clamp(3rem, 7.4vw, 6.8rem); line-height: .98; }
@@ -151,12 +152,11 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
     @media (max-width: 860px) {
       .top nav { display: none; }
       .hero, .about, .visit { grid-template-columns: 1fr; }
-      .hero__arch { max-height: 60svh; }
+      .hero__arch { grid-row: 2; max-height: 48svh; }
       .stamp { left: auto; right: 1rem; top: 1rem; bottom: auto; }
       .groups { grid-template-columns: 1fr; }
       .visit__round { width: 70%; margin-inline: auto; }
     }
   }
   @keyframes turn { to { transform: rotate(360deg); } }
-  @keyframes drift { from { transform: scale(1.15); } to { transform: scale(1); } }
 </style>

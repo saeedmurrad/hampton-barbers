@@ -13,7 +13,7 @@ interface Props { title: string; description?: string; design?: string; themeCol
 const { title, description = site.description, design, themeColor = '#12100e' } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
-const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const canonical = new URL(!isDemo && design ? `${base}/` : Astro.url.pathname, Astro.site).href;
 const n = designs.findIndex((d) => d.id === design);
 const prev = designs[(n + designs.length - 1) % designs.length];
 const next = designs[(n + 1) % designs.length];
@@ -43,7 +43,7 @@ const jsonLd = {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    {isDemo && <meta name="robots" content="noindex" />}
+    {(isDemo || Astro.url.pathname.endsWith('/admin/') || Boolean(design && Astro.url.pathname !== `${base}/`)) && <meta name="robots" content="noindex" />}
     <meta name="theme-color" content={themeColor} />
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
     <meta property="og:type" content="website" />
@@ -58,7 +58,7 @@ const jsonLd = {
   <body class={design} id="top">
     <a class="skip" href="#main">Skip to content</a>
     <slot />
-    {design && <div class="bar"><a href={site.phoneHref}>Call the shop</a><a href={site.directionsUrl} rel="noopener">Directions</a></div>}
+    {design && <nav class="bar" aria-label="Quick contact"><a href={site.phoneHref}>Call the shop</a><a href={site.directionsUrl} rel="noopener">Directions</a></nav>}
     {isDemo && design && (
       <nav class="designs" aria-label="Design options">
         <a href={`${base}/${prev.id}/`} aria-label={`Previous design: ${prev.name}`}>‹</a>
@@ -71,49 +71,52 @@ const jsonLd = {
     <script>
       import { renderMenu, STORE_KEY, fetchLive } from '../lib/menu';
 
-      // Price list: an unpublished draft on this device wins (so the admin can preview it),
-      // otherwise the published list from Firebase replaces the built-in one.
+      import { parseVisit, renderVisit, VISIT_DRAFT_KEY } from '../lib/visit';
+
       const priceHost = document.querySelector<HTMLElement>('[data-menu]');
       if (priceHost) {
-        const show = (cats: unknown) => {
-          const html = renderMenu(priceHost.dataset.menu!, cats as never);
-          if (html && html !== priceHost.innerHTML) priceHost.innerHTML = html;
+        let menuDraft: string | null = null;
+        let visitDraft: string | null = null;
+        let settings = parseVisit();
+        try {
+          menuDraft = localStorage.getItem(STORE_KEY);
+          visitDraft = localStorage.getItem(VISIT_DRAFT_KEY);
+        } catch { /* storage blocked */ }
+
+        const showMenu = (menu: Parameters<typeof renderMenu>[1]) => {
+          const html = renderMenu(priceHost.dataset.menu!, menu);
+          if (html && html !== priceHost.innerHTML) {
+            const expanded = priceHost.querySelector<HTMLDetailsElement>('details')?.open;
+            priceHost.innerHTML = html;
+            if (expanded) priceHost.querySelector('details')?.setAttribute('open', '');
+          }
         };
-        let draft: string | null = null;
-        try { draft = localStorage.getItem(STORE_KEY); } catch { /* storage blocked */ }
-        if (draft) {
-          try {
-            show(JSON.parse(draft));
-            const note = document.createElement('p');
-            note.className = 'draftnote';
-            note.textContent = 'You are seeing your unpublished draft prices.';
-            document.body.append(note);
-          } catch { /* broken draft: keep the built-in list */ }
-        } else {
-          fetchLive().then((cats) => { if (cats) show(cats); });
+        if (menuDraft) {
+          try { showMenu(JSON.parse(menuDraft)); } catch { menuDraft = null; }
         }
+        if (visitDraft) settings = parseVisit(visitDraft);
+        if (menuDraft || visitDraft) {
+          const note = document.createElement('p');
+          note.className = 'draftnote';
+          note.textContent = 'You are seeing an unpublished draft on this device.';
+          document.body.append(note);
+        }
+
+        renderVisit(settings);
+        fetchLive().then((live) => {
+          if (!live) return;
+          if (!menuDraft) showMenu(live.menu);
+          if (!visitDraft) {
+            settings = live.visit;
+            renderVisit(settings);
+          }
+        });
+        window.setInterval(() => renderVisit(settings), 30_000);
       }
 
       // Scroll reveals
       const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -6% 0px', threshold: 0.08 });
       document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
-
-      // Open / closed status and today's row (shop time = Europe/London)
-      const pills = document.querySelectorAll<HTMLElement>('[data-hours]');
-      if (pills.length) {
-        const hours: { day: number; open: string; close: string }[] = JSON.parse(pills[0].dataset.hours!);
-        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
-        const get = (t: string) => parts.find((p) => p.type === t)!.value;
-        const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
-        const now = `${get('hour')}:${get('minute')}`;
-        const today = hours.find((h) => h.day === day)!;
-        const next = hours.find((h) => h.day === (day + 1) % 7)!;
-        const open = now >= today.open && now < today.close;
-        const f = (t: string) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`; };
-        const text = open ? `Open now, until ${f(today.close)}` : now < today.open ? `Closed, opens ${f(today.open)} today` : `Closed, opens ${f(next.open)} tomorrow`;
-        pills.forEach((el) => { el.dataset.open = String(open); el.querySelector('span')!.textContent = text; });
-        document.querySelectorAll(`[data-day="${day}"]`).forEach((el) => el.setAttribute('data-today', ''));
-      }
 
     </script>
   </body>

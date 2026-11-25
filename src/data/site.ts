@@ -38,14 +38,14 @@ export type Item = { name: string; price: string; note: string };
 export type Category = { name: string; items: Item[] };
 export const menu: Category[] = [
   { name: 'Cuts', items: [
-    { name: 'Gents Cut', price: '£14', note: 'Scissors or clippers, however you like it.' },
-    { name: 'Skin Fade', price: '£16', note: 'Under 15s £13.' },
+    { name: 'Gents Cut', price: '£14', note: 'A classic scissor or clipper cut. Tell us how you like the length and finish.' },
+    { name: 'Skin Fade', price: '£16', note: 'A fade blended down to skin at the sides and back. Under 15s £13.' },
     { name: 'Gents Cut with Cut Throat', price: '£16', note: 'Edges finished with the razor.' },
     { name: 'Wash & Cut', price: '£18', note: 'Shampoo, cut and style.' },
     { name: 'Crew Cut', price: '£8', note: 'One grade all over.' },
   ] },
   { name: 'Beards', items: [
-    { name: 'Beard Trim', price: '£8', note: 'Shaped, lined up and tidied.' },
+    { name: 'Beard Trim', price: '£8', note: 'Trim and shape the beard, with a tidy outline.' },
   ] },
   { name: 'Family and concessions', items: [
     { name: 'Father & Son', price: '£18', note: 'Monday to Thursday in term time, child under 15.' },
@@ -57,7 +57,7 @@ export const menu: Category[] = [
 
 export const designs = [
   { id: 'heritage', name: 'Heritage', blurb: 'Traditional and centred, like a printed barber’s card. Charcoal and brass.' },
-  { id: 'fresh', name: 'Fresh', blurb: 'Light and friendly. Rounded tiles that put hours, rating and address up front.' },
+  { id: 'fresh', name: 'Fresh', blurb: 'A modern walk-in homepage with bold photography, a style gallery and easy directions.' },
   { id: 'street', name: 'Street', blurb: 'Loud black-and-lime poster with giant type. Aimed at a younger crowd.' },
   { id: 'club', name: 'Club', blurb: 'Calm and upmarket. Green and cream, arched photos, a menu-style price list.' },
 ];
