@@ -23,6 +23,15 @@ service cloud.firestore {
         && request.resource.data.get('visit', '').size() < 12000;
     }
 
+    // Live shop status (how busy the shop is): anyone can read it, only admins can change it.
+    match /site/live {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['json', 'updatedAt'])
+        && request.resource.data.json is string
+        && request.resource.data.json.size() < 6000;
+    }
+
     // Who owns the price list. The first signed-in person to publish creates this record
     // and becomes the owner. After that it cannot be replaced or deleted.
     match /site/owner {

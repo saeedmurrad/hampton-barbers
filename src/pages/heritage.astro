@@ -7,6 +7,9 @@ import Hours from '../components/Hours.astro';
 import { site, menu } from '../data/site';
 import { renderMenu } from '../lib/menu';
 import Map from '../components/Map.astro';
+import LiveNow from '../components/LiveNow.astro';
+import LiveChip from '../components/LiveChip.astro';
+import Reviews from '../components/Reviews.astro';
 import StyleGallery from '../components/StyleGallery.astro';
 import ShopPhotos from '../components/ShopPhotos.astro';
 import shave from '../assets/photos/shave.jpg';
@@ -32,11 +35,14 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
         <p class="place up">Hampton Vale, Peterborough</p>
         <span class="rule up" aria-hidden="true"></span>
         <h1 class="up" style="--i:1">Walk-in barbers <em>in Hampton Vale</em></h1>
+        <LiveChip design="heritage" class="up" />
         <p class="sub up" style="--i:2">No appointment required. Come in during opening hours and we’ll see you as soon as a chair is free.</p>
         <div class="btns up" style="--i:3"><a class="btn" href={site.phoneHref}>Call {site.phone}</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Get directions</a></div>
         <Status class="up" />
       </div>
     </section>
+
+    <LiveNow design="heritage" title="How busy are we right now?" />
 
     <section class="story wrap" id="story">
       <div class="story__img" data-reveal="img"><Image src={shopfront} alt="The Hampton Barbers shop front on Four Chimneys Crescent" widths={[360, 640]} sizes="(max-width: 900px) 90vw, 25vw" /></div>
@@ -69,11 +75,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
       <StyleGallery variant="heritage" />
     </section>
 
-    <section class="praise wrap" data-reveal>
-      <p class="praise__stars" aria-hidden="true">★★★★☆</p>
-      <blockquote>“Been going here since I was 7 years old, 25 now.”</blockquote>
-      <p>Rated {site.rating.value} out of 5 from {site.rating.count} reviews on Google. <a href={site.reviewsUrl} rel="noopener">Read them</a></p>
-    </section>
+    <Reviews design="heritage" title="Kind words from our customers" />
 
     <section class="visit" id="visit">
       <div class="wrap visit__in">

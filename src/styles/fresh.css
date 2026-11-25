@@ -119,3 +119,33 @@ body.fresh {
 .fresh-gallery figure:hover { transform: rotate(-1.5deg) scale(1.03); transition: transform .4s cubic-bezier(.34,1.56,.64,1); }
 .fresh-shopphotos { margin-block: 1.5rem; grid-template-columns: repeat(2, 1fr); }
 .fresh-shopphotos img { border-radius: 18px; }
+
+/* ---------- Fresh: bright and playful, clearly different from Club ---------- */
+body.fresh { --forest: #1d3a8f; --lime: #ffd23f; --accent: #e4472b; --on-accent: #fff; --bg: #fff8ee; --paper: #fff8ee; --line: #ecdcc6; background: #fff8ee; }
+.fresh-nav, .fresh-hero { background: #fff1dc; color: #16130f; --text: #16130f; --muted: #5b5446; --accent: #e4472b; --on-accent: #fff; }
+.fresh-nav__inner { border-bottom-color: #16130f1f; }
+.fresh-brand > span { border-color: #16130f40; } .fresh-brand > span span { color: #e4472b; }
+.fresh-hero .fresh-kicker { color: #1d3a8f; }
+.fresh-hero h1 { letter-spacing: -.055em; }
+.fresh-hero h1 em { font-family: var(--display); font-style: normal; font-weight: 800; color: #16130f; background: linear-gradient(transparent 58%, #ffd23f 58%, #ffd23f 90%, transparent 90%); padding-inline: .05em; }
+.fresh-intro { color: #4a4538; }
+.fresh-hero__grid { grid-template-columns: 1.1fr .9fr; }
+.fresh-hero__photo { border-radius: 1.8rem; aspect-ratio: 4 / 5; max-height: 34rem; background: #fff; border: .55rem solid #fff; box-shadow: 0 34px 60px -28px #6b3b1aa6; transform: rotate(2.5deg); overflow: visible; }
+.fresh-hero__photo img { border-radius: 1.3rem; }
+.fresh-hero__photo figcaption { inset: auto .8rem .8rem; border-radius: 999px; padding: .6rem 1rem; background: #fff; color: #16130f; font-size: .85rem; box-shadow: 0 8px 20px #0002; }
+.fresh-sticker { position: absolute; top: -1.4rem; left: -1.6rem; width: 6.4rem; aspect-ratio: 1; display: grid; place-items: center; text-align: center; border-radius: 50%; background: #1d3a8f; color: #ffd23f; font: 800 .95rem/1.05 var(--display); transform: rotate(-12deg); box-shadow: 0 10px 25px #1d3a8f55; animation: fresh-wiggle 4s ease-in-out infinite; }
+@keyframes fresh-wiggle { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(-4deg) scale(1.06); } }
+.fresh-work { background: #ffe6cc; }
+.fresh .pc { background: #fff; border-color: #f0dcc2; }
+.fresh .pc:hover { border-color: #e4472b; box-shadow: 0 14px 30px #e4472b22; }
+.fresh .pc b { color: #e4472b; }
+.fresh-filters button { border-color: #d9b48f; }
+.fresh-filters button[aria-pressed=true], .fresh-filters button:hover { background: #e4472b; color: #fff; border-color: #e4472b; }
+.fresh .btn { border-radius: 999px; }
+.fresh-hero .btn:not(.btn--line) { background: #e4472b; color: #fff; border-color: #e4472b; box-shadow: 0 10px 22px -10px #e4472b; }
+.fresh-visit, .fresh-footer { --accent: #ffd23f; --on-accent: #16130f; }
+@media (max-width: 720px) {
+  .fresh-hero__grid { grid-template-columns: 1fr; }
+  .fresh-hero__photo { max-height: 24rem; aspect-ratio: 4 / 3.6; transform: rotate(1.5deg); margin: 1rem .6rem 0; }
+  .fresh-sticker { width: 5rem; font-size: .78rem; top: -1.2rem; left: -.6rem; }
+}

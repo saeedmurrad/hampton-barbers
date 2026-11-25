@@ -41,7 +41,7 @@ for (const vp of [{ width: 390, height: 844, isMobile: true, hasTouch: true }, {
         const r = h.getBoundingClientRect(); if (!r.height) continue;
         const sib = h.nextElementSibling; if (!sib) continue;
         const s = sib.getBoundingClientRect();
-        if (s.height && s.top < r.bottom - 4) out.push('heading overlapped by next element: ' + name(h));
+        if (s.height && s.top < r.bottom - 4 && s.left < r.right - 4 && s.right > r.left + 4) out.push('heading overlapped by next element: ' + name(h));
       }
       return out;
     });

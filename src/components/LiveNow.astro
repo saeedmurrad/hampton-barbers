@@ -1,0 +1,75 @@
+---
+// "Right now at Hampton Barbers": live wait time, free chairs and queue.
+import { site } from '../data/site';
+import { LIVE_DEMO, viewOf, agoText, chairsHtml, queueHtml } from '../lib/live';
+interface Props { design: 'heritage' | 'fresh' | 'street' | 'club'; title?: string; }
+const { design, title = 'Right now at Hampton Barbers' } = Astro.props;
+const s = LIVE_DEMO[design];
+const v = viewOf(s);
+const steps = ['Quiet', 'Short wait', 'Busy', 'Very busy'];
+---
+<section class:list={['live', `live--${design}`]} id="live" data-live-root={design} data-level={v.level} aria-labelledby="live-title">
+  <div class="live__in">
+    <header class="live__head">
+      <p class="live__badge"><i aria-hidden="true"></i>Live</p>
+      <h2 id="live-title">{title}</h2>
+      <p class="live__ago" data-live="ago">{agoText(s.updatedAt)}</p>
+    </header>
+
+    <div class="live__grid">
+      <div class="live__wait" aria-live="polite">
+        <p class="live__label" data-live="label">{v.label}</p>
+        <p class="live__big"><b data-live="headline">{v.headline}</b><small data-live="unit">{v.unit}</small></p>
+        <p class="live__range">Estimated wait: <span data-live="range">{v.range}</span></p>
+        <div class="live__meter" data-live-meter role="img" aria-label="How busy the shop is">
+          {steps.map((t, i) => <i class:list={[{ on: v.level > 0 && i < v.level }]}><span>{t}</span></i>)}
+        </div>
+        <p class="live__note" data-live="note" hidden={!v.note}>{v.note}</p>
+      </div>
+
+      <div class="live__floor">
+        <div class="live__block">
+          <h3>Barber chairs</h3>
+          <ul class="live__chairs" data-live-chairs set:html={chairsHtml(v)} />
+        </div>
+        <div class="live__block">
+          <h3>Waiting</h3>
+          <ul class="live__queue" data-live-queue set:html={queueHtml(v)} />
+        </div>
+        <dl class="live__stats">
+          <div><dt>Barbers cutting</dt><dd data-live="barbers">{v.barbers}</dd></div>
+          <div><dt>Chairs free</dt><dd data-live="free">{v.freeChairs}</dd></div>
+          <div><dt>People waiting</dt><dd data-live="waiting">{v.waiting}</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <footer class="live__foot">
+      <p>A rough guide set by the shop. Walk-ins are seen in order.</p>
+      <div class="btns"><a class="btn" href={site.phoneHref}>Call before you come</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Directions</a></div>
+    </footer>
+  </div>
+</section>
+
+<script>
+  import { LIVE_KEY, LIVE_DEMO, parseLiveAll, fetchLiveStatus, paintLive, type LiveAll } from '../lib/live';
+  document.querySelectorAll<HTMLElement>('[data-live-root]').forEach(async (root) => {
+    if (root.closest('[data-live-preview]')) return; // admin preview is driven by the admin page
+    const d = root.dataset.liveRoot!;
+    let local: LiveAll | null = null;
+    let live: LiveAll | null = null;
+    try { local = parseLiveAll(localStorage.getItem(LIVE_KEY)); } catch { /* storage blocked */ }
+    // Use whichever copy was updated most recently: this device's admin edits or the published one.
+    const show = () => {
+      const a = local?.[d], b = live?.[d];
+      const pick = a && b ? ((a.updatedAt ?? 0) >= (b.updatedAt ?? 0) ? a : b) : a ?? b ?? LIVE_DEMO[d];
+      paintLive(root, pick);
+    };
+    show();
+    const refresh = async () => { const got = await fetchLiveStatus(); if (got) { live = got; show(); } };
+    refresh();
+    setInterval(() => { refresh(); show(); }, 60_000);
+    // When the admin page is open in another tab on this device, follow its changes instantly.
+    addEventListener('storage', (e) => { if (e.key === LIVE_KEY) { local = parseLiveAll(e.newValue); show(); } });
+  });
+</script>

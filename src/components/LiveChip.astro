@@ -1,0 +1,13 @@
+---
+// Compact live status for the first screen. Tapping it jumps to the full panel.
+import { LIVE_DEMO, viewOf } from '../lib/live';
+interface Props { design: 'heritage' | 'fresh' | 'street' | 'club'; class?: string; }
+const { design, class: cls } = Astro.props;
+const v = viewOf(LIVE_DEMO[design]);
+---
+<a class:list={['lchip', `lchip--${design}`, cls]} href="#live" data-live-root={design} data-level={v.level} aria-label="Live wait time. See how busy the shop is right now">
+  <span class="lchip__live"><i aria-hidden="true"></i>Live</span>
+  <span class="lchip__wait"><b data-live="headline">{v.headline}</b><small data-live="unit">{v.unit}</small></span>
+  <span class="lchip__meta"><strong data-live="label">{v.label}</strong><span><span data-live="free">{v.freeChairs}</span> free · <span data-live="waiting">{v.waiting}</span> waiting</span></span>
+  <span class="lchip__go" aria-hidden="true">→</span>
+</a>

@@ -7,6 +7,9 @@ import SpecialHours from './SpecialHours.astro';
 import Map from './Map.astro';
 import { site, menu, styles } from '../data/site';
 import ShopPhotos from './ShopPhotos.astro';
+import LiveNow from './LiveNow.astro';
+import LiveChip from './LiveChip.astro';
+import Reviews from './Reviews.astro';
 import { renderMenu } from '../lib/menu';
 import shopfront from '../assets/photos/shopfront.jpg';
 import shave from '../assets/photos/shave.jpg';
@@ -44,16 +47,20 @@ const faq = [
         <div class="fresh-hero__copy pop">
           <p class="fresh-kicker">Hampton Vale, Peterborough</p>
           <h1>Good hair.<br /> <em>No appointment.</em></h1>
+          <LiveChip design="fresh" />
           <p class="fresh-intro">Walk-in haircuts, skin fades and beard trims. Your neighbourhood barbers since {site.since}.</p>
           <Status />
           <div class="btns"><a class="btn" href={site.directionsUrl}>Get directions</a><a class="btn btn--line" href="#prices">View prices</a></div>
         </div>
         <figure class="fresh-hero__photo up">
-          <Image src={cut4} alt="A finished skin fade at Hampton Barbers" widths={[480, 760, 1100]} sizes="(max-width: 720px) 92vw, 46vw" loading="eager" fetchpriority="high" />
-          <figcaption>Skin fade <span>Cut at Hampton Barbers</span></figcaption>
+          <Image src={shopfront} alt="The Hampton Barbers shop front on Four Chimneys Crescent" widths={[480, 760, 864]} sizes="(max-width: 720px) 92vw, 42vw" loading="eager" fetchpriority="high" />
+          <figcaption>Find us here <span>110 Four Chimneys Crescent</span></figcaption>
+          <span class="fresh-sticker" aria-hidden="true">Walk-ins<br />welcome!</span>
         </figure>
       </div>
     </section>
+
+    <LiveNow design="fresh" title="How long is the wait?" />
 
     <section class="wrap fresh-section" id="prices">
       <div class="fresh-heading" data-reveal><p class="fresh-kicker">Services & prices</p><h2>Find your cut.</h2></div>
@@ -100,6 +107,8 @@ const faq = [
         <a class="fresh-review" href={site.reviewsUrl}><strong>{site.rating.value}/5</strong><span>Read our {site.rating.count} Google reviews</span></a>
       </div>
     </section>
+
+    <Reviews design="fresh" title="Customers love us." />
 
     <section class="wrap fresh-section" id="find">
       <div class="fresh-visit">

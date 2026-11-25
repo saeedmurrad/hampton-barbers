@@ -1,0 +1,258 @@
+---
+import Base from '../../layouts/Base.astro';
+import LiveNow from '../../components/LiveNow.astro';
+import { designs } from '../../data/site';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Hampton Barbers admin: live shop status" description="Tell customers how busy the shop is right now.">
+  <main id="main" class="la">
+    <header class="la__top">
+      <div>
+        <a class="la__back" href={`${base}/admin/`}>← Prices and hours</a>
+        <h1>Live shop status</h1>
+      </div>
+      <p id="la-status" role="status" aria-live="polite">Loading…</p>
+    </header>
+
+    <section class="la__acct" id="la-account" aria-label="Your account"></section>
+
+    <nav class="la__tabs" aria-label="Which demo design to edit">
+      <span>Demo: each design has its own example. Editing</span>
+      {designs.map((d, i) => <button type="button" data-tab={d.id} aria-pressed={i === 0 ? 'true' : 'false'}>{d.name}</button>)}
+    </nav>
+
+    <div class="la__grid">
+      <div class="la__controls">
+        <div class="la__quick" aria-label="Quick updates">
+          <button type="button" data-quick="walkin">+ Someone walked in</button>
+          <button type="button" data-quick="seated">Next customer seated</button>
+          <button type="button" data-quick="done">A cut just finished</button>
+          <button type="button" data-quick="empty">Shop is empty</button>
+        </div>
+
+        {[
+          ['barbers', 'Barbers cutting now', 'How many barbers are working right now'],
+          ['inChair', 'Customers in the chair', 'Being cut right now'],
+          ['waiting', 'People waiting', 'Sitting in the waiting area'],
+          ['minutes', 'Minutes per customer', 'Average time for one cut'],
+        ].map(([k, label, hint]) => (
+          <div class="la__step" data-field={k}>
+            <div><b>{label}</b><small>{hint}</small></div>
+            <div class="la__ctl">
+              <button type="button" data-dec={k} aria-label={`Fewer: ${label}`}>−</button>
+              <output data-val={k}>0</output>
+              <button type="button" data-inc={k} aria-label={`More: ${label}`}>+</button>
+            </div>
+          </div>
+        ))}
+
+        <label class="la__field">How busy we look
+          <select id="la-mode">
+            <option value="auto">Work it out from the numbers (recommended)</option>
+            <option value="quiet">Quiet: walk straight in</option>
+            <option value="steady">Short wait</option>
+            <option value="busy">Busy</option>
+            <option value="very-busy">Very busy</option>
+            <option value="paused">Not cutting right now (break or closing)</option>
+          </select>
+        </label>
+        <label class="la__field">Short message for customers (optional)
+          <input id="la-note" maxlength="120" placeholder="e.g. Back from lunch at 2pm" />
+        </label>
+      </div>
+
+      <div class="la__preview" data-live-preview>
+        <p class="la__plabel">What customers see</p>
+        <LiveNow design="fresh" title="Right now at Hampton Barbers" />
+      </div>
+    </div>
+  </main>
+</Base>
+
+<script>
+  import { LIVE_KEY, LIVE_DEMO, LIVE_DESIGNS, cleanStatus, parseLiveAll, fetchLiveStatus, paintLive, type LiveAll, type LiveStatus } from '../../lib/live';
+  import { initializeApp } from 'firebase/app';
+  import { getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
+  import { getFirestore, connectFirestoreEmulator, doc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
+
+  const cfg = {
+    apiKey: import.meta.env.PUBLIC_FB_API_KEY, authDomain: import.meta.env.PUBLIC_FB_AUTH_DOMAIN,
+    projectId: import.meta.env.PUBLIC_FB_PROJECT_ID, appId: import.meta.env.PUBLIC_FB_APP_ID,
+  };
+  const connected = Boolean(cfg.apiKey && cfg.projectId);
+  const app = connected ? initializeApp(cfg) : null;
+  const auth = app ? getAuth(app) : null;
+  const db = app ? getFirestore(app) : null;
+  if (auth && db && /^(localhost|127\.0\.0\.1|.+\.test)$/.test(location.hostname) && new URLSearchParams(location.search).has('emulator')) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  }
+
+  const statusEl = document.getElementById('la-status')!;
+  const account = document.getElementById('la-account')!;
+  const preview = document.querySelector<HTMLElement>('.la__preview .live')!;
+  const modeEl = document.getElementById('la-mode') as HTMLSelectElement;
+  const noteEl = document.getElementById('la-note') as HTMLInputElement;
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+  let user: User | null = null;
+  let tab = 'heritage';
+  let all: LiveAll = Object.fromEntries(LIVE_DESIGNS.map((d) => [d, { ...LIVE_DEMO[d] }]));
+  const stamp = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+
+  const draw = () => {
+    const s = all[tab];
+    (['barbers', 'inChair', 'waiting', 'minutes'] as const).forEach((k) => {
+      document.querySelector(`[data-val="${k}"]`)!.textContent = String(s[k]);
+    });
+    modeEl.value = s.mode;
+    if (document.activeElement !== noteEl) noteEl.value = s.note;
+    preview.className = preview.className.replace(/live--\w+/, `live--${tab === 'fresh' || tab === 'club' ? tab : 'fresh'}`);
+    paintLive(preview, s);
+    document.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+  };
+
+  let timer: number | undefined;
+  const save = () => {
+    all[tab] = cleanStatus({ ...all[tab], updatedAt: Date.now() }, LIVE_DEMO[tab]);
+    draw();
+    try { localStorage.setItem(LIVE_KEY, JSON.stringify(all)); } catch { /* storage blocked */ }
+    if (!user || !db) { statusEl.textContent = 'Shown on this device only. Sign in to update the website for everyone.'; return; }
+    statusEl.textContent = 'Updating the website…';
+    clearTimeout(timer);
+    timer = window.setTimeout(publish, 700);
+  };
+
+  const publish = async () => {
+    if (!user || !db) return;
+    const write = () => setDoc(doc(db, 'site', 'live'), { json: JSON.stringify(all), updatedAt: serverTimestamp() });
+    const denied = (err: unknown) => String((err as { code?: string }).code ?? '').includes('permission');
+    try {
+      try { await write(); }
+      catch (err) {
+        if (!denied(err)) throw err;
+        await setDoc(doc(db, 'site', 'owner'), { uid: user.uid });   // first admin claims the site
+        await write();
+      }
+      statusEl.textContent = `Live for everyone ✓ ${stamp.format(new Date())}`;
+    } catch (err) {
+      statusEl.textContent = denied(err)
+        ? 'This account is not allowed to update the website. Sign in with the account that set it up.'
+        : 'Could not reach the website. Check the internet connection; it will retry on your next change.';
+    }
+  };
+
+  const bump = (k: 'barbers' | 'inChair' | 'waiting' | 'minutes', d: number) => {
+    const s = { ...all[tab] };
+    s[k] = s[k] + d * (k === 'minutes' ? 5 : 1);
+    if (k === 'barbers') s.inChair = Math.min(s.inChair, Math.max(0, s.barbers));
+    all[tab] = cleanStatus(s, LIVE_DEMO[tab]);
+    save();
+  };
+
+  document.addEventListener('click', (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>('button');
+    if (!t) return;
+    if (t.dataset.inc) bump(t.dataset.inc as never, 1);
+    else if (t.dataset.dec) bump(t.dataset.dec as never, -1);
+    else if (t.dataset.tab) { tab = t.dataset.tab; draw(); }
+    else if (t.dataset.quick) {
+      const s = { ...all[tab] };
+      if (t.dataset.quick === 'walkin') {
+        if (s.inChair < s.barbers && s.waiting === 0) s.inChair++; else s.waiting++;
+      } else if (t.dataset.quick === 'seated') {
+        if (s.waiting > 0 && s.inChair < s.barbers) { s.waiting--; s.inChair++; }
+      } else if (t.dataset.quick === 'done') {
+        if (s.waiting > 0) s.waiting--; else if (s.inChair > 0) s.inChair--;
+      } else if (t.dataset.quick === 'empty') { s.inChair = 0; s.waiting = 0; }
+      all[tab] = cleanStatus({ ...s, mode: s.mode === 'paused' ? 'auto' : s.mode }, LIVE_DEMO[tab]);
+      save();
+    }
+  });
+  modeEl.addEventListener('change', () => { all[tab] = { ...all[tab], mode: modeEl.value as LiveStatus['mode'] }; save(); });
+  let noteTimer: number | undefined;
+  noteEl.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = window.setTimeout(() => { all[tab] = { ...all[tab], note: noteEl.value }; save(); }, 400); });
+
+  // ---------- Account (sign-in only; accounts are created on the main admin page) ----------
+  const drawAccount = (msg = '') => {
+    const note = msg ? `<p class="la__msg" role="alert">${esc(msg)}</p>` : '';
+    if (!connected) { account.innerHTML = '<p><strong>Not connected.</strong> Changes show on this device only.</p>'; return; }
+    if (!user) {
+      account.innerHTML = `<form id="la-signin" class="la__signin"><b>Sign in to update the website for everyone</b>
+        <input type="email" name="email" autocomplete="username" placeholder="Email" required />
+        <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
+        <button type="submit" class="primary">Sign in</button></form>${note}
+        <p class="la__hint">Until you sign in, changes show only on this device, which is handy for a demo.</p>`;
+    } else {
+      account.innerHTML = `<p>Signed in as <strong>${esc(user.email)}</strong>. Every change goes live straight away. <button type="button" class="link" data-out>Sign out</button></p>${note}`;
+    }
+  };
+  account.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!auth) return;
+    const f = new FormData(e.target as HTMLFormElement);
+    try { await signInWithEmailAndPassword(auth, String(f.get('email')).trim(), String(f.get('password'))); }
+    catch { drawAccount('The email or password is not right.'); }
+  });
+  account.addEventListener('click', async (e) => { if ((e.target as HTMLElement).closest('[data-out]') && auth) await signOut(auth); });
+  if (auth) onAuthStateChanged(auth, (u) => { user = u; drawAccount(); statusEl.textContent = u ? 'Signed in. Changes go live straight away.' : 'Shown on this device only. Sign in to update the website for everyone.'; });
+  else drawAccount();
+
+  // ---------- Start: newest of this device's copy and the published copy ----------
+  (async () => {
+    let local: LiveAll | null = null;
+    try { local = parseLiveAll(localStorage.getItem(LIVE_KEY)); } catch { /* none */ }
+    const published = await fetchLiveStatus();
+    all = Object.fromEntries(LIVE_DESIGNS.map((d) => {
+      const a = local?.[d], b = published?.[d];
+      return [d, a && b ? ((a.updatedAt ?? 0) >= (b.updatedAt ?? 0) ? a : b) : a ?? b ?? { ...LIVE_DEMO[d] }];
+    }));
+    draw();
+  })();
+  draw();
+</script>
+
+<style is:global>
+  .la { --bg: #f4f2ee; --surface: #fff; --text: #15140f; --muted: #57534a; --accent: #15140f; --on-accent: #fff; --line: #d9d4c8; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; --dw: 700; background: #f4f2ee; color: #15140f; min-height: 100svh; padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 3rem) 5rem; }
+  .la > * { max-width: 76rem; margin-inline: auto; }
+  .la__top { display: flex; justify-content: space-between; align-items: end; gap: 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; background: #f4f2ee; padding-block: .75rem; border-bottom: 1px solid var(--line); }
+  .la__back { font-size: .9rem; color: var(--muted); }
+  .la h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.8rem); letter-spacing: -.04em; margin-top: .3rem; }
+  #la-status { font-weight: 700; font-size: .92rem; color: #2a7a4b; }
+  .la button, .la input, .la select { font: inherit; }
+  .la button { min-height: 2.9rem; padding: .5rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; font-weight: 650; cursor: pointer; }
+  .la button:hover { border-color: #15140f; }
+  .la .primary { background: #15140f; color: #fff; border-color: #15140f; }
+  .la .link { border: 0; background: none; text-decoration: underline; min-height: auto; padding: 0 .25rem; }
+  .la__acct { margin-top: 1rem; padding: 1rem 1.1rem; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .la__signin { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  .la__signin b { width: 100%; }
+  .la__signin input { flex: 1 1 12rem; min-height: 2.9rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 10px; }
+  .la__hint { font-size: .85rem; color: var(--muted); margin-top: .5rem; }
+  .la__msg { color: #8a4b00; font-weight: 600; margin-top: .5rem; }
+  .la__tabs { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-block: 1.25rem; }
+  .la__tabs span { font-size: .85rem; color: var(--muted); margin-right: .25rem; }
+  .la__tabs button[aria-pressed='true'] { background: #15140f; color: #fff; border-color: #15140f; }
+  .la__grid { display: grid; grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  .la__controls { display: grid; gap: .75rem; }
+  .la__quick { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  .la__quick button { min-height: 3.3rem; background: #15140f; color: #fff; border-color: #15140f; }
+  .la__quick button:nth-child(4) { background: #fff; color: #15140f; border-color: var(--line); }
+  .la__step { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 1rem; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .la__step b { display: block; }
+  .la__step small { color: var(--muted); font-size: .82rem; }
+  .la__ctl { display: flex; align-items: center; gap: .5rem; flex: none; }
+  .la__ctl button { width: 3rem; height: 3rem; padding: 0; border-radius: 50%; font-size: 1.5rem; line-height: 1; }
+  .la__ctl output { min-width: 2.2rem; text-align: center; font-family: var(--display); font-size: 1.8rem; font-weight: 700; }
+  .la__field { display: grid; gap: .35rem; font-weight: 650; font-size: .9rem; }
+  .la__field select, .la__field input { min-height: 2.9rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  .la__plabel { font-size: .75rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .la__preview .live { padding-block: .5rem 0; }
+  .la__preview .live__in { width: 100%; }
+  .la__preview .live__head h2 { font-size: 1.6rem; }
+  .la__preview .live__grid { grid-template-columns: 1fr; }
+  .la__preview .live__big b { font-size: clamp(3.5rem, 8vw, 5.5rem); }
+  .la__preview .live__foot { display: none; }
+  @media (max-width: 900px) { .la__grid { grid-template-columns: 1fr; } }
+</style>

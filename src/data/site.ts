@@ -72,6 +72,17 @@ export const styles: Style[] = [
   { key: 'kids-cut', name: 'Kids Cut', tags: ['Kids'], blurb: 'Patient barbers and a smart cut for school, from under 5s upwards.', by: 'Ibrahim Guetar', byUrl: 'https://unsplash.com/@himo_beast1996', pos: '50% 30%' },
 ];
 
+// Customer reviews. Word-for-word quotes from Google reviews that the shop showed on its
+// own 2022 website, plus one recent Google review. Names shortened to first name and initial.
+export const reviews = [
+  { text: 'Been going here since I was 7 years old, 25 now.', name: 'Google review' },
+  { text: 'Never been anywhere else since… excellent service.', name: 'Simon W.' },
+  { text: 'Does both my sons hairs amazing! He’s very patient and polite also.', name: 'Emma C.' },
+  { text: 'Very friendly and professional service. Staff are well trained and well mannered.', name: 'Hansley M.' },
+  { text: 'Very good barbers. Went for a beard trim and service was outstanding.', name: 'Grant M.' },
+  { text: 'Friendly efficient staff.', name: 'Ioannis D.' },
+];
+
 export const designs = [
   { id: 'heritage', name: 'Heritage', blurb: 'Old-fashioned barber’s card: centred, charcoal and brass, framed photo plates and slow ink-like motion.' },
   { id: 'fresh', name: 'Fresh', blurb: 'Bright and friendly: bold photos, a filterable style gallery, bouncy pop-in motion.' },

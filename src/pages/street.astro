@@ -6,6 +6,9 @@ import SpecialHours from '../components/SpecialHours.astro';
 import { site, menu, fmt } from '../data/site';
 import { renderMenu } from '../lib/menu';
 import Map from '../components/Map.astro';
+import LiveNow from '../components/LiveNow.astro';
+import LiveChip from '../components/LiveChip.astro';
+import Reviews from '../components/Reviews.astro';
 import StyleGallery from '../components/StyleGallery.astro';
 import ShopPhotos from '../components/ShopPhotos.astro';
 import cut4 from '../assets/photos/cut-4.jpg';
@@ -23,6 +26,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
   <main id="main">
     <section class="hero">
       <h1><span class="up">Hampton</span><span class="up hollow" style="--i:1">Barbers</span></h1>
+      <LiveChip design="street" />
       <div class="hero__row">
         <div class="hero__copy up" style="--i:2">
           <p>Walk in. Sit down. Walk out sharp.<br />Hampton Vale, Peterborough. Since {site.since}.</p>
@@ -40,6 +44,8 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
       {[0, 1, 2, 3].map(() => <div>{tape.map((t) => <span>{t}</span>)}</div>)}
     </div>
 
+    <LiveNow design="street" title="Right now in the shop" />
+
     <section class="prices" id="prices">
       <h2 data-reveal>Prices</h2>
       <ol data-menu="street" data-reveal set:html={renderMenu('street', menu)} />
@@ -51,6 +57,8 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
       <p class="cuts__sub" data-reveal><span class="hover-only">Hover a name to see it. </span>Screenshot one and show your barber.</p>
       <StyleGallery variant="street" />
     </section>
+
+    <Reviews design="street" title="Word on the street" />
 
     <section class="hrs" id="hours">
       <h2 data-reveal>Opening hours</h2>

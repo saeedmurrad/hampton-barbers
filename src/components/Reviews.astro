@@ -1,0 +1,24 @@
+---
+// What customers say: a slowly moving row of real Google review quotes.
+import { site, reviews } from '../data/site';
+interface Props { design: 'heritage' | 'fresh' | 'street' | 'club'; title?: string; }
+const { design, title = 'What our customers say' } = Astro.props;
+---
+<section class:list={['revs', `revs--${design}`]} id="reviews" aria-labelledby="revs-title">
+  <div class="revs__head">
+    <h2 id="revs-title" data-reveal>{title}</h2>
+    <a class="revs__score" href={site.reviewsUrl} rel="noopener" data-reveal style="--d:1">
+      <b>{site.rating.value}</b><span><span class="revs__stars" aria-hidden="true">★★★★★</span>{site.rating.count} reviews on Google</span>
+    </a>
+  </div>
+  <div class="revs__rail" role="region" aria-label="Customer reviews" tabindex="0">
+    <ul class="revs__track">
+      {[0, 1].map((copy) => reviews.map((r) => (
+        <li aria-hidden={copy === 1 ? 'true' : undefined}>
+          <blockquote><p>“{r.text}”</p><footer>{r.name}</footer></blockquote>
+        </li>
+      )))}
+    </ul>
+  </div>
+  <p class="revs__more"><a href={site.reviewsUrl} rel="noopener">Read all {site.rating.count} reviews on Google →</a></p>
+</section>
