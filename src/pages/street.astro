@@ -1,0 +1,171 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import Status from '../components/Status.astro';
+import { site, services, fmt } from '../data/site';
+import tools from '../assets/photos/tools.jpg';
+import shave from '../assets/photos/shave.jpg';
+import cut1 from '../assets/photos/cut-1.jpg';
+import cut2 from '../assets/photos/cut-2.jpg';
+import cut3 from '../assets/photos/cut-3.png';
+import cut4 from '../assets/photos/cut-4.jpg';
+import cut5 from '../assets/photos/cut-5.jpg';
+
+const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
+const film = [
+  { src: cut4, alt: 'Back view of a sharp skin fade', cap: 'Skin fade' },
+  { src: cut2, alt: 'Side view of a short fade with a shaped beard', cap: 'Fade + beard' },
+  { src: shave, alt: 'A barber giving a customer a cut throat shave', cap: 'Cut throat' },
+  { src: cut1, alt: 'Back view of a tapered gents cut', cap: 'Taper' },
+  { src: cut5, alt: 'A young boy in the barber chair with a fresh cut', cap: 'Kids' },
+  { src: cut3, alt: 'Side view of a scissor cut with a trimmed beard', cap: 'Scissor cut' },
+];
+const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No booking', 'Open 7 days'];
+---
+<Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough" design="street" themeColor="#0a0a0c">
+  <header class="bar-top">
+    <a class="mark" href="#top">HB<span>/09</span></a>
+    <nav aria-label="Main"><a href="#prices">Prices</a><a href="#cuts">Cuts</a><a href="#hours">Hours</a></nav>
+    <a class="call" href={site.phoneHref}>Call {site.phone}</a>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <h1><span class="up">Hampton</span><span class="up hollow" style="--i:1">Barbers</span></h1>
+      <div class="hero__row">
+        <div class="hero__copy up" style="--i:2">
+          <p>Walk in. Sit down. Walk out sharp.<br />Hampton Vale, Peterborough. Since {site.since}.</p>
+          <div class="btns"><a class="btn" href={site.phoneHref}>Call the shop</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Directions</a></div>
+          <Status />
+        </div>
+        <div class="hero__pic up" style="--i:3">
+          <Image src={tools} alt="Combs and scissors laid out on a towel" widths={[640, 1100, 1600]} sizes="(max-width: 800px) 100vw, 58vw" loading="eager" fetchpriority="high" />
+          <p class="sticker" aria-hidden="true">No<br />booking<br />needed</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="tape" aria-hidden="true">
+      {[0, 1, 2, 3].map(() => <div>{tape.map((t) => <span>{t}</span>)}</div>)}
+    </div>
+
+    <section class="prices" id="prices">
+      <h2 data-reveal>Prices</h2>
+      <ol>
+        {services.map((s, i) => (
+          <li data-reveal><span class="no">{String(i + 1).padStart(2, '0')}</span><div><h3>{s.name}</h3><p>{s.note}</p></div><b>{s.price}</b></li>
+        ))}
+      </ol>
+      {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
+    </section>
+
+    <section class="cuts" id="cuts">
+      <h2 data-reveal>The cuts</h2>
+      <div class="film" tabindex="0" role="region" aria-label="Photos of haircuts, scroll sideways">
+        {film.map((f, i) => (
+          <figure><Image src={f.src} alt={f.alt} widths={[400, 760]} sizes="(max-width: 700px) 72vw, 380px" /><figcaption><span>{String(i + 1).padStart(2, '0')}</span>{f.cap}</figcaption></figure>
+        ))}
+      </div>
+    </section>
+
+    <section class="hrs" id="hours">
+      <h2 data-reveal>Open every day</h2>
+      <ul class="week">
+        {site.hours.map((h, i) => <li data-day={h.day} data-reveal style={`--d:${i}`}><span>{h.short}</span><b>{fmt(h.open)}</b><b>{fmt(h.close)}</b></li>)}
+      </ul>
+    </section>
+
+    <section class="where">
+      <p class="where__label" data-reveal>Find us</p>
+      <address data-reveal>{site.address.street}<br />{site.address.locality} {site.address.postcode}</address>
+      <div class="btns" data-reveal><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
+      <p class="rate" data-reveal>Rated {site.rating.value}/5 from {site.rating.count} Google reviews. <a href={site.reviewsUrl} rel="noopener">Read them</a></p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p class="foot__big" aria-hidden="true">Since {site.since}</p>
+    <p><a href={site.facebook} rel="noopener">Facebook</a><a href={site.instagram} rel="noopener">Instagram</a><a href={site.reviewsUrl} rel="noopener">Google</a></p>
+    <p class="small">© {new Date().getFullYear()} {site.company}</p>
+  </footer>
+</Base>
+
+<style is:global>
+  body.street {
+    --bg: #0a0a0c; --surface: #131317; --text: #fff; --muted: #a4a4b0; --accent: #c8f542; --on-accent: #0a0a0c; --line: #2c2c35;
+    --display: 'Bebas Neue', Impact, sans-serif; --dw: 400; --radius: 0;
+    h1, h2, h3 { text-transform: uppercase; line-height: .86; }
+    .btn { text-transform: uppercase; letter-spacing: .06em; font-size: .95rem; }
+    .pad { padding-inline: clamp(1rem, 3.5vw, 3rem); }
+
+    .bar-top { position: sticky; top: 0; z-index: 40; display: flex; align-items: stretch; justify-content: space-between; background: var(--bg); border-bottom: 2px solid var(--text); }
+    .mark { font-family: var(--display); font-size: 2rem; line-height: 1; padding: .8rem clamp(1rem, 3.5vw, 3rem); text-decoration: none; }
+    .mark span { color: var(--accent); }
+    .bar-top nav { display: flex; align-items: center; gap: 2.5rem; font-size: .85rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+    .bar-top nav a { text-decoration: none; } .bar-top nav a:hover { color: var(--accent); }
+    .call { display: grid; place-items: center; padding-inline: clamp(1rem, 3vw, 2.25rem); background: var(--accent); color: var(--on-accent); font-weight: 800; text-decoration: none; text-transform: uppercase; letter-spacing: .05em; font-size: .9rem; }
+
+    .hero { padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 3.5vw, 3rem) clamp(3rem, 6vw, 5rem); overflow: clip; }
+    .hero h1 { font-size: min(19.5vw, 20rem); display: grid; }
+    .hero h1 span { display: block; }
+    .hollow { color: transparent; -webkit-text-stroke: clamp(1.5px, .3vw, 4px) var(--accent); }
+    .hero__row { display: grid; grid-template-columns: 1fr 1.4fr; gap: clamp(1.5rem, 4vw, 4rem); align-items: end; margin-top: clamp(1.5rem, 3vw, 3rem); }
+    .hero__copy { display: grid; gap: 1.5rem; }
+    .hero__copy p { font-size: clamp(1.1rem, 1.9vw, 1.5rem); font-weight: 600; line-height: 1.35; }
+    .hero__pic { position: relative; border: 2px solid var(--text); }
+    .hero__pic img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; filter: grayscale(1) contrast(1.2); }
+    .sticker { position: absolute; right: -1rem; top: -2.2rem; width: 8.5rem; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; text-align: center; background: var(--accent); color: var(--on-accent); font-family: var(--display); font-size: 1.55rem; line-height: .9; text-transform: uppercase; transform: rotate(12deg); animation: wobble 5s ease-in-out infinite; }
+
+    .tape { display: flex; overflow: hidden; background: var(--accent); color: var(--on-accent); transform: rotate(-2deg) scale(1.04); margin-block: 2rem 4rem; padding-block: .6rem; }
+    .tape div { display: flex; flex: none; animation: tape 26s linear infinite; }
+    .tape span { font-family: var(--display); font-size: clamp(1.8rem, 4.5vw, 3.4rem); text-transform: uppercase; padding-inline: 1.5rem; white-space: nowrap; line-height: 1; }
+    .tape span::after { content: '/'; margin-left: 3rem; opacity: .45; }
+
+    .prices, .cuts, .hrs, .where { padding: clamp(3rem, 7vw, 6rem) clamp(1rem, 3.5vw, 3rem); }
+    .prices h2, .cuts h2, .hrs h2 { font-size: clamp(4.5rem, 15vw, 14rem); }
+    .prices ol { margin-top: 2rem; border-top: 2px solid var(--text); }
+    .prices li { display: grid; grid-template-columns: 4rem 1fr auto; align-items: center; gap: 1rem; padding: 1.1rem .75rem; border-bottom: 1px solid var(--line); transition: background-color .2s, color .2s, padding .3s; }
+    .prices li:hover { background: var(--accent); color: var(--on-accent); padding-inline: 1.75rem; }
+    .prices li:hover p, .prices li:hover .no { color: inherit; }
+    .no { font-family: var(--display); font-size: 1.4rem; color: var(--accent); }
+    .prices h3 { font-size: clamp(2rem, 5vw, 4rem); }
+    .prices li p { color: var(--muted); font-size: .92rem; margin-top: .2rem; }
+    .prices li b { font-family: var(--display); font-weight: 400; font-size: clamp(2.4rem, 6vw, 5rem); line-height: 1; }
+    .demo { margin-top: 1.5rem; font-size: .85rem; color: var(--muted); }
+
+    .cuts { padding-inline: 0; } .cuts h2 { padding-inline: clamp(1rem, 3.5vw, 3rem); }
+    .film { display: flex; gap: 0; overflow-x: auto; scroll-snap-type: x mandatory; margin-top: 2rem; border-block: 2px solid var(--text); scrollbar-width: thin; scrollbar-color: var(--accent) var(--bg); }
+    .film figure { flex: none; width: min(72vw, 23.75rem); scroll-snap-align: start; border-right: 2px solid var(--text); position: relative; overflow: hidden; }
+    .film img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; filter: grayscale(1) contrast(1.15); transition: filter .4s, transform .6s; }
+    .film figure:hover img { filter: none; transform: scale(1.05); }
+    .film figcaption { position: absolute; left: 0; bottom: 0; background: var(--bg); padding: .5rem .9rem; font-weight: 800; text-transform: uppercase; font-size: .8rem; letter-spacing: .1em; }
+    .film figcaption span { color: var(--accent); margin-right: .6rem; }
+
+    .week { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 2rem; border: 2px solid var(--text); }
+    .week li { display: grid; gap: .25rem; padding: 1.25rem .9rem 1.5rem; border-right: 1px solid var(--line); }
+    .week li:last-child { border-right: 0; }
+    .week span { font-family: var(--display); font-size: clamp(1.8rem, 3.6vw, 3.2rem); line-height: 1; margin-bottom: .75rem; text-transform: uppercase; }
+    .week b { font-weight: 600; font-size: .95rem; color: var(--muted); }
+    .week li[data-today] { background: var(--accent); color: var(--on-accent); } .week li[data-today] b { color: inherit; }
+
+    .where { display: grid; gap: 1.75rem; }
+    .where__label { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-size: .85rem; }
+    .where address { font-family: var(--display); text-transform: uppercase; font-size: clamp(2.8rem, 9.5vw, 9rem); line-height: .88; }
+    .rate { color: var(--muted); }
+
+    .foot { padding: 0 clamp(1rem, 3.5vw, 3rem) 6rem; display: grid; gap: 1rem; overflow: clip; }
+    .foot__big { font-family: var(--display); font-size: min(25vw, 24rem); line-height: .8; text-transform: uppercase; color: transparent; -webkit-text-stroke: 2px var(--line); white-space: nowrap; }
+    .foot a { margin-right: 1.5rem; font-weight: 700; text-transform: uppercase; font-size: .85rem; letter-spacing: .1em; }
+    .small { color: var(--muted); font-size: .85rem; }
+
+    @media (max-width: 800px) {
+      .bar-top nav { display: none; }
+      .hero__row { grid-template-columns: 1fr; }
+      .sticker { right: .5rem; width: 6.5rem; font-size: 1.2rem; }
+      .week { grid-template-columns: repeat(2, 1fr); } .week li { border-bottom: 1px solid var(--line); }
+      .prices li { grid-template-columns: 2.4rem 1fr auto; padding-inline: .25rem; }
+    }
+  }
+  @keyframes tape { to { transform: translateX(-100%); } }
+  @keyframes wobble { 0%, 100% { transform: rotate(12deg); } 50% { transform: rotate(4deg) scale(1.05); } }
+</style>

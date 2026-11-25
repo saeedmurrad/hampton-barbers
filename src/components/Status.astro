@@ -1,0 +1,5 @@
+---
+import { site } from '../data/site';
+const data = JSON.stringify(site.hours.map(({ day, open, close }) => ({ day, open, close })));
+---
+<p class:list={['status', Astro.props.class]} data-hours={data}><i></i><span>Open seven days a week</span></p>

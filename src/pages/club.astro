@@ -1,0 +1,165 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import Status from '../components/Status.astro';
+import Hours from '../components/Hours.astro';
+import { site, services } from '../data/site';
+import shave from '../assets/photos/shave.jpg';
+import shopfront from '../assets/photos/shopfront.jpg';
+import cut2 from '../assets/photos/cut-2.jpg';
+import cut4 from '../assets/photos/cut-4.jpg';
+import cut5 from '../assets/photos/cut-5.jpg';
+
+const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
+const groups = ['Cuts', 'Beards', 'Family'].map((g) => ({ name: g === 'Family' ? 'Family and concessions' : g, items: services.filter((s) => s.group === g) }));
+---
+<Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough" design="club" themeColor="#0f2a22">
+  <header class="top wrap">
+    <a class="name" href="#top">Hampton <em>Barbers</em></a>
+    <nav aria-label="Main"><a href="#about">About</a><a href="#menu">Prices</a><a href="#visit">Visit</a></nav>
+    <a class="phone" href={site.phoneHref}>{site.phone}</a>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap">
+      <div class="hero__arch up"><Image src={shave} alt="A barber giving a customer a cut throat shave" widths={[480, 800, 1200]} sizes="(max-width: 860px) 100vw, 44vw" loading="eager" fetchpriority="high" quality={72} /></div>
+      <div class="hero__text">
+        <p class="small-caps up" style="--i:1">Hampton Vale, Peterborough. Est. {site.since}.</p>
+        <h1 class="up" style="--i:2">A proper cut, <em>every time.</em></h1>
+        <p class="up" style="--i:3">Unhurried barbering from people who have been doing it for years. There is no booking system and no waiting list. Come in when it suits you.</p>
+        <div class="btns up" style="--i:4"><a class="btn" href={site.phoneHref}>Call the shop</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Get directions</a></div>
+        <Status class="up" />
+      </div>
+      <div class="stamp" aria-hidden="true">
+        <svg viewBox="0 0 100 100"><defs><path id="ring" d="M50,50 m-39,0 a39,39 0 1,1 78,0 a39,39 0 1,1 -78,0" /></defs><text><textPath href="#ring">Walk-ins welcome · Seven days a week · </textPath></text></svg>
+        <b>HB</b>
+      </div>
+    </section>
+
+    <section class="about wrap" id="about">
+      <div class="about__text" data-reveal>
+        <h2>Your neighbourhood barbers, <em>since {site.since}.</em></h2>
+        <p>We have been cutting hair in the centre of Hampton Vale since {site.since}. Some of our customers first came in as schoolboys and now bring children of their own.</p>
+        <p>Between us we have more than thirty years behind the chair. Bring a photo, or describe what you want, and we will take it from there.</p>
+      </div>
+      <div class="arches">
+        <figure data-reveal="img"><Image src={cut4} alt="Back view of a sharp skin fade" widths={[300, 520]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
+        <figure data-reveal="img" style="--d:1"><Image src={cut2} alt="Side view of a short fade with a shaped beard" widths={[300, 520]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
+        <figure data-reveal="img" style="--d:2"><Image src={cut5} alt="A young boy in the barber chair with a fresh cut" widths={[300, 520]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
+      </div>
+    </section>
+
+    <section class="menu wrap" id="menu">
+      <div class="paper" data-reveal>
+        <h2>The price list</h2>
+        <div class="groups">
+          {groups.map((g) => (
+            <div>
+              <h3>{g.name}</h3>
+              <ul>{g.items.map((s) => <li><span>{s.name}<small>{s.note}</small></span><b>{s.price}</b></li>)}</ul>
+            </div>
+          ))}
+        </div>
+        {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
+      </div>
+    </section>
+
+    <section class="words wrap" data-reveal>
+      <a class="seal" href={site.reviewsUrl} rel="noopener"><b>{site.rating.value}</b><span>out of 5<br />{site.rating.count} Google reviews</span></a>
+      <blockquote>“Been going here since I was 7 years old, 25 now.”<cite>A customer on Google</cite></blockquote>
+    </section>
+
+    <section class="visit wrap" id="visit">
+      <div class="visit__round" data-reveal="img"><Image src={shopfront} alt="The Hampton Barbers shop front on Four Chimneys Crescent" widths={[420, 760]} sizes="(max-width: 860px) 70vw, 30vw" /></div>
+      <div class="paper visit__card" data-reveal style="--d:1">
+        <h2>Come and see us</h2>
+        <address>{site.address.street}, {site.address.locality}, {site.address.city} {site.address.postcode}</address>
+        <p class="note">Public parking is directly opposite the shop.</p>
+        <Hours />
+        <div class="btns"><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot wrap">
+    <p class="name">Hampton <em>Barbers</em></p>
+    <p><a href={site.facebook} rel="noopener">Facebook</a><a href={site.instagram} rel="noopener">Instagram</a><a href={site.reviewsUrl} rel="noopener">Google reviews</a></p>
+    <p class="small">© {new Date().getFullYear()} {site.company}</p>
+  </footer>
+</Base>
+
+<style is:global>
+  body.club {
+    --bg: #0f2a22; --surface: #f4ecdc; --text: #f4ecdc; --muted: #b7c4b6; --accent: #e09a5f; --on-accent: #10231c; --line: #2c5244;
+    --display: 'Fraunces Variable', Georgia, serif; --dw: 400; --radius: 999px;
+    h1, h2 { letter-spacing: -.02em; } h1 em, h2 em, .name em { font-style: italic; color: var(--accent); }
+
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 1.5rem; }
+    .name { font-family: var(--display); font-size: 1.6rem; text-decoration: none; letter-spacing: -.01em; }
+    .top nav { display: flex; gap: 2.25rem; font-size: .95rem; }
+    .top nav a { text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .25s; } .top nav a:hover { border-color: var(--accent); }
+    .phone { font-family: var(--display); font-style: italic; font-size: 1.25rem; color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: .3em; }
+
+    .hero { position: relative; display: grid; grid-template-columns: .85fr 1fr; gap: clamp(2rem, 6vw, 6rem); align-items: center; padding-block: clamp(1rem, 3vw, 2.5rem) clamp(4rem, 8vw, 7rem); }
+    .hero__arch { border-radius: 999px 999px 18px 18px; overflow: hidden; aspect-ratio: 4 / 5; max-height: 78svh; }
+    .hero__arch img { width: 100%; height: 100%; object-fit: cover; object-position: 40% 30%; animation: drift 18s ease-out both; }
+    .hero__text { display: grid; gap: 1.6rem; justify-items: start; }
+    .small-caps { font-size: .8rem; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+    .hero h1 { font-size: clamp(3rem, 7.4vw, 6.8rem); line-height: .98; }
+    .hero h1 em { display: block; }
+    .hero__text > p:not(.small-caps):not(.status) { color: var(--muted); font-size: 1.15rem; max-width: 30rem; }
+    .stamp { position: absolute; left: -1.25rem; bottom: clamp(5rem, 9vw, 8rem); width: clamp(6.5rem, 11vw, 9.5rem); aspect-ratio: 1; border-radius: 50%; background: var(--accent); color: var(--on-accent); }
+    .stamp svg { width: 100%; height: 100%; animation: turn 24s linear infinite; fill: currentColor; font-size: 9.6px; letter-spacing: .2em; text-transform: uppercase; font-weight: 600; }
+    .stamp b { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-style: italic; font-weight: 400; font-size: clamp(1.5rem, 2.6vw, 2.3rem); }
+
+    .about { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem, 6vw, 6rem); align-items: center; padding-block: clamp(3rem, 7vw, 6rem); }
+    .about__text { display: grid; gap: 1.25rem; }
+    .about h2 { font-size: clamp(2.2rem, 4.6vw, 3.8rem); line-height: 1.05; margin-bottom: .5rem; }
+    .about p { color: var(--muted); }
+    .arches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: end; }
+    .arches figure { border-radius: 999px 999px 12px 12px; overflow: hidden; }
+    .arches figure:nth-child(2) { margin-bottom: 3.5rem; }
+    .arches img { width: 100%; aspect-ratio: 1 / 2; object-fit: cover; }
+
+    .paper { background: var(--surface); color: #1b2a23; border-radius: 22px; padding: clamp(1.75rem, 5vw, 4.5rem); --line: #d8cdb6; --text: #1b2a23; --accent: #a8552a; --on-accent: #fff; }
+    .menu { padding-block: clamp(3rem, 7vw, 6rem); }
+    .menu h2 { font-size: clamp(2.6rem, 6vw, 4.6rem); font-style: italic; text-align: center; }
+    .groups { display: grid; grid-template-columns: 1.15fr .7fr 1.15fr; gap: clamp(1.5rem, 4vw, 3.5rem); margin-top: 3rem; }
+    .groups h3 { font-style: italic; font-size: 1.5rem; color: var(--accent); padding-bottom: .9rem; border-bottom: 1px solid #1b2a23; }
+    .groups li { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: .95rem 0; border-bottom: 1px solid var(--line); }
+    .groups li span { font-weight: 600; }
+    .groups li small { display: block; font-weight: 400; font-size: .85rem; opacity: .7; }
+    .groups li b { font-family: var(--display); font-size: 1.35rem; font-weight: 500; }
+    .demo { margin-top: 2rem; font-size: .82rem; opacity: .7; text-align: center; }
+
+    .words { display: flex; align-items: center; justify-content: center; gap: clamp(1.5rem, 5vw, 4rem); padding-block: clamp(3rem, 7vw, 6rem); flex-wrap: wrap; }
+    .seal { flex: none; width: 11rem; aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--accent); outline: 1px solid var(--accent); outline-offset: 6px; display: grid; place-content: center; text-align: center; text-decoration: none; transition: transform .5s; }
+    .seal:hover { transform: rotate(-8deg); }
+    .seal b { font-family: var(--display); font-size: 3.6rem; line-height: 1; color: var(--accent); font-weight: 400; }
+    .seal span { font-size: .78rem; line-height: 1.35; color: var(--muted); }
+    .words blockquote { font-family: var(--display); font-style: italic; font-size: clamp(1.7rem, 4vw, 3.1rem); line-height: 1.15; max-width: 20ch; }
+    .words cite { display: block; font: 500 .9rem 'Inter Variable', sans-serif; color: var(--muted); margin-top: 1rem; }
+
+    .visit { display: grid; grid-template-columns: .8fr 1.2fr; gap: clamp(2rem, 5vw, 5rem); align-items: center; padding-block: clamp(3rem, 7vw, 6rem); }
+    .visit__round { border-radius: 50%; overflow: hidden; aspect-ratio: 1; }
+    .visit__round img { width: 100%; height: 100%; object-fit: cover; }
+    .visit__card { display: grid; gap: 1.1rem; }
+    .visit__card h2 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); font-style: italic; }
+    .visit address { font-size: 1.1rem; font-weight: 600; } .note { opacity: .75; }
+
+    .foot { text-align: center; padding-block: 3rem 6rem; display: grid; gap: 1rem; border-top: 1px solid var(--line); }
+    .foot .name { font-size: 2.2rem; } .foot a { margin-inline: .8rem; }
+    .small { color: var(--muted); font-size: .85rem; }
+
+    @media (max-width: 860px) {
+      .top nav { display: none; }
+      .hero, .about, .visit { grid-template-columns: 1fr; }
+      .hero__arch { max-height: 60svh; }
+      .stamp { left: auto; right: 1rem; top: 1rem; bottom: auto; }
+      .groups { grid-template-columns: 1fr; }
+      .visit__round { width: 70%; margin-inline: auto; }
+    }
+  }
+  @keyframes turn { to { transform: rotate(360deg); } }
+  @keyframes drift { from { transform: scale(1.15); } to { transform: scale(1); } }
+</style>

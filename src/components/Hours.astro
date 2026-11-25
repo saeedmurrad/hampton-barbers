@@ -1,0 +1,9 @@
+---
+import { site, fmt } from '../data/site';
+---
+<table class="hours">
+  <caption class="sr">Opening hours</caption>
+  <tbody>
+    {site.hours.map((h) => <tr data-day={h.day}><th scope="row">{h.label}</th><td>{fmt(h.open)} to {fmt(h.close)}</td></tr>)}
+  </tbody>
+</table>

@@ -7,14 +7,16 @@ import '@fontsource-variable/fraunces/wght.css';
 import '@fontsource-variable/fraunces/wght-italic.css';
 import '@fontsource/bebas-neue/index.css';
 import '../styles/global.css';
-import { site, themes } from '../data/site';
+import { site, designs } from '../data/site';
 
-interface Props { title: string; description?: string; }
-const { title, description = site.description } = Astro.props;
+interface Props { title: string; description?: string; design?: string; themeColor?: string; }
+const { title, description = site.description, design, themeColor = '#12100e' } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
-const themeIds = themes.map((t) => t.id);
+const n = designs.findIndex((d) => d.id === design);
+const prev = designs[(n + designs.length - 1) % designs.length];
+const next = designs[(n + 1) % designs.length];
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -34,7 +36,7 @@ const jsonLd = {
 };
 ---
 <!doctype html>
-<html lang="en-GB" data-theme="heritage">
+<html lang="en-GB">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -42,7 +44,7 @@ const jsonLd = {
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     {isDemo && <meta name="robots" content="noindex" />}
-    <meta name="theme-color" content="#12100e" />
+    <meta name="theme-color" content={themeColor} />
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="en_GB" />
@@ -50,106 +52,50 @@ const jsonLd = {
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <meta name="twitter:card" content="summary_large_image" />
-    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
-    <script is:inline define:vars={{ themeIds }}>
-      (function () {
-        var d = document.documentElement; d.classList.add('js');
-        try {
-          var q = new URLSearchParams(location.search).get('theme');
-          var t = q || localStorage.getItem('hb-theme');
-          if (themeIds.indexOf(t) > -1) { d.dataset.theme = t; if (q) localStorage.setItem('hb-theme', t); }
-        } catch (e) {}
-      })();
-    </script>
+    {design && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+    <script is:inline>document.documentElement.classList.add('js');</script>
   </head>
-  <body>
+  <body class={design} id="top">
     <a class="skip" href="#main">Skip to content</a>
-    <div class="progress" aria-hidden="true"></div>
-    <header class="header">
-      <div class="wrap header__in">
-        <a class="logo" href={`${base}/`} aria-label={`${site.name} home`}>
-          <span class="pole" aria-hidden="true"></span>
-          <span>Hampton Barbers<small>Est. {site.since}</small></span>
-        </a>
-        <nav class="nav" aria-label="Main">
-          <a href={`${base}/#about`}>About</a>
-          <a href={`${base}/#services`}>Prices</a>
-          <a href={`${base}/#gallery`}>Gallery</a>
-          <a href={`${base}/#visit`}>Find us</a>
-          <a class="btn" href={site.phoneHref}>Call {site.phone}</a>
-        </nav>
-      </div>
-    </header>
-    <main id="main"><slot /></main>
-    <footer class="footer">
-      <div class="wrap footer__in">
-        <p><strong>{site.name}</strong><br />{site.address.street}, {site.address.locality}, {site.address.city} {site.address.postcode}<br /><a href={site.phoneHref}>{site.phone}</a></p>
-        <p class="social"><a href={site.facebook} rel="noopener">Facebook</a><a href={site.instagram} rel="noopener">Instagram</a><a href={site.reviewsUrl} rel="noopener">Google reviews</a></p>
-        <p>© {new Date().getFullYear()} {site.company}</p>
-      </div>
-    </footer>
-    <div class="bar"><a href={site.phoneHref}>Call the shop</a><a href={site.directionsUrl} rel="noopener">Directions</a></div>
-    {isDemo && (
-      <div class="themer">
-        <button type="button" popovertarget="themes">🎨 Themes</button>
-        <div id="themes" popover class="themer__panel">
-          <h2>Design preview: pick a theme</h2>
-          {themes.map((t) => (
-            <button type="button" data-theme-pick={t.id}>
-              <span class="sw">{t.swatch.map((c) => <i style={`background:${c}`} />)}</span>
-              <b>{t.name}</b><small>{t.blurb}</small>
-            </button>
-          ))}
-          <button type="button" class="themer__copy" data-theme-copy>Copy link to this theme</button>
-        </div>
-      </div>
+    <slot />
+    {design && <div class="bar"><a href={site.phoneHref}>Call the shop</a><a href={site.directionsUrl} rel="noopener">Directions</a></div>}
+    {isDemo && design && (
+      <nav class="designs" aria-label="Design options">
+        <a href={`${base}/${prev.id}/`} aria-label={`Previous design: ${prev.name}`}>‹</a>
+        <span>Design {n + 1} of {designs.length}: {designs[n].name}</span>
+        <a href={`${base}/${next.id}/`} aria-label={`Next design: ${next.name}`}>›</a>
+        <a href={`${base}/`}>All</a>
+      </nav>
     )}
     <script>
-      const root = document.documentElement;
       // Scroll reveals
-      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px', threshold: 0.12 });
+      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -6% 0px', threshold: 0.08 });
       document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
 
       // Open / closed status and today's row (shop time = Europe/London)
-      const el = document.querySelector<HTMLElement>('[data-hours]');
-      if (el) {
-        const hours: { day: number; open: string; close: string }[] = JSON.parse(el.dataset.hours!);
+      const pills = document.querySelectorAll<HTMLElement>('[data-hours]');
+      if (pills.length) {
+        const hours: { day: number; open: string; close: string }[] = JSON.parse(pills[0].dataset.hours!);
         const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
         const get = (t: string) => parts.find((p) => p.type === t)!.value;
         const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
         const now = `${get('hour')}:${get('minute')}`;
         const today = hours.find((h) => h.day === day)!;
-        const open = now >= today.open && now < today.close;
-        const fmt = (t: string) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`; };
         const next = hours.find((h) => h.day === (day + 1) % 7)!;
-        el.dataset.open = String(open);
-        el.querySelector('span')!.textContent = open ? `Open now · until ${fmt(today.close)}` : now < today.open ? `Closed · opens ${fmt(today.open)} today` : `Closed · opens ${fmt(next.open)} tomorrow`;
-        document.querySelector(`[data-day="${day}"]`)?.setAttribute('data-today', '');
+        const open = now >= today.open && now < today.close;
+        const f = (t: string) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`; };
+        const text = open ? `Open now, until ${f(today.close)}` : now < today.open ? `Closed, opens ${f(today.open)} today` : `Closed, opens ${f(next.open)} tomorrow`;
+        pills.forEach((el) => { el.dataset.open = String(open); el.querySelector('span')!.textContent = text; });
+        document.querySelectorAll(`[data-day="${day}"]`).forEach((el) => el.setAttribute('data-today', ''));
       }
 
-      // Map loads only when asked (no third-party requests before that)
-      document.querySelector<HTMLButtonElement>('[data-map]')?.addEventListener('click', (e) => {
-        const b = e.currentTarget as HTMLButtonElement;
+      // The map loads only when asked for (no third-party requests before that)
+      document.querySelectorAll<HTMLButtonElement>('[data-map]').forEach((b) => b.addEventListener('click', () => {
         const f = document.createElement('iframe');
         f.src = b.dataset.map!; f.title = 'Map showing Hampton Barbers'; f.loading = 'lazy';
-        b.parentElement!.replaceChildren(f);
-      });
-
-      // Theme switcher
-      const mark = () => document.querySelectorAll<HTMLElement>('[data-theme-pick]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themePick === root.dataset.theme)));
-      mark();
-      document.querySelectorAll<HTMLElement>('[data-theme-pick]').forEach((b) => b.addEventListener('click', (ev) => {
-        const apply = () => { root.dataset.theme = b.dataset.themePick!; try { localStorage.setItem('hb-theme', b.dataset.themePick!); } catch {} mark(); };
-        root.style.setProperty('--vx', `${ev.clientX}px`); root.style.setProperty('--vy', `${ev.clientY}px`);
-        const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (!reduce && 'startViewTransition' in document) (document as any).startViewTransition(apply); else apply();
-        history.replaceState(null, '', `?theme=${b.dataset.themePick}${location.hash}`);
+        f.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0';
+        b.parentElement!.append(f); b.remove();
       }));
-      document.querySelector<HTMLElement>('[data-theme-copy]')?.addEventListener('click', async (e) => {
-        const u = new URL(location.href); u.searchParams.set('theme', root.dataset.theme!); u.hash = '';
-        try { await navigator.clipboard.writeText(u.href); (e.currentTarget as HTMLElement).textContent = 'Link copied ✓'; } catch { prompt('Copy this link', u.href); }
-      });
     </script>
   </body>
 </html>

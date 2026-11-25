@@ -1,0 +1,162 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import Status from '../components/Status.astro';
+import { site, services, fmt } from '../data/site';
+import shopfront from '../assets/photos/shopfront.jpg';
+import shave from '../assets/photos/shave.jpg';
+import cut1 from '../assets/photos/cut-1.jpg';
+import cut2 from '../assets/photos/cut-2.jpg';
+import cut3 from '../assets/photos/cut-3.png';
+import cut4 from '../assets/photos/cut-4.jpg';
+import cut5 from '../assets/photos/cut-5.jpg';
+
+const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
+const years = new Date().getFullYear() - site.since;
+---
+<Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough" design="fresh" themeColor="#f6f1e7">
+  <header class="nav">
+    <a class="nav__logo" href="#top">hampton barbers<sup>’09</sup></a>
+    <nav aria-label="Main"><a href="#prices">Prices</a><a href="#cuts">Cuts</a><a href="#find">Find us</a></nav>
+    <a class="btn" href={site.phoneHref}>Call us</a>
+  </header>
+
+  <main id="main">
+    <section class="bento wrap">
+      <div class="tile t-head">
+        <h1 class="up">Good hair.<br />No appointment.</h1>
+        <p class="up" style="--i:1">Walk in, take a seat, and we will sort you out. Hampton Vale’s barbers for {years} years, open every day of the week.</p>
+        <div class="btns up" style="--i:2"><a class="btn" href={site.phoneHref}>{site.phone}</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Directions</a></div>
+      </div>
+      <div class="tile t-photo up" style="--i:1"><Image src={shopfront} alt="The Hampton Barbers shop front on Four Chimneys Crescent" widths={[480, 800]} sizes="(max-width: 860px) 100vw, 40vw" loading="eager" fetchpriority="high" /></div>
+      <div class="tile t-open up" style="--i:2"><Status /><small>Mon to Fri {fmt('09:00')} to {fmt('20:00')}</small></div>
+      <a class="tile t-rate up" style="--i:3" href={site.reviewsUrl} rel="noopener"><b>{site.rating.value}</b><span>out of 5 on Google<br />{site.rating.count} reviews</span></a>
+    </section>
+
+    <section class="strip wrap">
+      <div class="tile t-years" data-reveal><b>{years}</b><span>years in<br />Hampton Vale</span></div>
+      <div class="tile t-pic" data-reveal="img" style="--d:1"><Image src={cut4} alt="Back view of a sharp skin fade" widths={[400, 700]} sizes="(max-width: 860px) 100vw, 30vw" /></div>
+      <div class="tile t-list" data-reveal style="--d:2">
+        <h2>Why people come back</h2>
+        <ul><li>You never need to book</li><li>Open until 8pm on weekdays</li><li>Patient with children</li><li>Parking right opposite</li></ul>
+      </div>
+    </section>
+
+    <section class="wrap prices" id="prices">
+      <h2 data-reveal>Prices</h2>
+      <div class="cards">
+        {services.map((s, i) => <article class="pc" data-reveal style={`--d:${i % 4}`}><b>{s.price}</b><h3>{s.name}</h3><p>{s.note}</p></article>)}
+      </div>
+      {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
+    </section>
+
+    <section class="wrap cuts" id="cuts">
+      <h2 data-reveal>Recent cuts</h2>
+      <div class="mosaic">
+        <div class="m m--tall" data-reveal="img"><Image src={cut2} alt="Side view of a short fade with a shaped beard" widths={[400, 700]} sizes="(max-width: 700px) 50vw, 25vw" /></div>
+        <div class="m" data-reveal="img" style="--d:1"><Image src={cut5} alt="A young boy in the barber chair with a fresh cut" widths={[400, 700]} sizes="(max-width: 700px) 50vw, 25vw" /></div>
+        <div class="m m--wide" data-reveal="img" style="--d:2"><Image src={shave} alt="A barber giving a customer a cut throat shave" widths={[600, 1100]} sizes="(max-width: 700px) 100vw, 50vw" /></div>
+        <div class="m" data-reveal="img" style="--d:1"><Image src={cut1} alt="Back view of a tapered gents cut" widths={[400, 700]} sizes="(max-width: 700px) 50vw, 25vw" /></div>
+        <div class="m" data-reveal="img" style="--d:2"><Image src={cut3} alt="Side view of a scissor cut with a trimmed beard" widths={[400, 700]} sizes="(max-width: 700px) 50vw, 25vw" /></div>
+        <div class="m m--say" data-reveal style="--d:3"><p>“Been going here since I was 7 years old, 25 now.”</p><small>A customer on Google</small></div>
+      </div>
+    </section>
+
+    <section class="wrap find" id="find">
+      <div class="find__card" data-reveal>
+        <div class="find__text">
+          <h2>Find us</h2>
+          <address>{site.address.street}, {site.address.locality}, {site.address.city} {site.address.postcode}</address>
+          <ul class="days">{site.hours.map((h) => <li data-day={h.day}><span>{h.short}</span><b>{fmt(h.open)} to {fmt(h.close)}</b></li>)}</ul>
+          <div class="btns"><a class="btn" href={site.directionsUrl} rel="noopener">Open in Maps</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
+        </div>
+        <div class="find__map"><button class="btn" type="button" data-map={site.mapEmbed}>Show the map</button></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p class="foot__big">Walk in today.</p>
+    <p class="foot__links"><a href={site.facebook} rel="noopener">Facebook</a><a href={site.instagram} rel="noopener">Instagram</a><a href={site.reviewsUrl} rel="noopener">Google reviews</a></p>
+    <p class="small">© {new Date().getFullYear()} {site.company}</p>
+  </footer>
+</Base>
+
+<style is:global>
+  body.fresh {
+    --bg: #f6f1e7; --surface: #fff; --text: #16130f; --muted: #5d564a; --accent: #c8371f; --on-accent: #fff; --line: #ddd4c2;
+    --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; --dw: 700; --radius: 999px;
+    h1, h2, h3 { letter-spacing: -.035em; }
+
+    .nav { position: sticky; top: .75rem; z-index: 40; width: min(100% - 1.5rem, 60rem); margin: .75rem auto 0; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .5rem .5rem .5rem 1.4rem; background: rgb(255 255 255 / .85); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 999px; }
+    .nav__logo { font-family: var(--display); font-weight: 800; font-size: 1.2rem; letter-spacing: -.04em; text-decoration: none; }
+    .nav__logo sup { color: var(--accent); font-size: .6em; margin-left: .15em; }
+    .nav nav { display: flex; gap: 1.75rem; font-weight: 550; font-size: .95rem; }
+    .nav nav a { text-decoration: none; } .nav nav a:hover { color: var(--accent); }
+    .nav .btn { min-height: 2.6rem; padding: .4rem 1.2rem; }
+
+    .tile { border-radius: 28px; background: var(--surface); border: 1px solid var(--line); overflow: hidden; --cover: var(--surface); }
+    .bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; margin-top: 2rem; }
+    .t-head { grid-column: span 7; padding: clamp(1.75rem, 5vw, 4rem); display: grid; align-content: center; gap: 1.5rem; }
+    .t-head h1 { font-size: clamp(2.5rem, 5.6vw, 5rem); line-height: .94; }
+    .t-head p { font-size: 1.15rem; color: var(--muted); max-width: 30rem; }
+    .t-photo { grid-column: span 5; grid-row: span 2; min-height: 24rem; }
+    .t-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .t-open { grid-column: span 4; padding: 1.5rem 1.75rem; display: grid; gap: .3rem; align-content: center; background: var(--text); color: var(--bg); border-color: var(--text); }
+    .t-open .status { font-size: 1.15rem; } .t-open small { opacity: .7; }
+    .t-rate { grid-column: span 3; padding: 1.25rem 1.5rem; display: flex; align-items: center; gap: 1rem; text-decoration: none; background: var(--accent); color: #fff; border-color: var(--accent); transition: transform .3s; }
+    .t-rate:hover { transform: rotate(-2deg) scale(1.02); }
+    .t-rate b { font-family: var(--display); font-size: 3.2rem; line-height: 1; letter-spacing: -.04em; }
+    .t-rate span { font-size: .85rem; line-height: 1.35; font-weight: 550; }
+
+    .strip { display: grid; grid-template-columns: 1fr 1.2fr 1.4fr; gap: 1rem; margin-top: 1rem; }
+    .t-years { padding: 2rem; display: grid; align-content: end; min-height: 17rem; background: #1f3a8a; color: #fff; border-color: #1f3a8a; }
+    .t-years b { font-family: var(--display); font-size: clamp(5rem, 11vw, 9rem); line-height: .8; letter-spacing: -.05em; }
+    .t-years span { font-weight: 600; margin-top: .75rem; line-height: 1.25; }
+    .t-pic img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 5 / 4; }
+    .t-list { padding: 2rem; display: grid; gap: 1.25rem; align-content: center; }
+    .t-list h2 { font-size: 1.7rem; }
+    .t-list li { padding: .7rem 0; border-top: 1px solid var(--line); font-weight: 550; }
+
+    .prices, .cuts, .find { padding-top: clamp(4.5rem, 9vw, 8rem); }
+    .prices > h2, .cuts > h2 { font-size: clamp(2.8rem, 8vw, 6rem); margin-bottom: 2rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr)); gap: 1rem; }
+    .pc { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 1.5rem; display: grid; gap: .35rem; transition: transform .3s cubic-bezier(.2,.8,.2,1), background-color .3s, color .3s; }
+    .pc:hover { transform: translateY(-6px) rotate(-1deg); background: var(--text); color: var(--bg); }
+    .pc b { font-family: var(--display); font-size: 2.6rem; line-height: 1; letter-spacing: -.04em; color: var(--accent); margin-bottom: 1.25rem; }
+    .pc h3 { font-size: 1.25rem; letter-spacing: -.02em; }
+    .pc p { font-size: .9rem; opacity: .7; }
+    .demo { margin-top: 1.5rem; font-size: .85rem; color: var(--muted); }
+
+    .mosaic { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 15rem; gap: 1rem; }
+    .m { border-radius: 24px; overflow: hidden; }
+    .m img { width: 100%; height: 100%; object-fit: cover; }
+    .m--tall { grid-row: span 2; } .m--wide { grid-column: span 2; }
+    .m--say { background: var(--accent); color: #fff; padding: 1.5rem; display: grid; align-content: space-between; }
+    .m--say p { font-family: var(--display); font-weight: 700; font-size: 1.45rem; line-height: 1.1; letter-spacing: -.02em; }
+
+    .find__card { display: grid; grid-template-columns: 1fr 1fr; border-radius: 32px; overflow: hidden; background: var(--text); color: var(--bg); --line: #3a352d; }
+    .find__text { padding: clamp(1.75rem, 5vw, 4rem); display: grid; gap: 1.5rem; }
+    .find__text h2 { font-size: clamp(2.6rem, 6vw, 4.5rem); }
+    .find address { font-size: 1.15rem; opacity: .85; }
+    .days li { display: flex; justify-content: space-between; padding: .55rem 0; border-top: 1px solid var(--line); }
+    .days li b { font-weight: 500; }
+    .days li[data-today] { color: #ff8a73; } .days li[data-today] b { font-weight: 700; }
+    .find .btn--line { color: var(--bg); }
+    .find__map { position: relative; min-height: 22rem; display: grid; place-items: center; background: repeating-linear-gradient(45deg, #2a2620 0 22px, #25211c 22px 44px); }
+
+    .foot { padding-block: clamp(4rem, 9vw, 7rem) 6rem; display: grid; gap: 1.25rem; }
+    .foot__big { font-family: var(--display); font-weight: 800; font-size: clamp(3.5rem, 14vw, 12rem); line-height: .85; letter-spacing: -.05em; color: var(--accent); }
+    .foot__links a { margin-right: 1.5rem; font-weight: 600; }
+    .small { color: var(--muted); font-size: .85rem; }
+
+    @media (max-width: 860px) {
+      .nav nav { display: none; }
+      .t-head, .t-photo { grid-column: 1 / -1; } .t-photo { min-height: 18rem; grid-row: auto; }
+      .t-open { grid-column: span 12; } .t-rate { grid-column: span 12; }
+      .strip, .find__card { grid-template-columns: 1fr; }
+      .mosaic { grid-template-columns: 1fr 1fr; grid-auto-rows: 12rem; }
+      .m--say { grid-column: 1 / -1; gap: 1rem; }
+    }
+  }
+</style>
