@@ -1,0 +1,186 @@
+---
+import Base from '../layouts/Base.astro';
+import { designs } from '../data/site';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Hampton Barbers admin: prices and categories" description="Edit the Hampton Barbers price list.">
+  <main id="main" class="adm">
+    <header class="adm__top">
+      <div>
+        <a class="adm__back" href={`${base}/`}>← All designs</a>
+        <h1>Prices and categories</h1>
+      </div>
+      <p id="status" role="status" aria-live="polite">Nothing changed yet</p>
+    </header>
+
+    <p class="adm__note"><strong>Demo mode.</strong> Changes save on this device only, so you can try it and see them on all four designs. On the live site the owner signs in with a password and every visitor sees the new prices.</p>
+
+    <div id="editor"></div>
+
+    <footer class="adm__foot">
+      <div class="adm__see">
+        <span>See your changes on:</span>
+        {designs.map((d) => <a href={`${base}/${d.id}/#prices`}>{d.name}</a>)}
+      </div>
+      <div class="adm__ops">
+        <button type="button" id="export">Download price list</button>
+        <button type="button" id="reset" class="danger">Reset to the original list</button>
+      </div>
+    </footer>
+  </main>
+</Base>
+
+<script>
+  import { menu as defaults, type Category } from '../data/site';
+  import { STORE_KEY } from '../lib/menu';
+
+  const root = document.getElementById('editor')!;
+  const status = document.getElementById('status')!;
+  const clone = (v: Category[]): Category[] => JSON.parse(JSON.stringify(v));
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+  let state: Category[] = (() => {
+    try { const s = localStorage.getItem(STORE_KEY); if (s) return JSON.parse(s) as Category[]; } catch { /* use defaults */ }
+    return clone(defaults);
+  })();
+
+  let timer: number | undefined;
+  const save = () => {
+    clearTimeout(timer);
+    status.textContent = 'Saving…';
+    timer = window.setTimeout(() => {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); status.textContent = 'All changes saved'; }
+      catch { status.textContent = 'Could not save on this device'; }
+    }, 250);
+  };
+
+  const render = () => {
+    root.innerHTML = state.map((c, ci) => `
+      <section class="cat" data-c="${ci}">
+        <div class="cat__head">
+          <input class="cat__name" data-f="cname" aria-label="Category name" placeholder="Category name" value="${esc(c.name)}" />
+          <div class="tools">
+            <button type="button" data-a="cup" aria-label="Move category up" ${ci === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" data-a="cdown" aria-label="Move category down" ${ci === state.length - 1 ? 'disabled' : ''}>↓</button>
+            <button type="button" data-a="cdel" class="danger">Delete category</button>
+          </div>
+        </div>
+        <div class="heads" aria-hidden="true"><span>Service</span><span>Price</span><span>Note (optional)</span><span></span></div>
+        ${c.items.map((it, ii) => `
+          <div class="item" data-i="${ii}">
+            <input data-f="name" aria-label="Service name" placeholder="Service name" value="${esc(it.name)}" />
+            <input data-f="price" aria-label="Price" placeholder="£0" inputmode="decimal" value="${esc(it.price)}" />
+            <input data-f="note" aria-label="Note" placeholder="Short note" value="${esc(it.note)}" />
+            <div class="tools">
+              <button type="button" data-a="up" aria-label="Move service up" ${ii === 0 ? 'disabled' : ''}>↑</button>
+              <button type="button" data-a="down" aria-label="Move service down" ${ii === c.items.length - 1 ? 'disabled' : ''}>↓</button>
+              <button type="button" data-a="del" class="danger" aria-label="Delete ${esc(it.name) || 'service'}">✕</button>
+            </div>
+          </div>`).join('')}
+        <button type="button" class="add" data-a="add">+ Add a service</button>
+      </section>`).join('') + `<button type="button" class="add add--cat" data-a="cadd">+ Add a category</button>`;
+  };
+
+  const where = (el: Element) => {
+    const c = el.closest<HTMLElement>('[data-c]');
+    const i = el.closest<HTMLElement>('[data-i]');
+    return { ci: c ? Number(c.dataset.c) : -1, ii: i ? Number(i.dataset.i) : -1 };
+  };
+  const swap = <T,>(a: T[], x: number, y: number) => { [a[x], a[y]] = [a[y], a[x]]; };
+
+  root.addEventListener('input', (e) => {
+    const t = e.target as HTMLInputElement;
+    const { ci, ii } = where(t);
+    if (t.dataset.f === 'cname') state[ci].name = t.value;
+    else if (ii > -1) (state[ci].items[ii] as Record<string, string>)[t.dataset.f!] = t.value;
+    save();
+  });
+
+  // A bare number in the price box becomes pounds: 15 -> £15
+  root.addEventListener('change', (e) => {
+    const t = e.target as HTMLInputElement;
+    if (t.dataset.f !== 'price') return;
+    const v = t.value.trim();
+    if (/^\d+([.,]\d{1,2})?$/.test(v)) {
+      const { ci, ii } = where(t);
+      t.value = state[ci].items[ii].price = `£${v.replace(',', '.')}`;
+      save();
+    }
+  });
+
+  root.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-a]');
+    if (!b) return;
+    const { ci, ii } = where(b);
+    const a = b.dataset.a;
+    if (a === 'cadd') state.push({ name: 'New category', items: [{ name: '', price: '', note: '' }] });
+    else if (a === 'add') state[ci].items.push({ name: '', price: '', note: '' });
+    else if (a === 'del') { if (!confirm(`Delete "${state[ci].items[ii].name || 'this service'}"?`)) return; state[ci].items.splice(ii, 1); }
+    else if (a === 'cdel') { if (!confirm(`Delete the category "${state[ci].name}" and its ${state[ci].items.length} services?`)) return; state.splice(ci, 1); }
+    else if (a === 'up') swap(state[ci].items, ii, ii - 1);
+    else if (a === 'down') swap(state[ci].items, ii, ii + 1);
+    else if (a === 'cup') swap(state, ci, ci - 1);
+    else if (a === 'cdown') swap(state, ci, ci + 1);
+    render();
+    save();
+    if (a === 'add') root.querySelector<HTMLInputElement>(`[data-c="${ci}"] .item:last-of-type input`)?.focus();
+    if (a === 'cadd') { const el = root.querySelector<HTMLInputElement>('.cat:last-of-type .cat__name'); el?.focus(); el?.select(); }
+  });
+
+  document.getElementById('reset')!.addEventListener('click', () => {
+    if (!confirm('Throw away your changes on this device and go back to the original price list?')) return;
+    try { localStorage.removeItem(STORE_KEY); } catch { /* nothing stored */ }
+    state = clone(defaults);
+    render();
+    status.textContent = 'Back to the original list';
+  });
+
+  document.getElementById('export')!.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
+    a.download = 'hampton-barbers-prices.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  render();
+</script>
+
+<style is:global>
+  .adm { --bg: #f4f2ee; --text: #15140f; --accent: #15140f; --on-accent: #fff; --line: #d9d4c8; background: #f4f2ee; color: #15140f; min-height: 100svh; padding: clamp(1.25rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem) 4rem; }
+  .adm > * { max-width: 62rem; margin-inline: auto; }
+  .adm__top { display: flex; justify-content: space-between; align-items: end; gap: 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; background: #f4f2ee; padding-block: .75rem; border-bottom: 1px solid var(--line); }
+  .adm__back { font-size: .9rem; color: #57534a; }
+  .adm h1 { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.8rem); letter-spacing: -.04em; margin-top: .35rem; }
+  #status { font-size: .9rem; font-weight: 600; color: #2a7a4b; }
+  .adm__note { background: #fff7d6; border: 1px solid #e6d68a; border-radius: 10px; padding: .9rem 1.1rem; font-size: .95rem; margin-block: 1.25rem; }
+  .adm input, .adm button { font: inherit; }
+  .adm input { width: 100%; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; }
+  .adm input:focus-visible { outline: 3px solid #2f6fed; outline-offset: 1px; border-color: #2f6fed; }
+  .adm button { min-height: 2.75rem; padding: .4rem .85rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; cursor: pointer; font-weight: 600; }
+  .adm button:hover:not(:disabled) { border-color: #15140f; }
+  .adm button:disabled { opacity: .35; cursor: default; }
+  .adm .danger { color: #b3261e; }
+  .adm .danger:hover:not(:disabled) { border-color: #b3261e; background: #fdecea; }
+  .cat { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem; margin-bottom: 1.25rem; }
+  .cat__head { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+  .cat__name { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-weight: 700; font-size: 1.35rem !important; letter-spacing: -.02em; }
+  .tools { display: flex; gap: .35rem; flex: none; }
+  .heads, .item { display: grid; grid-template-columns: 1.4fr 6rem 1.8fr auto; gap: .5rem; align-items: center; }
+  .heads { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8a8477; padding-inline: .15rem; margin-bottom: .35rem; }
+  .heads span:last-child { width: 9.1rem; }
+  .item { margin-bottom: .5rem; }
+  .add { margin-top: .5rem; border-style: dashed !important; }
+  .add--cat { display: block; width: 100%; max-width: 62rem; min-height: 3.5rem !important; background: transparent !important; }
+  .adm__foot { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+  .adm__see { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; font-weight: 600; }
+  .adm__see a { display: inline-grid; place-items: center; min-height: 2.75rem; padding: .4rem 1rem; border-radius: 999px; background: #15140f; color: #fff; text-decoration: none; }
+  .adm__ops { display: flex; gap: .5rem; flex-wrap: wrap; }
+  @media (max-width: 720px) {
+    .heads { display: none; }
+    .item { grid-template-columns: 1fr 5.5rem; padding: .75rem; border: 1px solid var(--line); border-radius: 10px; background: #faf9f6; }
+    .item input[data-f='note'], .item .tools { grid-column: 1 / -1; }
+    .item .tools { justify-content: flex-end; }
+    .cat__head { flex-wrap: wrap; }
+  }
+</style>

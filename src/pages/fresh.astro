@@ -2,7 +2,9 @@
 import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Status from '../components/Status.astro';
-import { site, services, fmt } from '../data/site';
+import { site, menu, fmt } from '../data/site';
+import { renderMenu } from '../lib/menu';
+import Map from '../components/Map.astro';
 import shopfront from '../assets/photos/shopfront.jpg';
 import shave from '../assets/photos/shave.jpg';
 import cut1 from '../assets/photos/cut-1.jpg';
@@ -44,9 +46,7 @@ const years = new Date().getFullYear() - site.since;
 
     <section class="wrap prices" id="prices">
       <h2 data-reveal>Prices</h2>
-      <div class="cards">
-        {services.map((s, i) => <article class="pc" data-reveal style={`--d:${i % 4}`}><b>{s.price}</b><h3>{s.name}</h3><p>{s.note}</p></article>)}
-      </div>
+      <div data-menu="fresh" data-reveal set:html={renderMenu('fresh', menu)} />
       {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
     </section>
 
@@ -70,7 +70,7 @@ const years = new Date().getFullYear() - site.since;
           <ul class="days">{site.hours.map((h) => <li data-day={h.day}><span>{h.short}</span><b>{fmt(h.open)} to {fmt(h.close)}</b></li>)}</ul>
           <div class="btns"><a class="btn" href={site.directionsUrl} rel="noopener">Open in Maps</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
         </div>
-        <div class="find__map"><button class="btn" type="button" data-map={site.mapEmbed}>Show the map</button></div>
+        <Map class="find__map" />
       </div>
     </section>
   </main>
@@ -124,7 +124,9 @@ const years = new Date().getFullYear() - site.since;
     .pc { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 1.5rem; display: grid; gap: .35rem; transition: transform .3s cubic-bezier(.2,.8,.2,1), background-color .3s, color .3s; }
     .pc:hover { transform: translateY(-6px) rotate(-1deg); background: var(--text); color: var(--bg); }
     .pc b { font-family: var(--display); font-size: 2.6rem; line-height: 1; letter-spacing: -.04em; color: var(--accent); margin-bottom: 1.25rem; }
-    .pc h3 { font-size: 1.25rem; letter-spacing: -.02em; }
+    .pc h4 { font-family: var(--display); font-weight: 700; font-size: 1.25rem; letter-spacing: -.02em; line-height: 1.1; }
+    .pgroup + .pgroup { margin-top: 2.5rem; }
+    .pgroup__h { font-size: 1.35rem; letter-spacing: -.02em; color: var(--muted); margin-bottom: 1rem; }
     .pc p { font-size: .9rem; opacity: .7; }
     .demo { margin-top: 1.5rem; font-size: .85rem; color: var(--muted); }
 
@@ -143,7 +145,7 @@ const years = new Date().getFullYear() - site.since;
     .days li b { font-weight: 500; }
     .days li[data-today] { color: #ff8a73; } .days li[data-today] b { font-weight: 700; }
     .find .btn--line { color: var(--bg); }
-    .find__map { position: relative; min-height: 22rem; display: grid; place-items: center; background: repeating-linear-gradient(45deg, #2a2620 0 22px, #25211c 22px 44px); }
+    .find__map { min-height: 24rem; }
 
     .foot { padding-block: clamp(4rem, 9vw, 7rem) 6rem; display: grid; gap: 1.25rem; }
     .foot__big { font-family: var(--display); font-weight: 800; font-size: clamp(3.5rem, 14vw, 12rem); line-height: .85; letter-spacing: -.05em; color: var(--accent); }

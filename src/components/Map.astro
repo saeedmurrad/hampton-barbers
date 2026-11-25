@@ -1,0 +1,6 @@
+---
+import { site } from '../data/site';
+---
+<div class:list={['map', Astro.props.class]}>
+  <iframe src={site.mapEmbed} title="Map showing where Hampton Barbers is" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+</div>

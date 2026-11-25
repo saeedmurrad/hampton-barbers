@@ -2,7 +2,9 @@
 import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Status from '../components/Status.astro';
-import { site, services, fmt } from '../data/site';
+import { site, menu, fmt } from '../data/site';
+import { renderMenu } from '../lib/menu';
+import Map from '../components/Map.astro';
 import tools from '../assets/photos/tools.jpg';
 import shave from '../assets/photos/shave.jpg';
 import cut1 from '../assets/photos/cut-1.jpg';
@@ -51,11 +53,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
 
     <section class="prices" id="prices">
       <h2 data-reveal>Prices</h2>
-      <ol>
-        {services.map((s, i) => (
-          <li data-reveal><span class="no">{String(i + 1).padStart(2, '0')}</span><div><h3>{s.name}</h3><p>{s.note}</p></div><b>{s.price}</b></li>
-        ))}
-      </ol>
+      <ol data-menu="street" data-reveal set:html={renderMenu('street', menu)} />
       {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
     </section>
 
@@ -80,6 +78,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
       <address data-reveal>{site.address.street}<br />{site.address.locality} {site.address.postcode}</address>
       <div class="btns" data-reveal><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
       <p class="rate" data-reveal>Rated {site.rating.value}/5 from {site.rating.count} Google reviews. <a href={site.reviewsUrl} rel="noopener">Read them</a></p>
+      <div data-reveal><Map class="smap" /></div>
     </section>
   </main>
 
@@ -125,10 +124,13 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
     .prices h2, .cuts h2, .hrs h2 { font-size: clamp(4.5rem, 15vw, 14rem); }
     .prices ol { margin-top: 2rem; border-top: 2px solid var(--text); }
     .prices li { display: grid; grid-template-columns: 4rem 1fr auto; align-items: center; gap: 1rem; padding: 1.1rem .75rem; border-bottom: 1px solid var(--line); transition: background-color .2s, color .2s, padding .3s; }
-    .prices li:hover { background: var(--accent); color: var(--on-accent); padding-inline: 1.75rem; }
+    .prices li:not(.cat):hover { background: var(--accent); color: var(--on-accent); padding-inline: 1.75rem; }
     .prices li:hover p, .prices li:hover .no { color: inherit; }
+    .prices li.cat { display: block; padding: .45rem .75rem; background: var(--text); color: var(--bg); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; font-size: .8rem; }
+    .smap { min-height: clamp(18rem, 40vw, 28rem); border: 2px solid var(--text); margin-top: 1rem; }
+    .smap iframe { filter: grayscale(1) invert(.92) contrast(1.1); }
     .no { font-family: var(--display); font-size: 1.4rem; color: var(--accent); }
-    .prices h3 { font-size: clamp(2rem, 5vw, 4rem); }
+    .prices h4 { font-family: var(--display); font-weight: 400; text-transform: uppercase; line-height: .86; font-size: clamp(2rem, 5vw, 4rem); }
     .prices li p { color: var(--muted); font-size: .92rem; margin-top: .2rem; }
     .prices li b { font-family: var(--display); font-weight: 400; font-size: clamp(2.4rem, 6vw, 5rem); line-height: 1; }
     .demo { margin-top: 1.5rem; font-size: .85rem; color: var(--muted); }

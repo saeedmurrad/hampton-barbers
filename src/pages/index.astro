@@ -23,6 +23,7 @@ const shot = (id: string) => shots[`../assets/previews/${id}.jpg`]?.default;
         </li>
       ))}
     </ol>
+    <a class="pick__admin" href={`${base}/admin/`}><strong>Admin page</strong><span>Change prices, add services and add categories. The four designs update to match.</span></a>
   </main>
 </Base>
 
@@ -39,5 +40,8 @@ const shot = (id: string) => shots[`../assets/previews/${id}.jpg`]?.default;
   .pick span { font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #8a8477; }
   .pick h2 { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-weight: 700; font-size: 1.9rem; letter-spacing: -.03em; margin-top: .3rem; }
   .pick li p { color: #57534a; margin-top: .5rem; }
+  .pick__admin { display: grid; gap: .3rem; margin-top: clamp(1.25rem, 3vw, 2.5rem); padding: 1.4rem 1.6rem; border-radius: 16px; background: #15140f; color: #fff; text-decoration: none; }
+  .pick__admin strong { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-size: 1.5rem; letter-spacing: -.02em; }
+  .pick__admin span { color: #c9c4b8; font-size: 1rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
   @media (max-width: 800px) { .pick ol { grid-template-columns: 1fr; } }
 </style>

@@ -34,17 +34,25 @@ export const fmt = (t: string) => {
 };
 
 // Prices are from the shop's 2022 price list and must be confirmed by the owner.
-export const services = [
-  { group: 'Cuts', name: 'Gents Cut', price: '£14', note: 'Scissors or clippers, however you like it.' },
-  { group: 'Cuts', name: 'Skin Fade', price: '£16', note: 'Under 15s £13.' },
-  { group: 'Cuts', name: 'Gents Cut with Cut Throat', price: '£16', note: 'Edges finished with the razor.' },
-  { group: 'Cuts', name: 'Wash & Cut', price: '£18', note: 'Shampoo, cut and style.' },
-  { group: 'Cuts', name: 'Crew Cut', price: '£8', note: 'One grade all over.' },
-  { group: 'Beards', name: 'Beard Trim', price: '£8', note: 'Shaped, lined up and tidied.' },
-  { group: 'Family', name: 'Father & Son', price: '£18', note: 'Monday to Thursday in term time, child under 15.' },
-  { group: 'Family', name: 'Children 5–15', price: '£10', note: 'Under 5s £9.' },
-  { group: 'Family', name: 'Students 16–18', price: '£11', note: 'Bring your student ID.' },
-  { group: 'Family', name: 'Over 65s', price: '£9', note: 'Every day of the week.' },
+export type Item = { name: string; price: string; note: string };
+export type Category = { name: string; items: Item[] };
+export const menu: Category[] = [
+  { name: 'Cuts', items: [
+    { name: 'Gents Cut', price: '£14', note: 'Scissors or clippers, however you like it.' },
+    { name: 'Skin Fade', price: '£16', note: 'Under 15s £13.' },
+    { name: 'Gents Cut with Cut Throat', price: '£16', note: 'Edges finished with the razor.' },
+    { name: 'Wash & Cut', price: '£18', note: 'Shampoo, cut and style.' },
+    { name: 'Crew Cut', price: '£8', note: 'One grade all over.' },
+  ] },
+  { name: 'Beards', items: [
+    { name: 'Beard Trim', price: '£8', note: 'Shaped, lined up and tidied.' },
+  ] },
+  { name: 'Family and concessions', items: [
+    { name: 'Father & Son', price: '£18', note: 'Monday to Thursday in term time, child under 15.' },
+    { name: 'Children 5–15', price: '£10', note: 'Under 5s £9.' },
+    { name: 'Students 16–18', price: '£11', note: 'Bring your student ID.' },
+    { name: 'Over 65s', price: '£9', note: 'Every day of the week.' },
+  ] },
 ];
 
 export const designs = [

@@ -3,7 +3,9 @@ import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Status from '../components/Status.astro';
 import Hours from '../components/Hours.astro';
-import { site, services } from '../data/site';
+import { site, menu } from '../data/site';
+import { renderMenu } from '../lib/menu';
+import Map from '../components/Map.astro';
 import shave from '../assets/photos/shave.jpg';
 import shopfront from '../assets/photos/shopfront.jpg';
 import cut2 from '../assets/photos/cut-2.jpg';
@@ -11,7 +13,6 @@ import cut4 from '../assets/photos/cut-4.jpg';
 import cut5 from '../assets/photos/cut-5.jpg';
 
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
-const groups = ['Cuts', 'Beards', 'Family'].map((g) => ({ name: g === 'Family' ? 'Family and concessions' : g, items: services.filter((s) => s.group === g) }));
 ---
 <Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough" design="club" themeColor="#0f2a22">
   <header class="top wrap">
@@ -52,14 +53,7 @@ const groups = ['Cuts', 'Beards', 'Family'].map((g) => ({ name: g === 'Family' ?
     <section class="menu wrap" id="menu">
       <div class="paper" data-reveal>
         <h2>The price list</h2>
-        <div class="groups">
-          {groups.map((g) => (
-            <div>
-              <h3>{g.name}</h3>
-              <ul>{g.items.map((s) => <li><span>{s.name}<small>{s.note}</small></span><b>{s.price}</b></li>)}</ul>
-            </div>
-          ))}
-        </div>
+        <div class="groups" data-menu="club" set:html={renderMenu('club', menu)} />
         {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
       </div>
     </section>
@@ -78,6 +72,7 @@ const groups = ['Cuts', 'Beards', 'Family'].map((g) => ({ name: g === 'Family' ?
         <Hours />
         <div class="btns"><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
       </div>
+      <div class="cmap-wrap" data-reveal><Map class="cmap" /></div>
     </section>
   </main>
 
@@ -124,7 +119,7 @@ const groups = ['Cuts', 'Beards', 'Family'].map((g) => ({ name: g === 'Family' ?
     .paper { background: var(--surface); color: #1b2a23; border-radius: 22px; padding: clamp(1.75rem, 5vw, 4.5rem); --line: #d8cdb6; --text: #1b2a23; --accent: #a8552a; --on-accent: #fff; }
     .menu { padding-block: clamp(3rem, 7vw, 6rem); }
     .menu h2 { font-size: clamp(2.6rem, 6vw, 4.6rem); font-style: italic; text-align: center; }
-    .groups { display: grid; grid-template-columns: 1.15fr .7fr 1.15fr; gap: clamp(1.5rem, 4vw, 3.5rem); margin-top: 3rem; }
+    .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: clamp(1.5rem, 4vw, 3.5rem); margin-top: 3rem; }
     .groups h3 { font-style: italic; font-size: 1.5rem; color: var(--accent); padding-bottom: .9rem; border-bottom: 1px solid #1b2a23; }
     .groups li { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: .95rem 0; border-bottom: 1px solid var(--line); }
     .groups li span { font-weight: 600; }
@@ -142,6 +137,8 @@ const groups = ['Cuts', 'Beards', 'Family'].map((g) => ({ name: g === 'Family' ?
 
     .visit { display: grid; grid-template-columns: .8fr 1.2fr; gap: clamp(2rem, 5vw, 5rem); align-items: center; padding-block: clamp(3rem, 7vw, 6rem); }
     .visit__round { border-radius: 50%; overflow: hidden; aspect-ratio: 1; }
+    .cmap-wrap { grid-column: 1 / -1; }
+    .cmap { min-height: clamp(18rem, 38vw, 26rem); border-radius: 22px; }
     .visit__round img { width: 100%; height: 100%; object-fit: cover; }
     .visit__card { display: grid; gap: 1.1rem; }
     .visit__card h2 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); font-style: italic; }

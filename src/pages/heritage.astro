@@ -3,7 +3,9 @@ import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Status from '../components/Status.astro';
 import Hours from '../components/Hours.astro';
-import { site, services } from '../data/site';
+import { site, menu } from '../data/site';
+import { renderMenu } from '../lib/menu';
+import Map from '../components/Map.astro';
 import shave from '../assets/photos/shave.jpg';
 import tools from '../assets/photos/tools.jpg';
 import shopfront from '../assets/photos/shopfront.jpg';
@@ -14,7 +16,6 @@ import cut4 from '../assets/photos/cut-4.jpg';
 import cut5 from '../assets/photos/cut-5.jpg';
 
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
-const half = Math.ceil(services.length / 2);
 const work = [
   { src: cut4, alt: 'Back view of a sharp skin fade' },
   { src: cut2, alt: 'Side view of a short fade with a shaped beard' },
@@ -61,11 +62,7 @@ const work = [
       <div class="card" data-reveal>
         <h2>Price List</h2>
         <p class="card__sub">Something for everyone</p>
-        <div class="cols">
-          {[services.slice(0, half), services.slice(half)].map((col) => (
-            <ul>{col.map((s) => <li><div class="row"><h3>{s.name}</h3><i></i><b>{s.price}</b></div><p>{s.note}</p></li>)}</ul>
-          ))}
-        </div>
+        <div data-menu="heritage" set:html={renderMenu('heritage', menu)} />
         {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
       </div>
     </section>
@@ -97,6 +94,7 @@ const work = [
           <div class="btns"><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a></div>
         </div>
       </div>
+      <div class="wrap" data-reveal><Map class="vmap" /></div>
     </section>
   </main>
 
@@ -148,13 +146,17 @@ const work = [
     .card { max-width: 62rem; margin-inline: auto; border: 1px solid var(--accent); outline: 1px solid var(--accent); outline-offset: 7px; padding: clamp(2rem, 6vw, 4.5rem); text-align: center; }
     .card h2 { font-size: clamp(2.6rem, 7vw, 5rem); font-style: italic; font-weight: 400; }
     .card__sub { letter-spacing: .3em; text-transform: uppercase; font-size: .78rem; color: var(--accent); margin-top: 1rem; }
-    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 clamp(2rem, 5vw, 4rem); margin-top: 3rem; text-align: left; }
-    .cols li { padding-block: .95rem; }
+    .mcat { margin-top: 2.75rem; text-align: left; }
+    .mcat__h { text-align: center; font-size: 1.5rem; font-style: italic; font-weight: 400; color: var(--accent); margin-bottom: .5rem; }
+    .cols { columns: 2; column-gap: clamp(2rem, 5vw, 4rem); }
+    .cols li { padding-block: .95rem; break-inside: avoid; }
     .row { display: flex; align-items: baseline; gap: .7rem; }
-    .row h3 { font-size: 1.3rem; font-weight: 500; }
+    .row h4 { font-family: var(--display); font-size: 1.3rem; font-weight: 500; }
     .row i { flex: 1; border-bottom: 2px dotted var(--line); transform: translateY(-.3em); }
     .row b { font-family: var(--display); font-size: 1.3rem; color: var(--accent); }
     .cols li p { color: var(--muted); font-size: .9rem; margin-top: .2rem; }
+    .vmap { margin-top: clamp(2.5rem, 6vw, 4.5rem); min-height: clamp(18rem, 40vw, 26rem); border: 1px solid var(--accent); outline: 1px solid var(--accent); outline-offset: 6px; }
+    .vmap iframe { filter: grayscale(.5) invert(.92) hue-rotate(180deg) sepia(.25) contrast(.95); }
     .demo { margin-top: 2.5rem; font-size: .82rem; color: var(--muted); }
 
     .work { padding-block: clamp(5rem, 10vw, 9rem); text-align: center; }
@@ -188,7 +190,7 @@ const work = [
       .story { grid-template-columns: 1fr 1fr; }
       .story__text { grid-column: 1 / -1; grid-row: 1; padding-top: 0; }
       .story__img--low { margin-top: 2.5rem; }
-      .cols, .visit__in { grid-template-columns: 1fr; }
+      .cols { columns: 1; } .visit__in { grid-template-columns: 1fr; }
       .work__grid { grid-template-columns: 1fr 1fr; }
     }
   }
