@@ -1,0 +1,155 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import { site, services } from '../data/site';
+import shave from '../assets/photos/shave.jpg';
+import tools from '../assets/photos/tools.jpg';
+import shopfront from '../assets/photos/shopfront.jpg';
+import cut1 from '../assets/photos/cut-1.jpg';
+import cut2 from '../assets/photos/cut-2.jpg';
+import cut3 from '../assets/photos/cut-3.png';
+import cut4 from '../assets/photos/cut-4.jpg';
+import cut5 from '../assets/photos/cut-5.jpg';
+
+const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
+const fmt = (t: string) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`; };
+const ticker = ['Skin fades', 'Gents cuts', 'Beard trims', 'Cut throat finish', 'Kids cuts', 'Father & son', 'Walk-ins welcome', 'Open 7 days'];
+const gallery = [
+  { src: cut4, alt: 'Back view of a sharp skin fade cut at Hampton Barbers', cap: 'Skin fade' },
+  { src: cut2, alt: 'Side view of a short fade with a shaped beard', cap: 'Fade & beard' },
+  { src: cut1, alt: 'Back view of a neat tapered gents cut', cap: 'Gents cut' },
+  { src: cut5, alt: 'A young boy in the barber chair with a fresh styled cut', cap: 'Kids cut' },
+  { src: cut3, alt: 'Side view of a classic scissor cut with a trimmed beard', cap: 'Scissor cut' },
+  { src: tools, alt: 'Combs and scissors laid out on a towel', cap: 'The tools' },
+];
+---
+<Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough">
+  <section class="hero">
+    <div class="hero__media">
+      <Image src={shave} alt="A barber giving a customer a cut throat shave" widths={[640, 1024, 1600, 1920]} sizes="100vw" loading="eager" fetchpriority="high" quality={70} />
+    </div>
+    <div class="wrap hero__in">
+      <p class="eyebrow fade">Hampton Vale · Peterborough · Since {site.since}</p>
+      <h1>
+        <span class="line"><span style="--i:0">Sharp cuts.</span></span>
+        <span class="line"><span style="--i:1">No <em>waiting</em></span></span>
+        <span class="line"><span style="--i:2">list.</span></span>
+      </h1>
+      <p class="hero__sub fade" style="--i:1">Hampton’s walk-in barbers since {site.since}. Take a seat, tell us what you want, and leave looking your best. Open seven days a week.</p>
+      <div class="hero__cta fade" style="--i:2">
+        <a class="btn" href={site.phoneHref}>Call {site.phone}</a>
+        <a class="btn btn--ghost" href={site.directionsUrl} rel="noopener">Get directions →</a>
+      </div>
+      <p class="status fade" style="--i:3" data-hours={JSON.stringify(site.hours.map(({ day, open, close }) => ({ day, open, close })))}><i></i><span>Open 7 days a week</span></p>
+    </div>
+    <div class="badge fade" style="--i:4" aria-hidden="true">
+      <svg viewBox="0 0 100 100"><defs><path id="c" d="M50,50 m-40,0 a40,40 0 1,1 80,0 a40,40 0 1,1 -80,0" /></defs><text><textPath href="#c">Walk-ins welcome · No appointment needed · </textPath></text></svg>
+      <b>HB</b>
+    </div>
+  </section>
+
+  <div class="marquee" aria-hidden="true">
+    {[0, 1, 2].map(() => <div class="marquee__track">{ticker.map((t) => <span>{t} ✦</span>)}</div>)}
+  </div>
+
+  <section class="section wrap" id="about">
+    <div class="about">
+      <div class="about__imgs">
+        <Image src={shopfront} alt="The Hampton Barbers shop front on Four Chimneys Crescent" widths={[400, 700]} sizes="(max-width: 860px) 80vw, 40vw" data-reveal="img" />
+        <Image src={tools} alt="Barber scissors and combs ready for the next customer" widths={[300, 500]} sizes="(max-width: 860px) 50vw, 25vw" data-reveal="img" />
+      </div>
+      <div>
+        <p class="eyebrow" data-reveal>Your local barbers</p>
+        <h2 class="h2" data-reveal style="--d:1">Part of Hampton since {site.since}.</h2>
+        <p class="lead" data-reveal style="--d:2">We opened our doors in the heart of Hampton Vale in {site.since}, and many of the boys who sat in our chairs back then now bring their own children. Experienced barbers, honest prices and a friendly welcome, every day of the week.</p>
+        <ul class="ticks" data-reveal style="--d:3">
+          <li>No appointment needed. Just walk in.</li>
+          <li>Open late on weekdays, until 8pm.</li>
+          <li>Great with children, students and over 65s.</li>
+          <li>Public parking directly opposite the shop.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="stats" data-reveal>
+      <div><b>{site.since}</b><span>Established</span></div>
+      <div><b>7</b><span>Days a week</span></div>
+      <div><b>71</b><span>Hours open weekly</span></div>
+      <div><b>{site.rating.value}★</b><span>{site.rating.count} Google reviews</span></div>
+    </div>
+  </section>
+
+  <section class="section services" id="services">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal>Price list</p>
+      <h2 class="h2" data-reveal style="--d:1">Something for everyone.</h2>
+      <ul class="price">
+        {services.map((s, i) => (
+          <li data-reveal style={`--d:${i % 2}`}><h3>{s.name}</h3><b>{s.price}</b><p>{s.note}</p></li>
+        ))}
+      </ul>
+      {isDemo && <p class="fineprint">Demo note: prices shown are from the shop’s 2022 price list and will be updated with the owner.</p>}
+    </div>
+  </section>
+
+  <section class="section" id="gallery" style="padding-bottom:0">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal>Our work</p>
+      <h2 class="h2" data-reveal style="--d:1">Fresh out of the chair.</h2>
+    </div>
+    <div class="gallery" tabindex="0" role="region" aria-label="Photo gallery, scroll sideways">
+      {gallery.map((g) => (
+        <figure><Image src={g.src} alt={g.alt} widths={[360, 720]} sizes="(max-width: 700px) 74vw, 352px" /><figcaption>{g.cap}</figcaption></figure>
+      ))}
+    </div>
+  </section>
+
+  <section class="section wrap">
+    <div class="reviews">
+      <div data-reveal>
+        <p class="eyebrow">Google reviews</p>
+        <p class="score">{site.rating.value}</p>
+        <p class="stars" aria-label={`${site.rating.value} out of 5 stars`}>★★★★☆</p>
+        <p class="lead">From {site.rating.count} reviews on Google.</p>
+      </div>
+      <div data-reveal style="--d:1">
+        <blockquote class="quote">“Been going here since I was 7 years old, 25 now.”</blockquote>
+        <p>A customer on Google</p>
+        <ul class="tags"><li>Skin fades</li><li>Attention to detail</li><li>Friendly barbers</li><li>Patient with children</li><li>Fair prices</li><li>Clean shop</li></ul>
+        <a class="btn btn--ghost" href={site.reviewsUrl} rel="noopener">Read the reviews →</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section visit" id="visit">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal>Find us</p>
+      <h2 class="h2" data-reveal style="--d:1">In the heart of Hampton Vale.</h2>
+      <div class="visit__grid">
+        <div data-reveal>
+          <table class="hours">
+            <caption class="skip">Opening hours</caption>
+            <tbody>{site.hours.map((h) => <tr data-day={h.day}><th scope="row">{h.label}</th><td>{fmt(h.open)} – {fmt(h.close)}</td></tr>)}</tbody>
+          </table>
+          <address class="addr">
+            {site.address.street}<br />{site.address.locality}, {site.address.city} {site.address.postcode}<br />
+            <a href={site.phoneHref}>{site.phone}</a>
+          </address>
+          <div class="hero__cta"><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a></div>
+        </div>
+        <div class="map" data-reveal style="--d:1">
+          <Image src={shopfront} alt="Hampton Barbers shop front with its black sign and barber pole" widths={[500, 860]} sizes="(max-width: 860px) 100vw, 45vw" />
+          <button class="btn" type="button" data-map={site.mapEmbed}>Show the map</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section cta wrap">
+    <p class="eyebrow" style="justify-content:center" data-reveal>No appointment needed</p>
+    <h2 data-reveal style="--d:1">Walk in today.</h2>
+    <div class="hero__cta" data-reveal style="--d:2">
+      <a class="btn" href={site.phoneHref}>Call {site.phone}</a>
+      <a class="btn btn--ghost" href={site.directionsUrl} rel="noopener">Get directions →</a>
+    </div>
+  </section>
+</Base>
