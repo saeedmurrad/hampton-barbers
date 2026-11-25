@@ -282,6 +282,15 @@ export const pageCredits: Record<string, { by: string; byUrl: string }[]> = {
   ]
 };
 
+// The owner's three shops. Keys match the live-status keys in src/lib/live.ts.
+// Demo: Hampton Vale's key is the design name; the other two are placeholders until the
+// owner confirms their names and addresses.
+export const shops = [
+  { id: 'hampton-vale', name: 'Hampton Vale', place: '110 Four Chimneys Crescent', directionsUrl: site.directionsUrl },
+  { id: 'shop-2', name: 'Shop two', place: 'Name and address to come', directionsUrl: '' },
+  { id: 'shop-3', name: 'Shop three', place: 'Name and address to come', directionsUrl: '' },
+];
+
 export const designs = [
   { id: 'heritage', name: 'Heritage', blurb: 'Old-fashioned barber’s card: centred, charcoal and brass, framed photo plates and slow ink-like motion.' },
   { id: 'fresh', name: 'Fresh', blurb: 'Bright and friendly: bold photos, a filterable style gallery, bouncy pop-in motion.' },

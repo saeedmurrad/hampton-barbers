@@ -4,7 +4,7 @@ import LiveNow from '../../components/LiveNow.astro';
 import { designs } from '../../data/site';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<Base title="Hampton Barbers admin: live shop status" description="Tell customers how busy the shop is right now.">
+<Base title="Hampton Barbers admin: live shop status" description="Tell customers how busy the shop is right now, and run the walk-in queue.">
   <main id="main" class="la">
     <header class="la__top">
       <div>
@@ -16,9 +16,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <section class="la__acct" id="la-account" aria-label="Your account"></section>
 
-    <nav class="la__tabs" aria-label="Which demo design to edit">
-      <span>Demo: each design has its own example. Editing</span>
-      {designs.map((d, i) => <button type="button" data-tab={d.id} aria-pressed={i === 0 ? 'true' : 'false'}>{d.name}</button>)}
+    <nav class="la__tabs" aria-label="Which shop to update">
+      <span class="grp"><span>Hampton Vale, as shown in:</span>
+        {designs.map((d, i) => <button type="button" data-tab={d.id} aria-pressed={i === 0 ? 'true' : 'false'}>{d.name}</button>)}
+      </span>
+      <span class="grp"><span>Other shops:</span>
+        <button type="button" data-tab="shop-2" aria-pressed="false">Shop two</button>
+        <button type="button" data-tab="shop-3" aria-pressed="false">Shop three</button>
+      </span>
     </nav>
 
     <div class="la__grid">
@@ -30,10 +35,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           <button type="button" data-quick="empty">Shop is empty</button>
         </div>
 
+        <div class="la__queue">
+          <div class="la__qhead"><b>Queue, in order</b><small>People who join online appear here by themselves.</small></div>
+          <ol data-queue></ol>
+        </div>
+
         {[
           ['barbers', 'Barbers cutting now', 'How many barbers are working right now'],
           ['inChair', 'Customers in the chair', 'Being cut right now'],
-          ['waiting', 'People waiting', 'Sitting in the waiting area'],
+          ['waiting', 'Walk-ins waiting', 'Adds or removes a walk-in at the back of the queue'],
           ['minutes', 'Minutes per customer', 'Average time for one cut'],
         ].map(([k, label, hint]) => (
           <div class="la__step" data-field={k}>
@@ -70,10 +80,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </Base>
 
 <script>
-  import { LIVE_KEY, LIVE_DEMO, LIVE_DESIGNS, cleanStatus, parseLiveAll, fetchLiveStatus, paintLive, type LiveAll, type LiveStatus } from '../../lib/live';
+  import { LIVE_KEY, TICKETS_KEY, LIVE_DEMO, LIVE_KEYS, WALK_IN, cleanStatus, parseLiveAll, fetchLiveStatus, paintLive, newest, type LiveAll, type LiveStatus } from '../../lib/live';
   import { initializeApp } from 'firebase/app';
   import { getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
-  import { getFirestore, connectFirestoreEmulator, doc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
+  import { getFirestore, connectFirestoreEmulator, doc, setDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore/lite';
+
+  type Ticket = { id: string; shop: string; name: string; eta: number; createdAt: number; cloud?: boolean };
 
   const cfg = {
     apiKey: import.meta.env.PUBLIC_FB_API_KEY, authDomain: import.meta.env.PUBLIC_FB_AUTH_DOMAIN,
@@ -91,49 +103,85 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const statusEl = document.getElementById('la-status')!;
   const account = document.getElementById('la-account')!;
   const preview = document.querySelector<HTMLElement>('.la__preview .live')!;
+  const queueEl = document.querySelector<HTMLElement>('[data-queue]')!;
   const modeEl = document.getElementById('la-mode') as HTMLSelectElement;
   const noteEl = document.getElementById('la-note') as HTMLInputElement;
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  const read = <T,>(k: string): T | null => { try { const x = localStorage.getItem(k); return x ? JSON.parse(x) as T : null; } catch { return null; } };
+  const write = (k: string, x: unknown) => { try { localStorage.setItem(k, JSON.stringify(x)); } catch { /* storage blocked */ } };
+  const clock = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const shopLabel = (k: string) => k === 'shop-2' ? 'Shop two' : k === 'shop-3' ? 'Shop three' : `Hampton Vale (${k[0].toUpperCase()}${k.slice(1)} demo)`;
 
   let user: User | null = null;
   let tab = 'heritage';
-  let all: LiveAll = Object.fromEntries(LIVE_DESIGNS.map((d) => [d, { ...LIVE_DEMO[d] }]));
-  const stamp = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+  let all: LiveAll = Object.fromEntries(LIVE_KEYS.map((k) => [k, cleanStatus(LIVE_DEMO[k], LIVE_DEMO[k])]));
+  let tickets = new Map<string, Ticket>();
+  let cloudSeen = false;          // true when the last cloud check could see every online ticket
+  let seenLocal = new Set<string>(); // online places made on this device that we have already seen
+  let lastQueueHtml = '';
 
-
-  const draw = () => {
-    const s = all[tab];
-    (['barbers', 'inChair', 'waiting', 'minutes'] as const).forEach((k) => {
-      document.querySelector(`[data-val="${k}"]`)!.textContent = String(s[k]);
-    });
-    modeEl.value = s.mode;
-    if (document.activeElement !== noteEl) noteEl.value = s.note;
-    preview.className = preview.className.replace(/live--\w+/, `live--${tab === 'fresh' || tab === 'club' ? tab : 'fresh'}`);
-    paintLive(preview, s);
-    document.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+  const toast = (msg: string) => {
+    document.querySelector('.la__toast')?.remove();
+    const t = Object.assign(document.createElement('p'), { className: 'la__toast', textContent: msg });
+    document.body.append(t);
+    setTimeout(() => t.remove(), 4000);
   };
 
+  // ---------- drawing ----------
+  const draw = () => {
+    const s = all[tab];
+    document.querySelector('[data-val="barbers"]')!.textContent = String(s.barbers);
+    document.querySelector('[data-val="inChair"]')!.textContent = String(s.inChair);
+    document.querySelector('[data-val="waiting"]')!.textContent = String(s.line.filter((x) => x === WALK_IN).length);
+    document.querySelector('[data-val="minutes"]')!.textContent = String(s.minutes);
+    modeEl.value = s.mode;
+    if (document.activeElement !== noteEl) noteEl.value = s.note;
+    const look = tab === 'fresh' || tab === 'club' ? tab : 'fresh';
+    preview.className = preview.className.replace(/live--\w+/, `live--${look}`);
+    paintLive(preview, s);
+    const qHtml = s.line.length ? s.line.map((x, i) => {
+      if (x === WALK_IN) return `<li><span class="n">${i + 1}</span><span><b>Walk-in</b><small>Waiting in the shop</small></span><button type="button" data-seat="${i}">Seat</button><button type="button" data-remove="${i}">Left</button></li>`;
+      const t = tickets.get(x);
+      const who = t ? esc(t.name) : 'Online customer';
+      const when = t ? `Joined online ${clock.format(new Date(t.createdAt))} · ${t.eta ? `arriving in about ${t.eta} min` : 'on the way now'}` : 'Joined online';
+      return `<li class="online"><span class="n">${i + 1}</span><span><b>${who}</b><small>${when}</small></span><button type="button" data-seat="${i}">Seat</button><button type="button" data-remove="${i}">Remove</button></li>`;
+    }).join('') : '<li class="empty">Nobody waiting</li>';
+    // Only redraw when something changed, so a barber's tap never lands on a button being replaced.
+    if (qHtml !== lastQueueHtml) { queueEl.innerHTML = qHtml; lastQueueHtml = qHtml; }
+    document.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.tab === tab));
+      const online = all[b.dataset.tab!].line.filter((x) => x !== WALK_IN).length;
+      const badge = b.querySelector('.badge');
+      if (String(online || '') !== (badge?.textContent ?? '')) {
+        badge?.remove();
+        if (online) b.insertAdjacentHTML('beforeend', `<b class="badge" title="Joined online">${online}</b>`);
+      }
+    });
+  };
+
+  // ---------- saving ----------
   let timer: number | undefined;
-  const save = () => {
-    all[tab] = cleanStatus({ ...all[tab], updatedAt: Date.now() }, LIVE_DEMO[tab]);
+  const commit = (keys: string[]) => {
+    const now = Date.now();
+    for (const k of keys) all[k] = cleanStatus({ ...all[k], updatedAt: now }, LIVE_DEMO[k]);
     draw();
-    try { localStorage.setItem(LIVE_KEY, JSON.stringify(all)); } catch { /* storage blocked */ }
+    write(LIVE_KEY, all);
     if (!user || !db) { statusEl.textContent = 'Shown on this device only. Sign in to update the website for everyone.'; return; }
     statusEl.textContent = 'Updating the website…';
     clearTimeout(timer);
-    timer = window.setTimeout(publish, 700);
+    timer = window.setTimeout(publish, 600);
   };
-
+  const stamp = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
   const publish = async () => {
     if (!user || !db) return;
-    const write = () => setDoc(doc(db, 'site', 'live'), { json: JSON.stringify(all), updatedAt: serverTimestamp() });
+    const write2 = () => setDoc(doc(db, 'site', 'live'), { json: JSON.stringify(all), updatedAt: serverTimestamp() });
     const denied = (err: unknown) => String((err as { code?: string }).code ?? '').includes('permission');
     try {
-      try { await write(); }
+      try { await write2(); }
       catch (err) {
         if (!denied(err)) throw err;
-        await setDoc(doc(db, 'site', 'owner'), { uid: user.uid });   // first admin claims the site
-        await write();
+        await setDoc(doc(db, 'site', 'owner'), { uid: user.uid }); // first admin claims the site
+        await write2();
       }
       statusEl.textContent = `Live for everyone ✓ ${stamp.format(new Date())}`;
     } catch (err) {
@@ -143,38 +191,118 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     }
   };
 
+  // ---------- online tickets ----------
+  const dropTicket = (id: string) => {
+    const t = tickets.get(id);
+    tickets.delete(id);
+    write(TICKETS_KEY, (read<Ticket[]>(TICKETS_KEY) ?? []).filter((x) => x.id !== id));
+    if (t?.cloud !== false && user && db && !id.startsWith('local')) deleteDoc(doc(db, 'tickets', id)).catch(() => { /* tidied up later */ });
+  };
+  const calledAdd = (s: LiveStatus, id: string) => [...s.called.filter((x) => x !== id), id].slice(-20);
+
+  const loadTickets = async () => {
+    const merged = new Map<string, Ticket>();
+    const localList = read<Ticket[]>(TICKETS_KEY) ?? [];
+    localList.forEach((t) => merged.set(t.id, t));
+    let cloudOk = false;
+    if (user && db) {
+      try {
+        const snap = await getDocs(query(collection(db, 'tickets'), where('status', '==', 'waiting')));
+        snap.forEach((d) => {
+          const x = d.data();
+          merged.set(d.id, { id: d.id, shop: x.shop, name: x.name, eta: x.eta, createdAt: x.createdAt?.toMillis?.() ?? Date.now(), cloud: true });
+        });
+        cloudOk = true;
+      } catch { /* not allowed or offline: use what this device knows */ }
+    }
+    cloudSeen = cloudOk;
+    const before = new Set(tickets.keys());
+    tickets = merged;
+    const changed = new Set<string>();
+    const now = Date.now();
+    for (const t of [...tickets.values()]) {
+      const s = all[t.shop];
+      if (!s) continue;
+      if (now - t.createdAt > 12 * 3_600_000) { dropTicket(t.id); if (s.line.includes(t.id)) { all[t.shop] = { ...s, line: s.line.filter((x) => x !== t.id) }; changed.add(t.shop); } continue; }
+      if (!s.line.includes(t.id) && !s.called.includes(t.id)) {
+        all[t.shop] = { ...all[t.shop], line: [...all[t.shop].line, t.id] };
+        changed.add(t.shop);
+        if (!before.has(t.id)) toast(`${t.name} joined the queue online for ${shopLabel(t.shop)}`);
+      }
+    }
+    // Remove online places whose ticket has gone (the customer left the queue).
+    const localIds = new Set(localList.map((t) => t.id));
+    for (const k of LIVE_KEYS) {
+      const s = all[k];
+      const keep = s.line.filter((x) => x === WALK_IN || tickets.has(x) || (!cloudSeen && !seenLocal.has(x)));
+      if (keep.length !== s.line.length) { all[k] = { ...s, line: keep }; changed.add(k); }
+    }
+    seenLocal = new Set([...seenLocal, ...localIds]);
+    if (changed.size) commit([...changed]); else draw();
+  };
+
+  // ---------- controls ----------
   const bump = (k: 'barbers' | 'inChair' | 'waiting' | 'minutes', d: number) => {
-    const s = { ...all[tab] };
-    s[k] = s[k] + d * (k === 'minutes' ? 5 : 1);
-    if (k === 'barbers') s.inChair = Math.min(s.inChair, Math.max(0, s.barbers));
-    all[tab] = cleanStatus(s, LIVE_DEMO[tab]);
-    save();
+    const s = { ...all[tab], line: [...all[tab].line] };
+    if (k === 'waiting') {
+      if (d > 0) s.line.push(WALK_IN);
+      else { const i = s.line.lastIndexOf(WALK_IN); if (i >= 0) s.line.splice(i, 1); }
+    } else if (k === 'minutes') s.minutes += d * 5;
+    else if (k === 'barbers') { s.barbers += d; s.inChair = Math.min(s.inChair, Math.max(0, s.barbers)); }
+    else s.inChair += d;
+    all[tab] = s;
+    commit([tab]);
+  };
+  const seat = (i: number) => {
+    const s = { ...all[tab], line: [...all[tab].line] };
+    const [x] = s.line.splice(i, 1);
+    if (x === undefined) return;
+    s.inChair = Math.min(s.barbers, s.inChair + 1);
+    if (x !== WALK_IN) { s.called = calledAdd(s, x); dropTicket(x); }
+    all[tab] = s;
+    commit([tab]);
+  };
+  const removeAt = (i: number) => {
+    const s = { ...all[tab], line: [...all[tab].line] };
+    const [x] = s.line.splice(i, 1);
+    if (x === undefined) return;
+    if (x !== WALK_IN) dropTicket(x);
+    all[tab] = s;
+    commit([tab]);
   };
 
   document.addEventListener('click', (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>('button');
-    if (!t) return;
+    if (!t || t.closest('[data-live-preview]')) return;
     if (t.dataset.inc) bump(t.dataset.inc as never, 1);
     else if (t.dataset.dec) bump(t.dataset.dec as never, -1);
     else if (t.dataset.tab) { tab = t.dataset.tab; draw(); }
+    else if (t.dataset.seat) seat(Number(t.dataset.seat));
+    else if (t.dataset.remove) removeAt(Number(t.dataset.remove));
     else if (t.dataset.quick) {
-      const s = { ...all[tab] };
-      if (t.dataset.quick === 'walkin') {
-        if (s.inChair < s.barbers && s.waiting === 0) s.inChair++; else s.waiting++;
-      } else if (t.dataset.quick === 'seated') {
-        if (s.waiting > 0 && s.inChair < s.barbers) { s.waiting--; s.inChair++; }
-      } else if (t.dataset.quick === 'done') {
-        if (s.waiting > 0) s.waiting--; else if (s.inChair > 0) s.inChair--;
-      } else if (t.dataset.quick === 'empty') { s.inChair = 0; s.waiting = 0; }
-      all[tab] = cleanStatus({ ...s, mode: s.mode === 'paused' ? 'auto' : s.mode }, LIVE_DEMO[tab]);
-      save();
+      const s = { ...all[tab], line: [...all[tab].line] };
+      const q = t.dataset.quick;
+      if (q === 'walkin') {
+        if (s.inChair < s.barbers && s.line.length === 0) s.inChair++; else s.line.push(WALK_IN);
+      } else if (q === 'seated' || q === 'done') {
+        if (s.line.length && (q === 'done' || s.inChair < s.barbers)) {
+          const x = s.line.shift()!;
+          if (q === 'seated') s.inChair = Math.min(s.barbers, s.inChair + 1);
+          if (x !== WALK_IN) { s.called = calledAdd(s, x); dropTicket(x); toast(`${tickets.get(x)?.name ?? 'Online customer'} has been called to the chair`); }
+        } else if (q === 'done' && s.inChair > 0) s.inChair--;
+      } else if (q === 'empty') {
+        s.line.filter((x) => x !== WALK_IN).forEach(dropTicket);
+        s.line = []; s.inChair = 0;
+      }
+      all[tab] = { ...s, mode: s.mode === 'paused' ? 'auto' : s.mode };
+      commit([tab]);
     }
   });
-  modeEl.addEventListener('change', () => { all[tab] = { ...all[tab], mode: modeEl.value as LiveStatus['mode'] }; save(); });
+  modeEl.addEventListener('change', () => { all[tab] = { ...all[tab], mode: modeEl.value as LiveStatus['mode'] }; commit([tab]); });
   let noteTimer: number | undefined;
-  noteEl.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = window.setTimeout(() => { all[tab] = { ...all[tab], note: noteEl.value }; save(); }, 400); });
+  noteEl.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = window.setTimeout(() => { all[tab] = { ...all[tab], note: noteEl.value }; commit([tab]); }, 400); });
 
-  // ---------- Account (sign-in only; accounts are created on the main admin page) ----------
+  // ---------- account (sign-in only; accounts are created on the main admin page) ----------
   const drawAccount = (msg = '') => {
     const note = msg ? `<p class="la__msg" role="alert">${esc(msg)}</p>` : '';
     if (!connected) { account.innerHTML = '<p><strong>Not connected.</strong> Changes show on this device only.</p>'; return; }
@@ -183,9 +311,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <input type="email" name="email" autocomplete="username" placeholder="Email" required />
         <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
         <button type="submit" class="primary">Sign in</button></form>${note}
-        <p class="la__hint">Until you sign in, changes show only on this device, which is handy for a demo.</p>`;
+        <p class="la__hint">Until you sign in, changes and online joiners show only on this device, which is handy for a demo.</p>`;
     } else {
-      account.innerHTML = `<p>Signed in as <strong>${esc(user.email)}</strong>. Every change goes live straight away. <button type="button" class="link" data-out>Sign out</button></p>${note}`;
+      account.innerHTML = `<p>Signed in as <strong>${esc(user.email)}</strong>. Every change goes live straight away, and online joiners appear here. <button type="button" class="link" data-out>Sign out</button></p>${note}`;
     }
   };
   account.addEventListener('submit', async (e) => {
@@ -196,21 +324,25 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     catch { drawAccount('The email or password is not right.'); }
   });
   account.addEventListener('click', async (e) => { if ((e.target as HTMLElement).closest('[data-out]') && auth) await signOut(auth); });
-  if (auth) onAuthStateChanged(auth, (u) => { user = u; drawAccount(); statusEl.textContent = u ? 'Signed in. Changes go live straight away.' : 'Shown on this device only. Sign in to update the website for everyone.'; });
+  if (auth) onAuthStateChanged(auth, (u) => {
+    user = u && !u.isAnonymous ? u : null;
+    drawAccount();
+    statusEl.textContent = user ? 'Signed in. Changes go live straight away.' : 'Shown on this device only. Sign in to update the website for everyone.';
+    loadTickets();
+  });
   else drawAccount();
 
-  // ---------- Start: newest of this device's copy and the published copy ----------
+  // ---------- start: newest of this device's copy and the published copy ----------
   (async () => {
-    let local: LiveAll | null = null;
-    try { local = parseLiveAll(localStorage.getItem(LIVE_KEY)); } catch { /* none */ }
+    const local = parseLiveAll(localStorage.getItem(LIVE_KEY));
     const published = await fetchLiveStatus();
-    all = Object.fromEntries(LIVE_DESIGNS.map((d) => {
-      const a = local?.[d], b = published?.[d];
-      return [d, a && b ? ((a.updatedAt ?? 0) >= (b.updatedAt ?? 0) ? a : b) : a ?? b ?? { ...LIVE_DEMO[d] }];
-    }));
+    all = Object.fromEntries(LIVE_KEYS.map((k) => [k, cleanStatus(newest(local?.[k], published?.[k], LIVE_DEMO[k]), LIVE_DEMO[k])]));
     draw();
+    loadTickets();
   })();
   draw();
+  setInterval(loadTickets, 8000);
+  addEventListener('storage', (e) => { if (e.key === TICKETS_KEY) loadTickets(); });
 </script>
 
 <style is:global>
@@ -255,4 +387,21 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .la__preview .live__big b { font-size: clamp(3.5rem, 8vw, 5.5rem); }
   .la__preview .live__foot { display: none; }
   @media (max-width: 900px) { .la__grid { grid-template-columns: 1fr; } }
+  .la__tabs .grp { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-right: .75rem; }
+  .la__tabs b.badge { display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; margin-left: .35rem; padding-inline: .3rem; border-radius: 999px; background: #e4472b; color: #fff; font-size: .72rem; }
+  .la__queue { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: .9rem 1rem; }
+  .la__qhead { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; flex-wrap: wrap; margin-bottom: .6rem; }
+  .la__qhead small { color: var(--muted); font-size: .8rem; }
+  .la__queue ol { display: grid; gap: .45rem; }
+  .la__queue li { display: grid; grid-template-columns: 2rem 1fr auto auto; align-items: center; gap: .5rem; padding: .45rem .5rem; border-radius: 10px; background: #f7f4ee; }
+  .la__queue li.online { background: #fff1ec; box-shadow: 0 0 0 1.5px #e4472b inset; }
+  .la__queue li .n { font-family: var(--display); font-weight: 800; font-size: 1.2rem; text-align: center; }
+  .la__queue li b { display: block; }
+  .la__queue li small { color: var(--muted); font-size: .8rem; }
+  .la__queue li button { min-height: 2.4rem; padding: .3rem .7rem; font-size: .85rem; }
+  .la__queue li button[data-seat] { background: #15140f; color: #fff; border-color: #15140f; }
+  .la__queue .empty { color: var(--muted); padding: .4rem .2rem; }
+  .la__toast { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 80; padding: .8rem 1.1rem; border-radius: 12px; background: #15140f; color: #fff; font-weight: 700; box-shadow: 0 14px 40px rgb(0 0 0 / .3); animation: la-toast .35s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes la-toast { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  .la__preview .live__shops, .la__preview .live__ticket, .la__preview .live__join { display: none !important; }
 </style>

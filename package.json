@@ -11,7 +11,8 @@
     "preview": "astro preview",
     "astro": "astro",
     "deploy": "astro build && npm run check && gh-pages -d dist --dotfiles --nojekyll",
-    "check": "node scripts/check-reveals.mjs && node scripts/check-spacing.mjs"
+    "check": "node scripts/check-reveals.mjs && node scripts/check-spacing.mjs",
+    "test:queue": "firebase emulators:exec --only auth,firestore --project hampton-barbers \"node scripts/test-queue.mjs .check\""
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.6",

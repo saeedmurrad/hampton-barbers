@@ -5,8 +5,13 @@ service cloud.firestore {
       return /databases/$(database)/documents/site/owner;
     }
     // The owner, or anyone the owner has added to the admins list, may change the price list.
+    // Real accounts only: visitors who join the queue get an anonymous sign-in, which must
+    // never count as the owner or an admin.
+    function isAccount() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
+    }
     function isAdmin() {
-      return request.auth != null
+      return isAccount()
         && exists(ownerPath())
         && (get(ownerPath()).data.uid == request.auth.uid
             || request.auth.uid in get(ownerPath()).data.get('admins', []));
@@ -29,14 +34,36 @@ service cloud.firestore {
       allow write: if isAdmin()
         && request.resource.data.keys().hasOnly(['json', 'updatedAt'])
         && request.resource.data.json is string
-        && request.resource.data.json.size() < 6000;
+        && request.resource.data.json.size() < 20000;
+    }
+
+    // Online queue tickets. A visitor (anonymous sign-in, no account) can add one ticket with
+    // only a first name and arrival time, and can see or delete only their own ticket.
+    // The shop can list, read and delete every ticket. Nobody can edit a ticket.
+    match /tickets/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['shop', 'name', 'eta', 'uid', 'status', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.shop in ['heritage', 'fresh', 'street', 'club', 'shop-2', 'shop-3']
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 24
+        && request.resource.data.eta is int
+        && request.resource.data.eta >= 0
+        && request.resource.data.eta <= 60
+        && request.resource.data.status == 'waiting'
+        && request.resource.data.createdAt == request.time;
+      allow get: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow update: if false;
+      allow delete: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     // Who owns the price list. The first signed-in person to publish creates this record
     // and becomes the owner. After that it cannot be replaced or deleted.
     match /site/owner {
       allow get: if request.auth != null && resource != null && resource.data.uid == request.auth.uid;
-      allow create: if request.auth != null
+      allow create: if isAccount()
         && request.resource.data.keys().hasOnly(['uid'])
         && request.resource.data.uid == request.auth.uid;
       allow update: if request.auth != null
