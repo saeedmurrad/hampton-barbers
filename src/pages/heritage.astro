@@ -12,9 +12,9 @@ import LiveChip from '../components/LiveChip.astro';
 import Reviews from '../components/Reviews.astro';
 import StyleGallery from '../components/StyleGallery.astro';
 import ShopPhotos from '../components/ShopPhotos.astro';
-import shave from '../assets/photos/shave.jpg';
-import shopfront from '../assets/photos/shopfront.jpg';
-import cut4 from '../assets/photos/cut-4.jpg';
+import heroImg from '../assets/pro/heritage-hero.jpg';
+import chairImg from '../assets/pro/heritage-chair.jpg';
+import caseImg from '../assets/pro/heritage-case.jpg';
 
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 ---
@@ -30,7 +30,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 
   <main id="main">
     <section class="hero">
-      <Image src={shave} alt="A barber giving a customer a cut throat shave" widths={[640, 1024, 1600, 1920]} sizes="100vw" loading="eager" fetchpriority="high" quality={70} />
+      <Image src={heroImg} alt="A customer relaxing under a hot towel in the barber’s chair" widths={[640, 1024, 1600, 2000]} sizes="100vw" loading="eager" fetchpriority="high" quality={70} />
       <div class="hero__in">
         <p class="place up">Hampton Vale, Peterborough</p>
         <span class="rule up" aria-hidden="true"></span>
@@ -45,14 +45,14 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
     <LiveNow design="heritage" title="How busy are we right now?" />
 
     <section class="story wrap" id="story">
-      <div class="story__img" data-reveal="img"><Image src={shopfront} alt="The Hampton Barbers shop front on Four Chimneys Crescent" widths={[360, 640]} sizes="(max-width: 900px) 90vw, 25vw" /></div>
+      <div class="story__img" data-reveal="img"><Image src={chairImg} alt="A classic red leather barber’s chair" widths={[360, 640, 900]} sizes="(max-width: 900px) 90vw, 25vw" /></div>
       <div class="story__text" data-reveal style="--d:1">
         <h2>Part of Hampton since {site.since}</h2>
         <p>We opened in the heart of Hampton Vale in {site.since}. Plenty of the lads who had their first proper haircut with us now bring their own children in.</p>
         <p>Our barbers have more than thirty years of experience between them. Skin fades, scissor cuts, cut throat finishes and beard trims. Show us a photo, or just tell us roughly what you are after.</p>
         <p class="sign">Seven days a week. No appointment, ever.</p>
       </div>
-      <div class="story__img story__img--low" data-reveal="img" style="--d:2"><Image src={cut4} alt="A sharp skin fade cut at Hampton Barbers, seen from the back" widths={[360, 640, 900]} sizes="(max-width: 900px) 90vw, 25vw" /></div>
+      <div class="story__img story__img--low" data-reveal="img" style="--d:2"><Image src={caseImg} alt="Clippers, combs and a leather barber’s case" widths={[360, 640, 900]} sizes="(max-width: 900px) 90vw, 25vw" /></div>
     </section>
 
     <section class="menu" id="prices">
@@ -60,13 +60,13 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
         <h2>Price List</h2>
         <p class="card__sub">Something for everyone</p>
         <div data-menu="heritage" set:html={renderMenu('heritage', menu)} />
-        {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
+        {isDemo && <p class="demo">Suggested prices for this demo, based on typical Peterborough barber prices in 2026. Final prices will be confirmed by the shop.</p>}
       </div>
     </section>
 
     <section class="inside wrap" aria-labelledby="inside-h">
       <h2 id="inside-h" data-reveal>Inside the shop</h2>
-      <ShopPhotos class="inside__photos" reveal="develop" />
+      <ShopPhotos class="inside__photos" reveal="develop" photos={["front-bw", "interior-1"]} />
     </section>
 
     <section class="work wrap" id="work">

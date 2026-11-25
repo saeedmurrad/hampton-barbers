@@ -1,21 +1,21 @@
 ---
-// The shop's own photos (from its Facebook page and old website).
+// The shop's own photos (from its Facebook page, Google listing and old website).
 import { Image } from 'astro:assets';
-import i1 from '../assets/photos/interior-1.jpg';
-import i2 from '../assets/photos/interior-2.jpg';
-import i3 from '../assets/photos/interior-3.jpg';
-import night from '../assets/photos/shopfront-night.jpg';
-interface Props { class?: string; reveal?: string; }
-const { class: cls, reveal = 'img' } = Astro.props;
-const shots = [
-  { src: night, alt: 'Hampton Barbers shop front lit up in the evening', cap: 'Open late on weekdays' },
-  { src: i1, alt: 'Inside Hampton Barbers: reception desk and barber chairs', cap: 'Walk straight in' },
-  { src: i2, alt: 'Row of barber chairs and lit mirrors inside Hampton Barbers', cap: 'Plenty of chairs' },
-  { src: i3, alt: 'Barber chairs and mirrors inside Hampton Barbers', cap: 'Clean, bright and friendly' },
-];
+interface Props { class?: string; reveal?: string; photos: string[]; }
+const { class: cls, reveal = 'img', photos } = Astro.props;
+const files = import.meta.glob<{ default: ImageMetadata }>('../assets/photos/*.jpg', { eager: true });
+const info: Record<string, { alt: string; cap: string }> = {
+  'front-bw': { alt: 'The Hampton Barbers shop front, in black and white', cap: 'On Four Chimneys Crescent' },
+  'front-colour': { alt: 'The glass front of Hampton Barbers', cap: 'Right in the centre of Hampton Vale' },
+  'shopfront-night': { alt: 'Hampton Barbers shop front lit up in the evening', cap: 'Open late on weekdays' },
+  'interior-1': { alt: 'Inside Hampton Barbers: reception desk and barber chairs', cap: 'Walk straight in' },
+  'interior-2': { alt: 'Row of barber chairs and lit mirrors inside Hampton Barbers', cap: 'Plenty of chairs' },
+  'interior-3': { alt: 'Barber chairs and mirrors inside Hampton Barbers', cap: 'Clean, bright and friendly' },
+  'interior-4': { alt: 'A barber chair by the window inside Hampton Barbers', cap: 'Bright and airy' },
+};
 ---
 <div class:list={['shop-photos', cls]}>
-  {shots.map((s, i) => (
-    <figure data-reveal={reveal} style={`--d:${i}`}><Image src={s.src} alt={s.alt} widths={[347]} sizes="(max-width: 700px) 46vw, 347px" /><figcaption>{s.cap}</figcaption></figure>
+  {photos.map((key, i) => (
+    <figure data-reveal={reveal} style={`--d:${i}`}><Image src={files[`../assets/photos/${key}.jpg`].default} alt={info[key].alt} widths={[400, 800]} sizes="(max-width: 700px) 46vw, 30vw" /><figcaption>{info[key].cap}</figcaption></figure>
   ))}
 </div>

@@ -11,11 +11,11 @@ import LiveNow from '../components/LiveNow.astro';
 import LiveChip from '../components/LiveChip.astro';
 import Reviews from '../components/Reviews.astro';
 import StyleGallery from '../components/StyleGallery.astro';
-import ShopPhotos from '../components/ShopPhotos.astro';
-import shopfront from '../assets/photos/shopfront.jpg';
-import cut2 from '../assets/photos/cut-2.jpg';
-import cut4 from '../assets/photos/cut-4.jpg';
-import cut5 from '../assets/photos/cut-5.jpg';
+import heroImg from '../assets/pro/club-hero.jpg';
+import combImg from '../assets/pro/club-comb.jpg';
+import capImg from '../assets/pro/club-cap.jpg';
+import frontImg from '../assets/photos/front-colour.jpg';
+import insideImg from '../assets/photos/interior-2.jpg';
 
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 ---
@@ -28,7 +28,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 
   <main id="main">
     <section class="hero wrap">
-      <div class="hero__arch up"><Image src={cut4} alt="A finished skin fade" widths={[480, 800, 1200]} sizes="(max-width: 860px) 100vw, 44vw" loading="eager" fetchpriority="high" quality={72} /></div>
+      <div class="hero__arch up"><Image src={heroImg} alt="A barber at work in a warm, wood-panelled barbershop" widths={[480, 800, 1200, 1600]} sizes="(max-width: 860px) 100vw, 44vw" loading="eager" fetchpriority="high" quality={72} /></div>
       <div class="hero__text">
         <p class="small-caps up" style="--i:1">Hampton Vale, Peterborough. Est. {site.since}.</p>
         <h1 class="up" style="--i:2">A proper cut, <em>every time.</em></h1>
@@ -52,9 +52,9 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
         <p>Between us we have more than thirty years behind the chair. Bring a photo, or describe what you want, and we will take it from there.</p>
       </div>
       <div class="arches">
-        <figure data-reveal="img"><Image src={cut4} alt="Back view of a sharp skin fade" widths={[300, 520]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
-        <figure data-reveal="img" style="--d:1"><Image src={cut2} alt="Side view of a short fade with a shaped beard" widths={[300, 520]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
-        <figure data-reveal="img" style="--d:2"><Image src={cut5} alt="A young boy in the barber chair with a fresh cut" widths={[300, 520]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
+        <figure data-reveal="img"><Image src={combImg} alt="A barber finishing a cut with comb and scissors" widths={[300, 520, 800]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
+        <figure data-reveal="img" style="--d:1"><Image src={insideImg} alt="Barber chairs and lit mirrors inside Hampton Barbers" widths={[300, 520]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
+        <figure data-reveal="img" style="--d:2"><Image src={capImg} alt="A barber trimming a beard with a straight razor" widths={[300, 520, 800]} sizes="(max-width: 860px) 30vw, 16vw" /></figure>
       </div>
     </section>
 
@@ -62,7 +62,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
       <div class="paper" data-reveal>
         <h2>The price list</h2>
         <div class="groups" data-menu="club" set:html={renderMenu('club', menu)} />
-        {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
+        {isDemo && <p class="demo">Suggested prices for this demo, based on typical Peterborough barber prices in 2026. Final prices will be confirmed by the shop.</p>}
       </div>
     </section>
 
@@ -72,15 +72,11 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
       <StyleGallery variant="club" />
     </section>
 
-    <section class="cinside wrap" aria-labelledby="cinside-h">
-      <h2 id="cinside-h" data-reveal>Inside <em>Hampton Barbers</em></h2>
-      <ShopPhotos class="cshop" />
-    </section>
 
     <Reviews design="club" title="In their words" />
 
     <section class="visit wrap" id="visit">
-      <div class="visit__round" data-reveal="img"><Image src={shopfront} alt="The Hampton Barbers shop front on Four Chimneys Crescent" widths={[420, 760]} sizes="(max-width: 860px) 70vw, 30vw" /></div>
+      <div class="visit__round" data-reveal="img"><Image src={frontImg} alt="The glass front of Hampton Barbers on Four Chimneys Crescent" widths={[420, 760, 1100]} sizes="(max-width: 860px) 70vw, 30vw" /></div>
       <div class="paper visit__card" data-reveal style="--d:1">
         <h2>Come and see us</h2>
         <address>{site.address.street}, {site.address.locality}, {site.address.city} {site.address.postcode}</address>

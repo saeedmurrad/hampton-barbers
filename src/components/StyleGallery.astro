@@ -1,11 +1,14 @@
 ---
 // One gallery of example haircut styles, drawn differently for each design.
 import { Image } from 'astro:assets';
-import { styles } from '../data/site';
+import { styles, styleShots, pageCredits } from '../data/site';
 interface Props { variant: 'heritage' | 'street' | 'club'; }
 const { variant } = Astro.props;
-const files = import.meta.glob<{ default: ImageMetadata }>('../assets/styles/*.jpg', { eager: true });
-const img = (key: string) => files[`../assets/styles/${key}.jpg`].default;
+const files = import.meta.glob<{ default: ImageMetadata }>('../assets/styles/*/*.jpg', { eager: true });
+const img = (key: string) => files[`../assets/styles/${variant}/${key}.jpg`].default;
+const credit = (key: string) => styleShots[variant]?.[key] ?? styles.find((x) => x.key === key)!;
+// One credit per photographer, in order of first appearance.
+const people = [...styles.map((x) => credit(x.key)), ...(pageCredits[variant] ?? [])].filter((c, i, all) => all.findIndex((o) => o.by === c.by) === i);
 const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 ---
 {variant === 'heritage' && (
@@ -48,7 +51,7 @@ const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'
   </div>
 )}
 
-<p class="sg-credit">Example photos for inspiration, not taken at Hampton Barbers. Photos from Unsplash by {styles.map((s, i) => <><a href={`${s.byUrl}?utm_source=hampton_barbers&utm_medium=referral`} rel="noopener">{s.by}</a>{i < styles.length - 2 ? ', ' : i === styles.length - 2 ? ' and ' : '.'}</>)}</p>
+<p class="sg-credit">Style and atmosphere photos are examples from Unsplash, not taken at Hampton Barbers. Photos by {people.map((c, i) => <><a href={`${c.byUrl}?utm_source=hampton_barbers&utm_medium=referral`} rel="noopener">{c.by}</a>{i < people.length - 2 ? ', ' : i === people.length - 2 ? ' and ' : '.'}</>)} Shop photos are Hampton Barbers’ own.</p>
 
 <script>
   // Street: the photo follows the pointer over the style list (desktop only).

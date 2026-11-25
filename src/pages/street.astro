@@ -11,7 +11,7 @@ import LiveChip from '../components/LiveChip.astro';
 import Reviews from '../components/Reviews.astro';
 import StyleGallery from '../components/StyleGallery.astro';
 import ShopPhotos from '../components/ShopPhotos.astro';
-import cut4 from '../assets/photos/cut-4.jpg';
+import heroImg from '../assets/pro/street-hero.jpg';
 
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No booking', 'Open 7 days'];
@@ -34,7 +34,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
           <Status />
         </div>
         <div class="hero__pic up" style="--i:3">
-          <Image src={cut4} alt="A finished skin fade at Hampton Barbers" widths={[640, 1100, 1600]} sizes="(max-width: 800px) 100vw, 58vw" loading="eager" fetchpriority="high" />
+          <Image src={heroImg} alt="A tattooed barber lining up a fade with a straight razor" widths={[640, 1100, 1600]} sizes="(max-width: 800px) 100vw, 58vw" loading="eager" fetchpriority="high" />
           <p class="sticker" aria-hidden="true">No<br />booking<br />needed</p>
         </div>
       </div>
@@ -49,7 +49,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
     <section class="prices" id="prices">
       <h2 data-reveal>Prices</h2>
       <ol data-menu="street" data-reveal set:html={renderMenu('street', menu)} />
-      {isDemo && <p class="demo">Demo note: these are the shop’s 2022 prices and will be updated with the owner.</p>}
+      {isDemo && <p class="demo">Suggested prices for this demo, based on typical Peterborough barber prices in 2026. Final prices will be confirmed by the shop.</p>}
     </section>
 
     <section class="cuts" id="cuts">
@@ -73,7 +73,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
       <address data-reveal>{site.address.street}<br />{site.address.locality} {site.address.postcode}</address>
       <div class="btns" data-reveal><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
       <p class="rate" data-reveal>Rated {site.rating.value}/5 from {site.rating.count} Google reviews. <a href={site.reviewsUrl} rel="noopener">Read them</a></p>
-      <ShopPhotos class="s-shop" />
+      <ShopPhotos class="s-shop" photos={["shopfront-night", "interior-3"]} />
       <div data-reveal><Map class="smap" /></div>
     </section>
   </main>

@@ -33,25 +33,26 @@ export const fmt = (t: string) => {
   return `${((h + 11) % 12) + 1}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`;
 };
 
-// Prices are from the shop's 2022 price list and must be confirmed by the owner.
+// Suggested prices based on typical Peterborough barber prices in late 2026. The owner must confirm them.
 export type Item = { name: string; price: string; note: string };
 export type Category = { name: string; items: Item[] };
 export const menu: Category[] = [
   { name: 'Cuts', items: [
-    { name: 'Gents Cut', price: '£14', note: 'A classic scissor or clipper cut. Tell us how you like the length and finish.' },
-    { name: 'Skin Fade', price: '£16', note: 'A fade blended down to skin at the sides and back. Under 15s £13.' },
-    { name: 'Gents Cut with Cut Throat', price: '£16', note: 'Edges finished with the razor.' },
-    { name: 'Wash & Cut', price: '£18', note: 'Shampoo, cut and style.' },
-    { name: 'Crew Cut', price: '£8', note: 'One grade all over.' },
+    { name: 'Gents Cut', price: '£17', note: 'A classic scissor or clipper cut. Tell us how you like the length and finish.' },
+    { name: 'Skin Fade', price: '£20', note: 'A fade blended down to skin at the sides and back. Under 15s £16.' },
+    { name: 'Gents Cut with Cut Throat', price: '£20', note: 'Edges finished with the razor.' },
+    { name: 'Wash & Cut', price: '£22', note: 'Shampoo, cut and style.' },
+    { name: 'Crew Cut', price: '£12', note: 'One grade all over.' },
   ] },
   { name: 'Beards', items: [
-    { name: 'Beard Trim', price: '£8', note: 'Trim and shape the beard, with a tidy outline.' },
+    { name: 'Beard Trim', price: '£10', note: 'Trim and shape the beard, with a tidy outline.' },
+    { name: 'Cut & Beard', price: '£26', note: 'Any haircut plus a beard trim and line-up.' },
   ] },
   { name: 'Family and concessions', items: [
-    { name: 'Father & Son', price: '£18', note: 'Monday to Thursday in term time, child under 15.' },
-    { name: 'Children 5–15', price: '£10', note: 'Under 5s £9.' },
-    { name: 'Students 16–18', price: '£11', note: 'Bring your student ID.' },
-    { name: 'Over 65s', price: '£9', note: 'Every day of the week.' },
+    { name: 'Father & Son', price: '£30', note: 'Monday to Thursday in term time, child under 15.' },
+    { name: 'Children 5–15', price: '£13', note: 'Under 5s £11.' },
+    { name: 'Students 16–18', price: '£15', note: 'Bring your student ID.' },
+    { name: 'Over 65s', price: '£12', note: 'Every day of the week.' },
   ] },
 ];
 
@@ -82,6 +83,204 @@ export const reviews = [
   { text: 'Very good barbers. Went for a beard trim and service was outstanding.', name: 'Grant M.' },
   { text: 'Friendly efficient staff.', name: 'Ioannis D.' },
 ];
+
+// Style photos for each design (free Unsplash licence). Fresh uses the credits in `styles` above.
+export const styleShots: Record<string, Record<string, { by: string; byUrl: string }>> = {
+  "heritage": {
+    "skin-fade": {
+      "by": "Agustin Fernandez",
+      "byUrl": "https://unsplash.com/@agustinfernandez"
+    },
+    "textured-fade": {
+      "by": "Megan Bagshaw",
+      "byUrl": "https://unsplash.com/@megbagshaw"
+    },
+    "afro-taper": {
+      "by": "Gulom Nazarov",
+      "byUrl": "https://unsplash.com/@modelyano"
+    },
+    "crew-cut": {
+      "by": "Behrouz Sasani",
+      "byUrl": "https://unsplash.com/@behrouzsasani"
+    },
+    "short-back-sides": {
+      "by": "Hannah Skelly",
+      "byUrl": "https://unsplash.com/@ivelisseskelly"
+    },
+    "textured-crop": {
+      "by": "Matheus Farias",
+      "byUrl": "https://unsplash.com/@karmatheux"
+    },
+    "quiff": {
+      "by": "John T.",
+      "byUrl": "https://unsplash.com/@shamstopu"
+    },
+    "pompadour": {
+      "by": "Alex Sheldon",
+      "byUrl": "https://unsplash.com/@slavewire"
+    },
+    "beard-sculpt": {
+      "by": "Lesly Juarez",
+      "byUrl": "https://unsplash.com/@jblesly"
+    },
+    "beard-trim": {
+      "by": "Nathon Oski",
+      "byUrl": "https://unsplash.com/@onatecan"
+    },
+    "cut-throat-shave": {
+      "by": "Arthur Humeau",
+      "byUrl": "https://unsplash.com/@_aaarthy"
+    },
+    "kids-cut": {
+      "by": "Tommy van Kessel",
+      "byUrl": "https://unsplash.com/@tommyvankessel"
+    }
+  },
+  "street": {
+    "skin-fade": {
+      "by": "Tá Focando",
+      "byUrl": "https://unsplash.com/@tafocandofotoefilme"
+    },
+    "textured-fade": {
+      "by": "Hesam Link",
+      "byUrl": "https://unsplash.com/@hesamjr"
+    },
+    "afro-taper": {
+      "by": "John Arano",
+      "byUrl": "https://unsplash.com/@johnarano"
+    },
+    "crew-cut": {
+      "by": "Behrooz Rahimi",
+      "byUrl": "https://unsplash.com/@behroozrahimi"
+    },
+    "short-back-sides": {
+      "by": "Amir Javadzadeh",
+      "byUrl": "https://unsplash.com/@awmirjim"
+    },
+    "textured-crop": {
+      "by": "Megan Bagshaw",
+      "byUrl": "https://unsplash.com/@megbagshaw"
+    },
+    "quiff": {
+      "by": "Le Thanh Son",
+      "byUrl": "https://unsplash.com/@notoriousfan3012"
+    },
+    "pompadour": {
+      "by": "Laszlo Barta",
+      "byUrl": "https://unsplash.com/@slie_design"
+    },
+    "beard-sculpt": {
+      "by": "Behrouz Sasani",
+      "byUrl": "https://unsplash.com/@behrouzsasani"
+    },
+    "beard-trim": {
+      "by": "César Badilla Miranda",
+      "byUrl": "https://unsplash.com/@xbmpro"
+    },
+    "cut-throat-shave": {
+      "by": "Allef Vinicius",
+      "byUrl": "https://unsplash.com/@seteph"
+    },
+    "kids-cut": {
+      "by": "Kawê Rodrigues",
+      "byUrl": "https://unsplash.com/@kawerodriguess"
+    }
+  },
+  "club": {
+    "skin-fade": {
+      "by": "Salah Regouane",
+      "byUrl": "https://unsplash.com/@salaheregouane"
+    },
+    "textured-fade": {
+      "by": "Megan Bagshaw",
+      "byUrl": "https://unsplash.com/@megbagshaw"
+    },
+    "afro-taper": {
+      "by": "Luke Thornton",
+      "byUrl": "https://unsplash.com/@lukethorntonofficial"
+    },
+    "crew-cut": {
+      "by": "Or Hakim",
+      "byUrl": "https://unsplash.com/@orhakim"
+    },
+    "short-back-sides": {
+      "by": "Nathan Fertig",
+      "byUrl": "https://unsplash.com/@nathanfertig"
+    },
+    "textured-crop": {
+      "by": "Thomas Marquize",
+      "byUrl": "https://unsplash.com/@tomarquize"
+    },
+    "quiff": {
+      "by": "Bojan Mano",
+      "byUrl": "https://unsplash.com/@bojandubov"
+    },
+    "pompadour": {
+      "by": "Alex Sheldon",
+      "byUrl": "https://unsplash.com/@slavewire"
+    },
+    "beard-sculpt": {
+      "by": "Eugene Chystiakov",
+      "byUrl": "https://unsplash.com/@eugenechystiakov"
+    },
+    "beard-trim": {
+      "by": "Mitchell Orr",
+      "byUrl": "https://unsplash.com/@mitchorr"
+    },
+    "cut-throat-shave": {
+      "by": "Victor Sirbu",
+      "byUrl": "https://unsplash.com/@victorsirbu04"
+    },
+    "kids-cut": {
+      "by": "Tommy van Kessel",
+      "byUrl": "https://unsplash.com/@tommyvankessel"
+    }
+  }
+};
+
+// Opening and about photos for each design (free Unsplash licence). Shop photos are the shop's own.
+export const pageCredits: Record<string, { by: string; byUrl: string }[]> = {
+  "heritage": [
+    {
+      "by": "Redd Francisco",
+      "byUrl": "https://unsplash.com/@reddfrancisco"
+    },
+    {
+      "by": "André Reis",
+      "byUrl": "https://unsplash.com/@andrereispt"
+    },
+    {
+      "by": "Andrea Donato",
+      "byUrl": "https://unsplash.com/@andreadonato"
+    }
+  ],
+  "street": [
+    {
+      "by": "Agustin Fernandez",
+      "byUrl": "https://unsplash.com/@agustinfernandez"
+    }
+  ],
+  "fresh": [
+    {
+      "by": "Michael DeMoya",
+      "byUrl": "https://unsplash.com/@demoya"
+    }
+  ],
+  "club": [
+    {
+      "by": "Reza Ghaemi",
+      "byUrl": "https://unsplash.com/@irezaghaemi"
+    },
+    {
+      "by": "Jonathan Cooper",
+      "byUrl": "https://unsplash.com/@theshuttervision"
+    },
+    {
+      "by": "André Reis",
+      "byUrl": "https://unsplash.com/@andrereispt"
+    }
+  ]
+};
 
 export const designs = [
   { id: 'heritage', name: 'Heritage', blurb: 'Old-fashioned barber’s card: centred, charcoal and brass, framed photo plates and slow ink-like motion.' },
