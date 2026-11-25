@@ -5,7 +5,8 @@ import Status from './Status.astro';
 import Hours from './Hours.astro';
 import SpecialHours from './SpecialHours.astro';
 import Map from './Map.astro';
-import { site, menu } from '../data/site';
+import { site, menu, styles } from '../data/site';
+import ShopPhotos from './ShopPhotos.astro';
 import { renderMenu } from '../lib/menu';
 import shopfront from '../assets/photos/shopfront.jpg';
 import shave from '../assets/photos/shave.jpg';
@@ -19,14 +20,8 @@ import '../styles/fresh.css';
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 const address = `${site.address.street}, ${site.address.locality}, ${site.address.city} ${site.address.postcode}`;
 const filters = ['All styles', 'Fades', 'Scissor cuts', 'Beards & shaves', 'Kids'];
-const photos = await Promise.all([
-  { src: cut2, title: 'Fade & shaped beard', tags: ['Fades', 'Beards & shaves'], position: '50% 42%' },
-  { src: cut4, title: 'Skin fade', tags: ['Fades'] },
-  { src: cut3, title: 'Scissor cut & beard', tags: ['Scissor cuts', 'Beards & shaves'] },
-  { src: cut1, title: 'Tapered cut', tags: ['Fades'] },
-  { src: cut5, title: 'Children’s cut', tags: ['Kids'] },
-  { src: shave, title: 'Cut-throat finish', tags: ['Beards & shaves'] },
-].map(async (photo) => ({ ...photo, full: (await getImage({ src: photo.src, width: Math.min(photo.src.width, 1100), format: 'webp' })).src })));
+const styleFiles = import.meta.glob<{ default: ImageMetadata }>('../assets/styles/*.jpg', { eager: true });
+const photos = await Promise.all(styles.map((st) => ({ src: styleFiles[`../assets/styles/${st.key}.jpg`].default, title: st.name, tags: st.tags, position: st.pos })).map(async (photo) => ({ ...photo, full: (await getImage({ src: photo.src, width: Math.min(photo.src.width, 1100), format: 'webp' })).src })));
 const faq = [
   ['Do I need an appointment?', 'No. Hampton Barbers is a walk-in shop. Come in during opening hours and we’ll see you as soon as a chair is free.'],
   ['Do you cut children’s hair?', 'Yes. See the price list for children’s cuts and the Father & Son offer.'],
@@ -38,7 +33,7 @@ const faq = [
   <header class="fresh-nav">
     <div class="wrap fresh-nav__inner">
       <a href="#top" class="fresh-brand"><span aria-hidden="true">HB<span>.</span></span><strong>Hampton<br />Barbers</strong></a>
-      <nav aria-label="Main"><a href="#prices">Services</a><a href="#cuts">Our work</a><a href="#find">Visit</a></nav>
+      <nav aria-label="Main"><a href="#prices">Services</a><a href="#cuts">Styles</a><a href="#find">Visit</a></nav>
       <a class="btn btn--line" href={site.phoneHref}>Call the shop</a>
     </div>
   </header>
@@ -46,7 +41,7 @@ const faq = [
   <main id="main">
     <section class="fresh-hero">
       <div class="wrap fresh-hero__grid">
-        <div class="fresh-hero__copy">
+        <div class="fresh-hero__copy pop">
           <p class="fresh-kicker">Hampton Vale, Peterborough</p>
           <h1>Good hair.<br /> <em>No appointment.</em></h1>
           <p class="fresh-intro">Walk-in haircuts, skin fades and beard trims. Your neighbourhood barbers since {site.since}.</p>
@@ -61,21 +56,21 @@ const faq = [
     </section>
 
     <section class="wrap fresh-section" id="prices">
-      <div class="fresh-heading"><p class="fresh-kicker">Services & prices</p><h2>Find your cut.</h2></div>
+      <div class="fresh-heading" data-reveal><p class="fresh-kicker">Services & prices</p><h2>Find your cut.</h2></div>
       <div data-menu="fresh" set:html={renderMenu('fresh', menu)} />
       {isDemo && <p class="fresh-note">Preview prices are based on the shop’s 2022 menu and are awaiting confirmation.</p>}
     </section>
 
     <section class="fresh-work" id="cuts">
       <div class="wrap fresh-section">
-        <div class="fresh-heading"><p class="fresh-kicker">Style gallery</p><h2>From the chair.</h2><p>Find a look you like and show it to your barber.</p></div>
+        <div class="fresh-heading" data-reveal><p class="fresh-kicker">Style gallery</p><h2>Find your style.</h2><p>Example photos of each cut. Tap one, then show it to your barber.</p></div>
         <div class="fresh-filters" aria-label="Filter styles" role="group" hidden>
           {filters.map((filter, i) => <button type="button" data-style-filter={filter} aria-pressed={i === 0 ? 'true' : 'false'}>{filter}</button>)}
         </div>
         <p class="sr" data-style-status role="status"></p>
         <div class="fresh-gallery">
-          {photos.map(({ src, title, tags, position, full }) => (
-            <figure data-style-card={JSON.stringify(tags)}>
+          {photos.map(({ src, title, tags, position, full }, i) => (
+            <figure data-style-card={JSON.stringify(tags)} data-reveal style={`--d:${i % 4}`}>
               <a href={full} data-gallery-link>
                 <Image src={src} alt="" widths={[320, 560, 720]} sizes="(max-width: 720px) 45vw, 32vw" style={{ objectPosition: position }} />
                 <span class="gallery-caption">{title}<span aria-hidden="true">+</span></span>
@@ -91,15 +86,17 @@ const faq = [
           <img alt="" src={photos[0].full} width="720" height="960" loading="lazy" />
           <div class="fresh-dialog__bar"><button type="button" data-gallery-prev>Previous</button><button type="button" data-gallery-next>Next</button></div>
         </dialog>
+        <p class="sg-credit">Example photos for inspiration, not taken at Hampton Barbers. Photos from Unsplash by {styles.map((st, i) => <><a href={`${st.byUrl}?utm_source=hampton_barbers&utm_medium=referral`} rel="noopener">{st.by}</a>{i < styles.length - 2 ? ', ' : i === styles.length - 2 ? ' and ' : '.'}</>)}</p>
       </div>
     </section>
 
     <section class="wrap fresh-section fresh-shop" aria-labelledby="shop-title">
       <Image src={shave} alt="A Hampton barber at work giving a customer a cut-throat shave" widths={[520, 850, 1200]} sizes="(max-width: 720px) 92vw, 46vw" />
-      <div class="fresh-heading">
+      <div class="fresh-heading" data-reveal>
         <p class="fresh-kicker">The shop</p>
         <h2 id="shop-title">Part of Hampton since {site.since}.</h2>
         <p>From a first haircut to a regular trim, bring a photo or tell us what you have in mind. We’ll talk it through in the chair.</p>
+        <ShopPhotos class="fresh-shopphotos" />
         <a class="fresh-review" href={site.reviewsUrl}><strong>{site.rating.value}/5</strong><span>Read our {site.rating.count} Google reviews</span></a>
       </div>
     </section>
@@ -107,7 +104,7 @@ const faq = [
     <section class="wrap fresh-section" id="find">
       <div class="fresh-visit">
         <div class="fresh-visit__info">
-          <div class="fresh-heading"><p class="fresh-kicker">Plan your visit</p><h2>See you soon.</h2></div>
+          <div class="fresh-heading" data-reveal><p class="fresh-kicker">Plan your visit</p><h2>See you soon.</h2></div>
           <Status />
           <address>{site.address.street}<br />{site.address.locality}, {site.address.city} {site.address.postcode}</address>
           <div class="btns"><a class="btn" href={site.directionsUrl}>Get directions</a><button class="btn btn--line" type="button" data-copy-address={address} hidden>Copy address</button></div>
@@ -124,7 +121,7 @@ const faq = [
     </section>
 
     <section class="wrap fresh-section fresh-faq">
-      <div class="fresh-heading"><p class="fresh-kicker">First visit</p><h2>Good to know.</h2></div>
+      <div class="fresh-heading" data-reveal><p class="fresh-kicker">First visit</p><h2>Good to know.</h2></div>
       <div>{faq.map(([question, answer]) => <details><summary>{question}</summary><p>{answer}</p></details>)}</div>
     </section>
   </main>

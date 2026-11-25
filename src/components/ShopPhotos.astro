@@ -1,0 +1,21 @@
+---
+// The shop's own photos (from its Facebook page and old website).
+import { Image } from 'astro:assets';
+import i1 from '../assets/photos/interior-1.jpg';
+import i2 from '../assets/photos/interior-2.jpg';
+import i3 from '../assets/photos/interior-3.jpg';
+import night from '../assets/photos/shopfront-night.jpg';
+interface Props { class?: string; reveal?: string; }
+const { class: cls, reveal = 'img' } = Astro.props;
+const shots = [
+  { src: night, alt: 'Hampton Barbers shop front lit up in the evening', cap: 'Open late on weekdays' },
+  { src: i1, alt: 'Inside Hampton Barbers: reception desk and barber chairs', cap: 'Walk straight in' },
+  { src: i2, alt: 'Row of barber chairs and lit mirrors inside Hampton Barbers', cap: 'Plenty of chairs' },
+  { src: i3, alt: 'Barber chairs and mirrors inside Hampton Barbers', cap: 'Clean, bright and friendly' },
+];
+---
+<div class:list={['shop-photos', cls]}>
+  {shots.map((s, i) => (
+    <figure data-reveal={reveal} style={`--d:${i}`}><Image src={s.src} alt={s.alt} widths={[347]} sizes="(max-width: 700px) 46vw, 347px" /><figcaption>{s.cap}</figcaption></figure>
+  ))}
+</div>

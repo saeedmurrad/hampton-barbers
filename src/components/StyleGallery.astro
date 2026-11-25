@@ -1,0 +1,69 @@
+---
+// One gallery of example haircut styles, drawn differently for each design.
+import { Image } from 'astro:assets';
+import { styles } from '../data/site';
+interface Props { variant: 'heritage' | 'street' | 'club'; }
+const { variant } = Astro.props;
+const files = import.meta.glob<{ default: ImageMetadata }>('../assets/styles/*.jpg', { eager: true });
+const img = (key: string) => files[`../assets/styles/${key}.jpg`].default;
+const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+---
+{variant === 'heritage' && (
+  <div class="sg-plates">
+    {styles.map((s, i) => (
+      <figure class="sg-plate" data-reveal="develop" style={`--d:${i % 3}`}>
+        <div class="sg-plate__frame"><Image src={img(s.key)} alt={`Example of a ${s.name.toLowerCase()}`} widths={[360, 640]} sizes="(max-width: 700px) 46vw, 24vw" style={`object-position:${s.pos ?? '50% 40%'}`} /></div>
+        <figcaption><span>No. {roman[i]}</span><b>{s.name}</b><small>{s.blurb}</small></figcaption>
+      </figure>
+    ))}
+  </div>
+)}
+
+{variant === 'street' && (
+  <div class="sg-index" data-sg-index>
+    <ol>
+      {styles.map((s, i) => (
+        <li data-reveal="wipe" data-sg-item={i}>
+          <span class="sg-no">{String(i + 1).padStart(2, '0')}</span>
+          <div class="sg-name"><b>{s.name}</b><small>{s.blurb}</small></div>
+          <span class="sg-tag">{s.tags[0]}</span>
+          <Image class="sg-thumb" src={img(s.key)} alt={`Example of a ${s.name.toLowerCase()}`} widths={[240, 480]} sizes="(max-width: 800px) 30vw, 240px" style={`object-position:${s.pos ?? '50% 40%'}`} />
+        </li>
+      ))}
+    </ol>
+    <div class="sg-float" aria-hidden="true">
+      {styles.map((s) => <Image src={img(s.key)} alt="" widths={[420, 760]} sizes="380px" style={`object-position:${s.pos ?? '50% 40%'}`} />)}
+    </div>
+  </div>
+)}
+
+{variant === 'club' && (
+  <div class="sg-look">
+    {styles.map((s, i) => (
+      <figure class="sg-look__item" data-reveal="arch" style={`--d:${i % 4}`}>
+        <div class="sg-look__arch"><Image src={img(s.key)} alt={`Example of a ${s.name.toLowerCase()}`} widths={[320, 600]} sizes="(max-width: 700px) 46vw, 22vw" style={`object-position:${s.pos ?? '50% 40%'}`} /></div>
+        <figcaption><em>{s.name}</em><small>{s.blurb}</small></figcaption>
+      </figure>
+    ))}
+  </div>
+)}
+
+<p class="sg-credit">Example photos for inspiration, not taken at Hampton Barbers. Photos from Unsplash by {styles.map((s, i) => <><a href={`${s.byUrl}?utm_source=hampton_barbers&utm_medium=referral`} rel="noopener">{s.by}</a>{i < styles.length - 2 ? ', ' : i === styles.length - 2 ? ' and ' : '.'}</>)}</p>
+
+<script>
+  // Street: the photo follows the pointer over the style list (desktop only).
+  const box = document.querySelector<HTMLElement>('[data-sg-index]');
+  if (box && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    const float = box.querySelector<HTMLElement>('.sg-float')!;
+    const pics = [...float.querySelectorAll('img')];
+    let x = 0, y = 0, tx = 0, ty = 0, raf = 0;
+    const loop = () => { x += (tx - x) * 0.18; y += (ty - y) * 0.18; float.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${(tx - x) * 0.04}deg)`; raf = requestAnimationFrame(loop); };
+    box.addEventListener('pointermove', (e) => { const r = box.getBoundingClientRect(); tx = e.clientX - r.left - 190; ty = e.clientY - r.top - 250; });
+    box.querySelectorAll<HTMLElement>('[data-sg-item]').forEach((li) => li.addEventListener('pointerenter', () => {
+      pics.forEach((p, i) => p.classList.toggle('on', i === Number(li.dataset.sgItem)));
+      float.classList.add('show');
+    }));
+    box.addEventListener('pointerenter', () => { if (!raf) raf = requestAnimationFrame(loop); });
+    box.addEventListener('pointerleave', () => { float.classList.remove('show'); cancelAnimationFrame(raf); raf = 0; });
+  }
+</script>

@@ -55,9 +55,26 @@ export const menu: Category[] = [
   ] },
 ];
 
+// Example photos for each style (free Unsplash licence, not taken at Hampton Barbers).
+export type Style = { key: string; name: string; tags: string[]; blurb: string; by: string; byUrl: string; pos?: string };
+export const styles: Style[] = [
+  { key: 'skin-fade', name: 'Skin Fade', tags: ['Fades'], blurb: 'Faded down to the skin at the back and sides, blending into length on top.', by: 'Victor Sirbu', byUrl: 'https://unsplash.com/@victorsirbu04', pos: '50% 35%' },
+  { key: 'textured-fade', name: 'Textured Fade', tags: ['Fades'], blurb: 'A fade with choppy, textured length on top. Styles in seconds with a little clay.', by: 'Langanis Studio', byUrl: 'https://unsplash.com/@langanisstudio', pos: '45% 40%' },
+  { key: 'afro-taper', name: 'Taper on Curly Hair', tags: ['Fades'], blurb: 'A clean taper at the sides that keeps natural curls full on top.', by: 'Obi', byUrl: 'https://unsplash.com/@obionyeador', pos: '50% 45%' },
+  { key: 'crew-cut', name: 'Crew Cut', tags: ['Fades'], blurb: 'Short and neat all round, a touch longer on top. Always tidy, no effort.', by: 'Mitchell Orr', byUrl: 'https://unsplash.com/@mitchorr', pos: '55% 35%' },
+  { key: 'short-back-sides', name: 'Short Back and Sides', tags: ['Scissor cuts'], blurb: 'The British classic: short and clean round the ears, length kept on top.', by: 'Stephan Louis', byUrl: 'https://unsplash.com/@stephanlouis', pos: '50% 22%' },
+  { key: 'textured-crop', name: 'Textured Crop', tags: ['Scissor cuts'], blurb: 'Short fringe pushed forward with lots of texture. Low on upkeep.', by: 'Thomas Marquize', byUrl: 'https://unsplash.com/@tomarquize', pos: '50% 25%' },
+  { key: 'quiff', name: 'Quiff', tags: ['Scissor cuts'], blurb: 'Short sides with volume swept up and back at the front.', by: 'Damian Barczak', byUrl: 'https://unsplash.com/@barczakshoots', pos: '50% 25%' },
+  { key: 'pompadour', name: 'Slick Back', tags: ['Scissor cuts'], blurb: 'Longer on top and combed back, finished with scissors and comb.', by: 'André Reis', byUrl: 'https://unsplash.com/@andrereispt', pos: '55% 30%' },
+  { key: 'beard-sculpt', name: 'Beard Shape-Up', tags: ['Beards & shaves'], blurb: 'Sharp cheek and neck lines on a full beard, matched to your fade.', by: 'Ahmad Ebadi', byUrl: 'https://unsplash.com/@ebadi__ahmad', pos: '50% 30%' },
+  { key: 'beard-trim', name: 'Beard Trim', tags: ['Beards & shaves'], blurb: 'Length taken down and tidied with scissors and clippers.', by: 'Mr Shave', byUrl: 'https://unsplash.com/@mrshave', pos: '50% 30%' },
+  { key: 'cut-throat-shave', name: 'Cut-Throat Finish', tags: ['Beards & shaves'], blurb: 'Edges finished with a straight razor for the crispest line.', by: 'Antonio Reynoso', byUrl: 'https://unsplash.com/@infantleon', pos: '50% 40%' },
+  { key: 'kids-cut', name: 'Kids Cut', tags: ['Kids'], blurb: 'Patient barbers and a smart cut for school, from under 5s upwards.', by: 'Ibrahim Guetar', byUrl: 'https://unsplash.com/@himo_beast1996', pos: '50% 30%' },
+];
+
 export const designs = [
-  { id: 'heritage', name: 'Heritage', blurb: 'Traditional and centred, like a printed barber’s card. Charcoal and brass.' },
-  { id: 'fresh', name: 'Fresh', blurb: 'A modern walk-in homepage with bold photography, a style gallery and easy directions.' },
-  { id: 'street', name: 'Street', blurb: 'Loud black-and-lime poster with giant type. Aimed at a younger crowd.' },
-  { id: 'club', name: 'Club', blurb: 'Calm and upmarket. Green and cream, arched photos, a menu-style price list.' },
+  { id: 'heritage', name: 'Heritage', blurb: 'Old-fashioned barber’s card: centred, charcoal and brass, framed photo plates and slow ink-like motion.' },
+  { id: 'fresh', name: 'Fresh', blurb: 'Bright and friendly: bold photos, a filterable style gallery, bouncy pop-in motion.' },
+  { id: 'street', name: 'Street', blurb: 'Loud black-and-lime poster: giant type, hard wipes, a hover-to-reveal style list.' },
+  { id: 'club', name: 'Club', blurb: 'Calm and upmarket: green and cream, arched lookbook photos, soft slow focus-in motion.' },
 ];

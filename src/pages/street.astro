@@ -6,28 +6,17 @@ import SpecialHours from '../components/SpecialHours.astro';
 import { site, menu, fmt } from '../data/site';
 import { renderMenu } from '../lib/menu';
 import Map from '../components/Map.astro';
-import shave from '../assets/photos/shave.jpg';
-import cut1 from '../assets/photos/cut-1.jpg';
-import cut2 from '../assets/photos/cut-2.jpg';
-import cut3 from '../assets/photos/cut-3.png';
+import StyleGallery from '../components/StyleGallery.astro';
+import ShopPhotos from '../components/ShopPhotos.astro';
 import cut4 from '../assets/photos/cut-4.jpg';
-import cut5 from '../assets/photos/cut-5.jpg';
 
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
-const film = [
-  { src: cut4, alt: 'Back view of a sharp skin fade', cap: 'Skin fade' },
-  { src: cut2, alt: 'Side view of a short fade with a shaped beard', cap: 'Fade + beard' },
-  { src: shave, alt: 'A barber giving a customer a cut throat shave', cap: 'Cut throat' },
-  { src: cut1, alt: 'Back view of a tapered gents cut', cap: 'Taper' },
-  { src: cut5, alt: 'A young boy in the barber chair with a fresh cut', cap: 'Kids' },
-  { src: cut3, alt: 'Side view of a scissor cut with a trimmed beard', cap: 'Scissor cut' },
-];
 const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No booking', 'Open 7 days'];
 ---
 <Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough" design="street" themeColor="#0a0a0c">
   <header class="bar-top">
     <a class="mark" href="#top">HB<span>/09</span></a>
-    <nav aria-label="Main"><a href="#prices">Prices</a><a href="#cuts">Cuts</a><a href="#hours">Hours</a></nav>
+    <nav aria-label="Main"><a href="#prices">Prices</a><a href="#cuts">Styles</a><a href="#hours">Hours</a></nav>
     <a class="call" href={site.phoneHref}>Call {site.phone}</a>
   </header>
 
@@ -58,12 +47,9 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
     </section>
 
     <section class="cuts" id="cuts">
-      <h2 data-reveal>The cuts</h2>
-      <div class="film" tabindex="0" role="region" aria-label="Photos of haircuts, scroll sideways">
-        {film.map((f, i) => (
-          <figure><Image src={f.src} alt={f.alt} widths={[400, 760]} sizes="(max-width: 700px) 72vw, 380px" /><figcaption><span>{String(i + 1).padStart(2, '0')}</span>{f.cap}</figcaption></figure>
-        ))}
-      </div>
+      <h2 data-reveal>Pick your cut</h2>
+      <p class="cuts__sub" data-reveal>Hover a name to see it. Screenshot it, show your barber.</p>
+      <StyleGallery variant="street" />
     </section>
 
     <section class="hrs" id="hours">
@@ -79,6 +65,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
       <address data-reveal>{site.address.street}<br />{site.address.locality} {site.address.postcode}</address>
       <div class="btns" data-reveal><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
       <p class="rate" data-reveal>Rated {site.rating.value}/5 from {site.rating.count} Google reviews. <a href={site.reviewsUrl} rel="noopener">Read them</a></p>
+      <ShopPhotos class="s-shop" />
       <div data-reveal><Map class="smap" /></div>
     </section>
   </main>
@@ -92,6 +79,13 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
 
 <style is:global>
   body.street {
+    .cuts { padding-inline: clamp(1rem, 3.5vw, 3rem) !important; }
+    .cuts__sub { color: var(--muted); font-weight: 600; margin: .5rem 0 2rem; }
+    .s-shop figure { border: 2px solid var(--text); }
+    .s-shop img { filter: grayscale(1) contrast(1.15); }
+    .s-shop figcaption { margin: 0; padding: .4rem .6rem; background: var(--text); color: var(--bg); font-weight: 800; text-transform: uppercase; letter-spacing: .1em; font-size: .72rem; }
+    .hero h1 span.up { animation: slam .7s cubic-bezier(.86,0,.07,1) both; }
+    .hero h1 span.up.hollow { animation-name: slamr; animation-delay: .18s; }
     --bg: #0a0a0c; --surface: #131317; --text: #fff; --muted: #a4a4b0; --accent: #c8f542; --on-accent: #0a0a0c; --line: #2c2c35;
     --display: 'Bebas Neue', Impact, sans-serif; --dw: 400; --radius: 0;
     h1, h2, h3 { text-transform: uppercase; line-height: .86; }
@@ -169,6 +163,8 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
       .prices li { grid-template-columns: 2.4rem 1fr auto; padding-inline: .25rem; }
     }
   }
+  @keyframes slam { 0% { transform: translateX(-60%) skewX(-12deg); clip-path: inset(0 100% 0 0); } 60% { transform: translateX(3%) skewX(4deg); clip-path: inset(0 0 0 0); } 100% { transform: none; } }
+  @keyframes slamr { 0% { transform: translateX(60%) skewX(12deg); clip-path: inset(0 0 0 100%); } 60% { transform: translateX(-3%) skewX(-4deg); clip-path: inset(0); } 100% { transform: none; } }
   @keyframes tape { to { transform: translateX(-100%); } }
   @keyframes wobble { 0%, 100% { transform: rotate(12deg); } 50% { transform: rotate(4deg) scale(1.05); } }
 </style>

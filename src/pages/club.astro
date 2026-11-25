@@ -7,6 +7,8 @@ import Hours from '../components/Hours.astro';
 import { site, menu } from '../data/site';
 import { renderMenu } from '../lib/menu';
 import Map from '../components/Map.astro';
+import StyleGallery from '../components/StyleGallery.astro';
+import ShopPhotos from '../components/ShopPhotos.astro';
 import shopfront from '../assets/photos/shopfront.jpg';
 import cut2 from '../assets/photos/cut-2.jpg';
 import cut4 from '../assets/photos/cut-4.jpg';
@@ -17,7 +19,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 <Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough" design="club" themeColor="#0f2a22">
   <header class="top wrap">
     <a class="name" href="#top">Hampton <em>Barbers</em></a>
-    <nav aria-label="Main"><a href="#about">About</a><a href="#prices">Prices</a><a href="#visit">Visit</a></nav>
+    <nav aria-label="Main"><a href="#about">About</a><a href="#looks">Lookbook</a><a href="#prices">Prices</a><a href="#visit">Visit</a></nav>
     <a class="phone" href={site.phoneHref}>{site.phone}</a>
   </header>
 
@@ -58,6 +60,17 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
       </div>
     </section>
 
+    <section class="looks wrap" id="looks">
+      <p class="small-caps" data-reveal>The lookbook</p>
+      <h2 data-reveal style="--d:1">Find your <em>style.</em></h2>
+      <StyleGallery variant="club" />
+    </section>
+
+    <section class="cinside wrap" aria-labelledby="cinside-h">
+      <h2 id="cinside-h" data-reveal>Inside <em>Hampton Barbers</em></h2>
+      <ShopPhotos class="cshop" />
+    </section>
+
     <section class="words wrap" data-reveal>
       <a class="seal" href={site.reviewsUrl} rel="noopener"><b>{site.rating.value}</b><span>out of 5<br />{site.rating.count} Google reviews</span></a>
       <blockquote>“Been going here since I was 7 years old, 25 now.”<cite>A customer on Google</cite></blockquote>
@@ -86,6 +99,14 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 
 <style is:global>
   body.club {
+    .looks { padding-block: clamp(3rem, 7vw, 6rem); }
+    .looks h2 { font-size: clamp(2.6rem, 6vw, 4.6rem); margin: .75rem 0 3rem; }
+    .cinside { padding-block: clamp(2rem, 5vw, 4rem); }
+    .cinside h2 { font-size: clamp(2rem, 4.5vw, 3.2rem); margin-bottom: 2rem; }
+    .cshop img { border-radius: 14px; }
+    .cshop figure:nth-child(even) { margin-top: 2rem; }
+    .hero__arch.up { animation: archopen 1.9s cubic-bezier(.16,1,.3,1) both; }
+    .hero__text .up { animation: focusin 1.5s cubic-bezier(.16,1,.3,1) both; animation-delay: calc(var(--i, 0) * .18s + .5s); }
     --bg: #0f2a22; --surface: #f4ecdc; --text: #f4ecdc; --muted: #b7c4b6; --accent: #e09a5f; --on-accent: #10231c; --line: #2c5244;
     --display: 'Fraunces Variable', Georgia, serif; --dw: 400; --radius: 999px;
     h1, h2 { letter-spacing: -.02em; } h1 em, h2 em, .name em { font-style: italic; color: var(--accent); }
@@ -158,5 +179,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
       .visit__round { width: 70%; margin-inline: auto; }
     }
   }
+  @keyframes archopen { from { clip-path: inset(30% 25% 0 25% round 999px 999px 0 0); opacity: 0; } to { clip-path: inset(0 round 999px 999px 18px 18px); opacity: 1; } }
+  @keyframes focusin { from { opacity: 0; filter: blur(16px); transform: translateY(30px); } to { opacity: 1; filter: none; transform: none; } }
   @keyframes turn { to { transform: rotate(360deg); } }
 </style>

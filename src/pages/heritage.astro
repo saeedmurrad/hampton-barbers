@@ -7,24 +7,13 @@ import Hours from '../components/Hours.astro';
 import { site, menu } from '../data/site';
 import { renderMenu } from '../lib/menu';
 import Map from '../components/Map.astro';
+import StyleGallery from '../components/StyleGallery.astro';
+import ShopPhotos from '../components/ShopPhotos.astro';
 import shave from '../assets/photos/shave.jpg';
-import tools from '../assets/photos/tools.jpg';
 import shopfront from '../assets/photos/shopfront.jpg';
-import cut1 from '../assets/photos/cut-1.jpg';
 import cut2 from '../assets/photos/cut-2.jpg';
-import cut3 from '../assets/photos/cut-3.png';
-import cut4 from '../assets/photos/cut-4.jpg';
-import cut5 from '../assets/photos/cut-5.jpg';
 
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
-const work = [
-  { src: cut4, alt: 'Back view of a sharp skin fade' },
-  { src: cut2, alt: 'Side view of a short fade with a shaped beard' },
-  { src: cut5, alt: 'A young boy in the barber chair with a fresh cut' },
-  { src: cut1, alt: 'Back view of a tapered gents cut' },
-  { src: cut3, alt: 'Side view of a scissor cut with a trimmed beard' },
-  { src: tools, alt: 'Combs and scissors laid out on a towel' },
-];
 ---
 <Base title="Hampton Barbers | Walk-in barber shop in Hampton Vale, Peterborough" design="heritage" themeColor="#12100e">
   <div class="top"><div class="wrap"><span>Open seven days. Late until 8pm on weekdays.</span><a href={site.phoneHref}>{site.phone}</a></div></div>
@@ -32,7 +21,7 @@ const work = [
     <div class="wrap head__in">
       <nav aria-label="Main"><a href="#story">Our story</a><a href="#prices">Price list</a></nav>
       <a class="crest" href="#top"><span>Hampton Barbers</span><small>Established {site.since}</small></a>
-      <nav aria-label="More"><a href="#work">Our work</a><a href="#visit">Find us</a></nav>
+      <nav aria-label="More"><a href="#work">Styles</a><a href="#visit">Find us</a></nav>
     </div>
   </header>
 
@@ -41,6 +30,7 @@ const work = [
       <Image src={shave} alt="A barber giving a customer a cut throat shave" widths={[640, 1024, 1600, 1920]} sizes="100vw" loading="eager" fetchpriority="high" quality={70} />
       <div class="hero__in">
         <p class="place up">Hampton Vale, Peterborough</p>
+        <span class="rule up" aria-hidden="true"></span>
         <h1 class="up" style="--i:1">Walk-in barbers <em>in Hampton Vale</em></h1>
         <p class="sub up" style="--i:2">No appointment required. Come in during opening hours and we’ll see you as soon as a chair is free.</p>
         <div class="btns up" style="--i:3"><a class="btn" href={site.phoneHref}>Call {site.phone}</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Get directions</a></div>
@@ -68,11 +58,15 @@ const work = [
       </div>
     </section>
 
+    <section class="inside wrap" aria-labelledby="inside-h">
+      <h2 id="inside-h" data-reveal>Inside the shop</h2>
+      <ShopPhotos class="inside__photos" reveal="develop" />
+    </section>
+
     <section class="work wrap" id="work">
-      <h2 data-reveal>Fresh out of the chair</h2>
-      <div class="work__grid">
-        {work.map((w, i) => <figure data-reveal="img" style={`--d:${i % 3}`}><Image src={w.src} alt={w.alt} widths={[360, 720]} sizes="(max-width: 700px) 46vw, 30vw" /></figure>)}
-      </div>
+      <h2 data-reveal>Find your style</h2>
+      <p class="work__sub" data-reveal style="--d:1">Point at a plate and show it to your barber.</p>
+      <StyleGallery variant="heritage" />
     </section>
 
     <section class="praise wrap" data-reveal>
@@ -163,7 +157,14 @@ const work = [
 
     .work { padding-block: clamp(5rem, 10vw, 9rem); text-align: center; }
     .work h2 { font-size: clamp(2.2rem, 5vw, 4rem); margin-bottom: 3rem; }
-    .work__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .work__sub { color: var(--muted); font-style: italic; margin: -2rem 0 3rem; }
+    .inside { padding-bottom: clamp(3rem, 7vw, 6rem); text-align: center; }
+    .inside h2 { font-size: clamp(2rem, 4.5vw, 3.4rem); font-style: italic; font-weight: 400; margin-bottom: 2.5rem; }
+    .inside .shop-photos figure { border: 1px solid var(--line); padding: .4rem; }
+    .inside .shop-photos figcaption { font-family: var(--display); font-style: italic; font-size: 1rem; text-align: center; }
+    .rule { display: block; width: 7rem; height: 1px; background: var(--accent); transform-origin: 50% 50%; animation: rule 1.6s cubic-bezier(.7,0,.2,1) .4s both; }
+    .hero h1.up { animation: ink 2s cubic-bezier(.2,.7,.2,1) both; animation-delay: .5s; }
+    .hero .up:not(h1):not(.rule) { animation: inkfade 1.6s ease both; animation-delay: calc(var(--i, 0) * .25s + .9s); }
     .work figure { overflow: hidden; border: 1px solid var(--line); padding: .4rem; }
     .work img { width: 100%; aspect-ratio: 1; object-fit: cover; filter: saturate(.75); }
     .work figure:hover img { filter: none; }
@@ -196,5 +197,8 @@ const work = [
       .work__grid { grid-template-columns: 1fr 1fr; }
     }
   }
+  @keyframes rule { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes ink { from { opacity: 0; letter-spacing: .14em; filter: blur(10px); } to { opacity: 1; letter-spacing: normal; filter: none; } }
+  @keyframes inkfade { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: none; } }
   @keyframes slowzoom { from { transform: scale(1.14); } to { transform: scale(1); } }
 </style>
