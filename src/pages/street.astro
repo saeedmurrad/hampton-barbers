@@ -71,9 +71,13 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
     <section class="where">
       <p class="where__label" data-reveal>Find us</p>
       <address data-reveal>{site.address.street}<br />{site.address.locality} {site.address.postcode}</address>
-      <div class="btns" data-reveal><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
-      <p class="rate" data-reveal>Rated {site.rating.value}/5 from {site.rating.count} Google reviews. <a href={site.reviewsUrl} rel="noopener">Read them</a></p>
-      <ShopPhotos class="s-shop" photos={["shopfront-night", "interior-3"]} />
+      <div class="where__row">
+        <div class="where__info">
+          <div class="btns" data-reveal><a class="btn" href={site.directionsUrl} rel="noopener">Get directions</a><a class="btn btn--line" href={site.phoneHref}>{site.phone}</a></div>
+          <p class="rate" data-reveal>Rated {site.rating.value}/5 from {site.rating.count} Google reviews. <a href={site.reviewsUrl} rel="noopener">Read them</a></p>
+        </div>
+        <ShopPhotos class="s-shop" photos={["shopfront-night", "interior-3"]} />
+      </div>
       <div data-reveal><Map class="smap" /></div>
     </section>
   </main>
@@ -158,6 +162,9 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
     .where__label { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-size: .85rem; }
     .where address { font-family: var(--display); text-transform: uppercase; font-size: clamp(2.8rem, 9.5vw, 9rem); line-height: .88; }
     .rate { color: var(--muted); }
+    .where__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 44rem); gap: clamp(1.5rem, 4vw, 3rem); align-items: end; }
+    .where__info { display: grid; gap: 1.25rem; align-content: end; }
+    @media (max-width: 900px) { .where__row { grid-template-columns: 1fr; } }
 
     .foot { padding: 0 clamp(1rem, 3.5vw, 3rem) 6rem; display: grid; gap: 1rem; overflow: clip; }
     .foot__big { font-family: var(--display); font-size: min(25vw, 24rem); line-height: .8; text-transform: uppercase; color: transparent; -webkit-text-stroke: 2px var(--line); white-space: nowrap; }

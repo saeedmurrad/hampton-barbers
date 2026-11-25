@@ -24,3 +24,6 @@ pnpm-debug.log*
 .idea/
 
 .firebase/
+
+# screenshots from the layout checks
+.check/
