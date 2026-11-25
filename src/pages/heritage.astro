@@ -11,7 +11,7 @@ import StyleGallery from '../components/StyleGallery.astro';
 import ShopPhotos from '../components/ShopPhotos.astro';
 import shave from '../assets/photos/shave.jpg';
 import shopfront from '../assets/photos/shopfront.jpg';
-import cut2 from '../assets/photos/cut-2.jpg';
+import cut4 from '../assets/photos/cut-4.jpg';
 
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 ---
@@ -46,7 +46,7 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
         <p>Our barbers have more than thirty years of experience between them. Skin fades, scissor cuts, cut throat finishes and beard trims. Show us a photo, or just tell us roughly what you are after.</p>
         <p class="sign">Seven days a week. No appointment, ever.</p>
       </div>
-      <div class="story__img story__img--low" data-reveal="img" style="--d:2"><Image src={cut2} alt="A finished fade and beard trim, seen from the side" widths={[360, 640]} sizes="(max-width: 900px) 90vw, 25vw" /></div>
+      <div class="story__img story__img--low" data-reveal="img" style="--d:2"><Image src={cut4} alt="A sharp skin fade cut at Hampton Barbers, seen from the back" widths={[360, 640, 900]} sizes="(max-width: 900px) 90vw, 25vw" /></div>
     </section>
 
     <section class="menu" id="prices">
@@ -131,7 +131,8 @@ const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 
     .story { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: clamp(1.5rem, 4vw, 4rem); align-items: start; padding-block: clamp(5rem, 10vw, 9rem); }
     .story__img { overflow: hidden; border: 1px solid var(--accent); padding: .5rem; }
-    .story__img img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; filter: saturate(.8); }
+    .story__img img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+    .story__img--low img { object-position: 50% 30%; }
     .story__img--low { margin-top: 6rem; }
     .story__text { text-align: center; display: grid; gap: 1.25rem; padding-top: 2rem; }
     .story h2 { font-size: clamp(2.2rem, 4.5vw, 3.6rem); margin-bottom: .5rem; }

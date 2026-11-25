@@ -58,11 +58,21 @@ const jsonLd = {
   <body class={design} id="top">
     <a class="skip" href="#main">Skip to content</a>
     <slot />
-    {design && <nav class="bar" aria-label="Quick contact"><a href={site.phoneHref}>Call the shop</a><a href={site.directionsUrl} rel="noopener">Directions</a></nav>}
+    {design && (
+      <nav class="fab" aria-label="Quick contact">
+        <a class="fab__dir" href={site.directionsUrl} rel="noopener" aria-label="Get directions to the shop">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" /></svg>
+        </a>
+        <a class="fab__call" href={site.phoneHref} aria-label={`Call the shop on ${site.phone}`}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1L6.6 10.8Z" /></svg>
+          <span>Call</span>
+        </a>
+      </nav>
+    )}
     {isDemo && design && (
       <nav class="designs" aria-label="Design options">
         <a href={`${base}/${prev.id}/`} aria-label={`Previous design: ${prev.name}`}>‹</a>
-        <span>Design {n + 1} of {designs.length}: {designs[n].name}</span>
+        <span><i class="designs__long">Design </i>{n + 1}<i class="designs__long"> of {designs.length}</i><i class="designs__short">/{designs.length}</i>: {designs[n].name}</span>
         <a href={`${base}/${next.id}/`} aria-label={`Next design: ${next.name}`}>›</a>
         <a href={`${base}/`}>All</a>
         <a class="designs__admin" href={`${base}/admin/`}>Edit prices</a>

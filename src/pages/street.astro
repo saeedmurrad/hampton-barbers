@@ -48,7 +48,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
 
     <section class="cuts" id="cuts">
       <h2 data-reveal>Pick your cut</h2>
-      <p class="cuts__sub" data-reveal>Hover a name to see it. Screenshot it, show your barber.</p>
+      <p class="cuts__sub" data-reveal><span class="hover-only">Hover a name to see it. </span>Screenshot one and show your barber.</p>
       <StyleGallery variant="street" />
     </section>
 
@@ -81,6 +81,7 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
   body.street {
     .cuts { padding-inline: clamp(1rem, 3.5vw, 3rem) !important; }
     .cuts__sub { color: var(--muted); font-weight: 600; margin: .5rem 0 2rem; }
+    @media (hover: none), (max-width: 800px) { .hover-only { display: none; } }
     .s-shop figure { border: 2px solid var(--text); }
     .s-shop img { filter: grayscale(1) contrast(1.15); }
     .s-shop figcaption { margin: 0; padding: .4rem .6rem; background: var(--text); color: var(--bg); font-weight: 800; text-transform: uppercase; letter-spacing: .1em; font-size: .72rem; }
@@ -159,7 +160,12 @@ const tape = ['Skin fades', 'Beard trims', 'Cut throat', 'Kids cuts', 'No bookin
       .bar-top nav { display: none; }
       .hero__row { grid-template-columns: 1fr; }
       .sticker { right: .5rem; width: 6.5rem; font-size: 1.2rem; }
-      .week { grid-template-columns: repeat(2, 1fr); } .week li { border-bottom: 1px solid var(--line); }
+      .week { grid-template-columns: 1fr; }
+      .week li { grid-template-columns: 4.2rem 1fr 1fr; align-items: center; padding: .7rem .9rem; border-right: 0; border-bottom: 1px solid var(--line); }
+      .week li:last-child { border-bottom: 0; }
+      .week span { font-size: 1.8rem; margin: 0; }
+      .week b { font-size: 1rem; }
+      .week b:last-child { text-align: right; }
       .prices li { grid-template-columns: 2.4rem 1fr auto; padding-inline: .25rem; }
     }
   }
