@@ -23,6 +23,4 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 
-# real admin emails stay out of the public repo (see firestore.rules.example)
-firestore.rules
 .firebase/

@@ -14,6 +14,6 @@ Prices are from the shop's 2022 price list and need the owner's confirmation. Ph
 
 - `/admin/` edits the price list. Edits are a draft in the browser until "Publish to the website" is pressed.
 - The published list is one Firestore document, `site/menu`, in the Firebase project `hampton-barbers`. Every design reads it when the page loads.
-- Sign-in is Firebase email and password. Who may publish is set in `firestore.rules` (not committed; see `firestore.rules.example`).
-  After changing it: `firebase deploy --only firestore --project hampton-barbers --account <your account>`.
+- Sign-in is Firebase email and password, with no confirmation email. The first signed-in person to press Publish becomes the owner (Firestore document `site/owner`); after that only the owner, or user IDs the owner adds to its `admins` list, can publish. Rules are in `firestore.rules`.
+  After changing them: `firebase deploy --only firestore --project hampton-barbers --account <your account>`.
 - Firebase web settings go in `.env` (see `.env.example`). Without them the admin page still works but cannot publish.

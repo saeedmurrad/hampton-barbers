@@ -39,8 +39,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   import { menu as defaults, type Category } from '../data/site';
   import { STORE_KEY, fetchLive } from '../lib/menu';
   import { initializeApp } from 'firebase/app';
-  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, applyActionCode, type User } from 'firebase/auth';
-  import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
+  import { getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, type User } from 'firebase/auth';
+  import { getFirestore, connectFirestoreEmulator, doc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
 
   const cfg = {
     apiKey: import.meta.env.PUBLIC_FB_API_KEY, authDomain: import.meta.env.PUBLIC_FB_AUTH_DOMAIN,
@@ -50,6 +50,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const app = connected ? initializeApp(cfg) : null;
   const auth = app ? getAuth(app) : null;
   const db = app ? getFirestore(app) : null;
+  // Local testing only (never on the real site): add ?emulator to use the Firebase emulators.
+  if (auth && db && /^(localhost|127\.0\.0\.1|.+\.test)$/.test(location.hostname) && new URLSearchParams(location.search).has('emulator')) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  }
 
   const root = document.getElementById('editor')!;
   const status = document.getElementById('status')!;
@@ -66,7 +71,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   let live: Category[] = clone(defaults);
   let user: User | null = null;
   const hasDraft = () => { try { return localStorage.getItem(STORE_KEY) !== null; } catch { return false; } };
-  const canPublish = () => Boolean(user?.emailVerified);
+  const canPublish = () => Boolean(user);
 
   const refresh = () => {
     publishBtn.disabled = !canPublish();
@@ -179,18 +184,25 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     if (!out.length) { status.textContent = 'Add at least one service before publishing.'; return; }
     publishBtn.disabled = true;
     status.textContent = 'Publishing…';
+    const write = () => setDoc(doc(db, 'site', 'menu'), { json: JSON.stringify(out), updatedAt: serverTimestamp() });
+    const denied = (err: unknown) => String((err as { code?: string }).code ?? '').includes('permission');
     try {
-      await user.getIdToken(true);
-      await setDoc(doc(db, 'site', 'menu'), { json: JSON.stringify(out), updatedAt: serverTimestamp() });
+      try {
+        await write();
+      } catch (err) {
+        if (!denied(err)) throw err;
+        // Nobody owns the price list yet: claim it for this account, then publish.
+        await setDoc(doc(db, 'site', 'owner'), { uid: user.uid });
+        await write();
+      }
       clearTimeout(timer);
       try { localStorage.removeItem(STORE_KEY); } catch { /* nothing stored */ }
       live = clone(out); state = clone(out);
       render();
       status.textContent = 'Published. Every visitor now sees these prices.';
     } catch (err) {
-      const code = (err as { code?: string }).code ?? '';
-      status.textContent = code.includes('permission')
-        ? 'This account is not allowed to change the prices. Ask the developer to add your email.'
+      status.textContent = denied(err)
+        ? 'This account is not allowed to change the prices. Sign in with the account that set this up.'
         : 'Publishing failed. Check your internet connection and try again.';
     }
     refresh();
@@ -204,15 +216,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     if (code.includes('weak-password')) return 'Choose a password with at least 6 characters.';
     if (code.includes('invalid-email')) return 'That does not look like an email address.';
     if (code.includes('too-many-requests')) return 'Too many tries. Wait a few minutes and try again.';
-    if (/invalid-action-code|expired-action-code/.test(code)) return 'That link has expired or was already used. Press Send the link again and use the new email.';
     if (code.includes('operation-not-allowed')) return 'Email sign-in is not switched on in Firebase yet.';
     return 'That did not work. Check your internet connection and try again.';
-  };
-
-  // Pull the confirmation code out of an emailed link, even if the "&" signs were changed on the way.
-  const codeFromLink = (raw: string) => {
-    const m = raw.replace(/&amp;/gi, '&').replace(/%26/gi, '&').match(/oobCode=([^&\s#"'<>]+)/);
-    try { return m ? decodeURIComponent(m[1]) : ''; } catch { return m ? m[1] : ''; }
   };
 
   const drawAccount = (msg = '') => {
@@ -223,6 +228,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       account.innerHTML = `
         <form id="signin" novalidate>
           <h2>Sign in to publish</h2>
+          <p class="acct__hint">First time? Type your email, choose a password, and press Create my account. No confirmation email is needed.</p>
           <div class="acct__row">
             <label>Email<input type="email" name="email" autocomplete="username" required /></label>
             <label>Password<input type="password" name="password" autocomplete="current-password" required minlength="6" /></label>
@@ -234,20 +240,6 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           </div>
           ${note}
         </form>`;
-    } else if (!user.emailVerified) {
-      account.innerHTML = `
-        <h2>Confirm your email</h2>
-        <p>We sent a link to <strong>${esc(user.email)}</strong>. Open that email, press the link, then come back and press Continue. Check your spam folder if it is not there.</p>
-        <div class="acct__btns">
-          <button type="button" class="primary" data-acct="continue">Continue</button>
-          <button type="button" data-acct="resend">Send the link again</button>
-          <button type="button" data-acct="out" class="link">Sign out</button>
-        </div>${note}
-        <div class="acct__paste">
-          <label for="pastelink">If the link opens an error page, copy the whole link (from the email, or from the address bar of the error page) and paste it here.</label>
-          <input type="text" id="pastelink" placeholder="Paste the link from the email" autocomplete="off" spellcheck="false" />
-          <button type="button" data-acct="paste">Confirm with this link</button>
-        </div>`;
     } else {
       account.innerHTML = `<p>Signed in as <strong>${esc(user.email)}</strong>. <button type="button" data-acct="out" class="link">Sign out</button></p>${note}`;
     }
@@ -276,29 +268,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       if (act === 'create') {
         const { email, password } = creds();
         if (!email || password.length < 6) return drawAccount('Enter your email and a password of at least 6 characters, then press Create my account.');
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await sendEmailVerification(cred.user);
+        await createUserWithEmailAndPassword(auth, email, password);
       } else if (act === 'forgot') {
         const { email } = creds();
         if (!email) return drawAccount('Type your email first, then press Forgot password.');
         await sendPasswordResetEmail(auth, email);
         drawAccount('If that email has an account, a reset link is on its way.');
-      } else if (act === 'continue' && user) {
-        await user.reload();
-        await user.getIdToken(true);
-        user = auth.currentUser;
-        drawAccount(user?.emailVerified ? '' : 'Not confirmed yet. Press the link in the email first.');
-      } else if (act === 'paste' && user) {
-        const code = codeFromLink((document.getElementById('pastelink') as HTMLInputElement).value);
-        if (!code) return drawAccount('That does not look like the link from the email. Copy the whole link and paste it again.');
-        await applyActionCode(auth, code);
-        await user.reload();
-        await user.getIdToken(true);
-        user = auth.currentUser;
-        drawAccount(user?.emailVerified ? '' : 'Still not confirmed. Press Send the link again and use the new email.');
-      } else if (act === 'resend' && user) {
-        await sendEmailVerification(user);
-        drawAccount('Sent. Look for an email from Firebase.');
       } else if (act === 'out') {
         await signOut(auth);
       }
@@ -345,8 +320,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .acct__row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
   .acct label { display: grid; gap: .3rem; font-size: .85rem; font-weight: 600; }
   .acct__btns { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .85rem; align-items: center; }
-  .acct__paste { display: grid; gap: .5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .92rem; }
-  .acct__paste button { justify-self: start; }
+  .acct__hint { font-size: .92rem; color: #57534a; margin-bottom: .75rem; }
   .acct__msg { margin-top: .75rem; color: #8a4b00; font-weight: 600; font-size: .95rem; }
   .cat { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem; margin-bottom: 1.25rem; }
   .cat__head { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; }

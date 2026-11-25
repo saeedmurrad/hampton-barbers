@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownerPath() {
+      return /databases/$(database)/documents/site/owner;
+    }
+    // The owner, or anyone the owner has added to the admins list, may change the price list.
+    function isAdmin() {
+      return request.auth != null
+        && exists(ownerPath())
+        && (get(ownerPath()).data.uid == request.auth.uid
+            || request.auth.uid in get(ownerPath()).data.get('admins', []));
+    }
+
+    // The published price list: anyone can read it, only admins can change it.
+    match /site/menu {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['json', 'updatedAt'])
+        && request.resource.data.json is string
+        && request.resource.data.json.size() < 20000;
+    }
+
+    // Who owns the price list. The first signed-in person to publish creates this record
+    // and becomes the owner. After that it cannot be replaced or deleted.
+    match /site/owner {
+      allow get: if request.auth != null && resource != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.keys().hasOnly(['uid', 'admins']);
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
