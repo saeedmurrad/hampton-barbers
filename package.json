@@ -10,7 +10,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "deploy": "astro build && gh-pages -d dist --dotfiles --nojekyll"
+    "deploy": "astro build && gh-pages -d dist --dotfiles --nojekyll",
+    "check": "node scripts/check-reveals.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.6",

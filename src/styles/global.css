@@ -82,7 +82,7 @@ main { overflow-x: clip; }
 /* ---------- Per-design motion: the same markup animates differently in each design ---------- */
 /* Heritage: slow, ink-like. Things fade out of a soft blur; photos "develop" from sepia. */
 .js body.heritage [data-reveal]:where(:not([data-reveal='img'], [data-reveal='develop'])) { transform: none; filter: blur(8px); letter-spacing: .02em; transition: opacity 1.1s ease, filter 1.1s ease, letter-spacing 1.2s ease; transition-delay: calc(var(--d, 0) * 120ms); }
-.js body.heritage [data-reveal].in { filter: none; letter-spacing: normal; }
+.js body.heritage [data-reveal].in { filter: none; letter-spacing: normal; transform: none; opacity: 1; }
 .js body.heritage :is([data-reveal='img'], [data-reveal='develop'])::after { display: none; }
 .js body.heritage :is([data-reveal='img'], [data-reveal='develop']) { opacity: 1; transform: none; }
 .js body.heritage :is([data-reveal='img'], [data-reveal='develop']) img { transform: none; filter: sepia(1) brightness(1.9) contrast(.55) blur(3px); transition: filter 1.6s ease; transition-delay: calc(var(--d, 0) * 160ms); }
@@ -104,7 +104,7 @@ main { overflow-x: clip; }
 
 /* Club: calm and luxurious. Slow rise out of soft focus; photos open from an arch. */
 .js body.club [data-reveal]:where(:not([data-reveal='img'], [data-reveal='arch'])) { transform: translateY(46px); filter: blur(14px); transition: opacity 1.4s cubic-bezier(.16,1,.3,1), transform 1.6s cubic-bezier(.16,1,.3,1), filter 1.4s cubic-bezier(.16,1,.3,1); transition-delay: calc(var(--d, 0) * 140ms); }
-.js body.club [data-reveal].in { filter: none; }
+.js body.club [data-reveal].in { filter: none; transform: none; opacity: 1; }
 .js body.club :is([data-reveal='img'], [data-reveal='arch']) { opacity: 1; transform: none; }
 .js body.club :is([data-reveal='img'], [data-reveal='arch'])::after { display: none; }
 .js body.club :is([data-reveal='img'], [data-reveal='arch']) img { clip-path: inset(38% 22% 0 22% round 999px 999px 0 0); transform: scale(1.15); transition: clip-path 1.8s cubic-bezier(.16,1,.3,1), transform 2.2s cubic-bezier(.16,1,.3,1); transition-delay: calc(var(--d, 0) * 160ms); }
