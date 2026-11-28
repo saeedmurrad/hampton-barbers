@@ -5,7 +5,7 @@
 .ui {
   --bg: #0a0c0b; --s1: #121614; --s2: #1a1f1c; --s3: #242b27;
   --line: rgb(255 255 255 / .08); --line2: rgb(255 255 255 / .16);
-  --text: #f4f1e8; --muted: #a7b0aa; --faint: #6f7973;
+  --text: #f4f1e8; --muted: #a7b0aa; --faint: #8a948e;
   --brass: #d9b76e; --ok: #3ddc84; --wait: #f6bd4b; --alert: #ff6f64; --info: #86b9ff;
   --display: 'Bricolage Grotesque Variable', system-ui, sans-serif;
   --pad: clamp(1rem, 3.2vw, 2rem);
@@ -31,7 +31,7 @@
 .u-chip--info { background: rgb(134 185 255 / .14); color: var(--info); }
 .u-chip--plain::before { display: none; }
 .u-live { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 650; color: var(--ok); }
-.u-live i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 rgb(61 220 132 / .6); animation: u-pulse 2s ease-out infinite; }
+.u-live i { width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 rgb(61 220 132 / .6); animation: u-pulse 2s ease-out infinite; }
 @keyframes u-pulse { to { box-shadow: 0 0 0 .55rem rgb(61 220 132 / 0); } }
 
 .u-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; padding: 0 1.05rem; border-radius: 12px; border: 1px solid var(--line2); background: var(--s2); color: var(--text); font-family: inherit; font-weight: 650; font-size: .95rem; line-height: 1; white-space: nowrap; cursor: pointer; text-decoration: none; transition: background .15s, border-color .15s, transform .1s; }
@@ -43,8 +43,8 @@
 .u-btn--go:hover { background: #5be79a; border-color: transparent; }
 .u-btn--quiet { background: none; border-color: transparent; color: var(--muted); padding-inline: .7rem; }
 .u-btn--quiet:hover { background: rgb(255 255 255 / .06); color: var(--text); border-color: transparent; }
-.u-btn--icon { width: 2.75rem; padding: 0; font-size: 1.15rem; letter-spacing: .05em; color: var(--muted); }
-.u-btn--sm { min-height: 2.35rem; padding-inline: .85rem; font-size: .85rem; border-radius: 10px; }
+.u-btn--icon { flex: none; width: 2.75rem; padding: 0; font-size: 1.15rem; letter-spacing: .05em; color: var(--muted); }
+.u-btn--sm { min-width: 2.5rem; min-height: 2.35rem; padding-inline: .85rem; font-size: .85rem; border-radius: 10px; }
 .u-btn--sm.u-btn--icon { width: 2.35rem; padding: 0; }
 .u-btn--lg { min-height: 3.6rem; padding-inline: 1.4rem; font-size: 1.05rem; border-radius: 16px; }
 .u-btn--block { width: 100%; }
@@ -72,6 +72,7 @@
 .u-nav { display: none; gap: .2rem; }
 .u-nav a { padding: .55rem .8rem; border-radius: 10px; color: var(--muted); font-size: .9rem; font-weight: 600; text-decoration: none; }
 .u-nav a[aria-current] { color: var(--text); background: rgb(255 255 255 / .06); }
+.u-nav--always { display: flex; flex-wrap: wrap; }
 
 /* ---------- queue desk ---------- */
 .u-desk__body { display: grid; gap: 1rem; padding: 1rem var(--pad) 6.5rem; max-width: 96rem; margin-inline: auto; }
@@ -99,8 +100,8 @@
 .u-chair.is-late .u-bar i { background: var(--wait); }
 
 .u-add { display: flex; gap: .5rem; flex: 1 1 16rem; min-width: 0; max-width: 30rem; }
-.u-add input, .u-field input { flex: 1 1 0; width: 0; min-width: 0; min-height: 2.75rem; padding: 0 .9rem; border-radius: 12px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font: inherit; }
-.u-add input::placeholder, .u-field input::placeholder { color: var(--faint); }
+.u-add input { flex: 1 1 0; width: 0; min-width: 0; min-height: 2.75rem; padding: 0 .9rem; border-radius: 12px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font: inherit; }
+.u-add input::placeholder { color: var(--faint); }
 .u-line { display: grid; gap: .45rem; }
 .u-row { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; grid-template-areas: 'n who eta' 'n tags act'; align-items: center; gap: .3rem .8rem; padding: .7rem .8rem; border-radius: 16px; background: var(--s2); border: 1px solid transparent; }
 .u-row__n { grid-area: n; text-align: center; font-size: 1.9rem; }
@@ -134,7 +135,7 @@
   .u-row__eta { min-width: 4.2rem; text-align: right; }
 }
 /* The smallest phones: the row keeps its main button and drops the "more" button. */
-@media (max-width: 379px) { .u-row__act .u-btn--icon { display: none; } .u-row { gap: .3rem .6rem; padding-inline: .65rem; } .u-chair { column-gap: .6rem; padding-inline: .7rem; } .u-chair__act .u-btn { padding-inline: .75rem; } }
+@media (max-width: 379px) { .u-top .u-seg { gap: .1rem; } .u-top .u-seg button { gap: .25rem; padding-inline: .3rem; font-size: .78rem; } .u-seg em { min-width: 1.05rem; padding: .12rem .25rem; font-size: .64rem; } .u-row { gap: .3rem .6rem; padding-inline: .65rem; } .u-row__act .u-btn--sm { padding-inline: .6rem; } .u-row__act .u-btn--icon { width: 2.25rem; } .u-chair { column-gap: .6rem; padding-inline: .7rem; } .u-chair__act .u-btn { padding-inline: .75rem; } }
 @media (min-width: 1500px) { .u-desk__body .u-main { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
 @media (min-width: 1000px) {
   .u-main { grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); }
@@ -144,7 +145,7 @@
 }
 /* On a phone the chair rows keep only what is needed at a glance: number, barber, one button.
    The avatar, the time chip and the "more" button return on wider screens. */
-.u-chair__who .u-avatar, .u-chair__meta, .u-chair__act .u-btn--icon { display: none; }
+.u-chair__who .u-avatar, .u-chair__meta { display: none; }
 @media (max-width: 619px) {
   .u-top { gap: .7rem; }
   .u-top .u-brand { flex: 1 1 auto; }
@@ -187,7 +188,8 @@
 
 /* ---------- the customer's ticket ---------- */
 .u-shopbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.u-shopbar > span { font-size: .88rem; font-weight: 600; color: var(--muted); }
+.u-shopbar > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .88rem; font-weight: 600; color: var(--muted); }
+.u-shopbar > .u-brand { flex: none; }
 .u-pass { position: relative; display: grid; gap: .35rem; padding: 1.35rem 1.35rem 1.2rem; border-radius: 28px; overflow: hidden; border: 1px solid rgb(217 183 110 / .32);
   background: radial-gradient(24rem 16rem at 100% 0, rgb(217 183 110 / .16), transparent 70%), linear-gradient(180deg, #1a201c, #111513); box-shadow: 0 30px 60px -30px rgb(0 0 0 / .9); }
 .u-pass__top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; font-size: .8rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brass); }
@@ -211,7 +213,9 @@
 .u-perf::before, .u-perf::after { content: ''; position: absolute; top: -.7rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--bg); border: 1px solid rgb(217 183 110 / .32); }
 .u-perf::before { left: -.75rem; } .u-perf::after { right: -.75rem; }
 .u-pass__acts { display: grid; gap: .35rem; }
-.u-pass__acts > div { display: flex; justify-content: space-between; }
+.u-pass__acts > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .2rem; }
+.u-pass__acts > div:empty { display: none; }
+.u-pass__acts > div > :only-child { margin-inline: auto; }
 .u-pass.is-turn { border-color: rgb(61 220 132 / .55); background: radial-gradient(26rem 18rem at 50% 0, rgb(61 220 132 / .3), transparent 72%), linear-gradient(180deg, #14241b, #0f1512); }
 .u-pass.is-turn .u-pass__top { color: var(--ok); }
 .u-pass.is-turn .u-pass__n { color: var(--ok); }
@@ -233,6 +237,60 @@
 .u-key i.w { background: var(--wait); } .u-key i.c { background: var(--faint); } .u-key i.m { background: var(--brass); }
 .u-note { margin-top: .9rem; font-size: .85rem; color: var(--muted); }
 .u-shopcard { display: grid; gap: .8rem; }
+
+/* ---------- the customer's queue page: the wait, joining, and the ticket ---------- */
+.u-queue { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1rem; width: min(100%, 31rem); margin-inline: auto; padding: 1rem 1rem 3rem; }
+.u-queue__main, .u-queue__side { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1rem; min-width: 0; }
+.u-queue__foot { text-align: center; }
+@media (min-width: 960px) {
+  .u-queue { width: min(100% - 4rem, 64rem); grid-template-columns: minmax(0, 27rem) minmax(0, 1fr); gap: 1.25rem 2rem; padding-block: 1.6rem 4rem; }
+  .u-queue > .u-shopbar { grid-column: 1 / -1; }
+  .u-queue__main { position: sticky; top: 1.2rem; }
+}
+/* The wait right now: the colour follows how busy the shop is. */
+.u-wait { --lc: var(--ok); position: relative; display: grid; gap: .35rem; padding: 1.35rem 1.35rem 1.2rem; border-radius: 28px; overflow: hidden; border: 1px solid var(--line2);
+  background: linear-gradient(180deg, #1a201c, #111513); /* for browsers without color-mix() */
+  background: radial-gradient(24rem 16rem at 100% 0, color-mix(in srgb, var(--lc) 15%, transparent), transparent 70%), linear-gradient(180deg, #1a201c, #111513); box-shadow: 0 30px 60px -30px rgb(0 0 0 / .9); }
+.ui[data-level='0'] .u-wait { --lc: #8d9690; } .ui[data-level='2'] .u-wait { --lc: var(--wait); } .ui[data-level='3'] .u-wait { --lc: #ff9a4d; } .ui[data-level='4'] .u-wait { --lc: var(--alert); }
+.u-wait .u-pass__top { color: var(--muted); }
+.u-wait__label { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; color: var(--lc); }
+.u-wait__label::before { content: ''; flex: none; width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
+.u-wait__big { display: flex; align-items: baseline; gap: .5rem; margin: .15rem 0 .35rem -.03em; }
+.u-wait__big b { font-size: clamp(4.8rem, 26vw, 7.5rem); color: var(--lc); }
+.u-wait__big small { font: 750 1.5rem/1 var(--display); letter-spacing: -.02em; color: var(--muted); }
+.u-wait__big.is-text b { font-size: clamp(2.9rem, 15vw, 4.4rem); letter-spacing: -.04em; line-height: 1; }
+.u-wait__ago { margin-top: .55rem; font-size: .75rem; color: var(--faint); text-align: center; }
+.u-wait__ago:empty { display: none; }
+.u-wait .u-perf::before, .u-wait .u-perf::after { border-color: var(--line2); }
+.u-wait .u-hint { text-align: center; }
+.u-wait .u-btn:disabled { opacity: .4; cursor: default; }
+.u-meter { display: grid; grid-template-columns: repeat(4, 1fr); gap: .3rem; margin-top: .9rem; }
+.u-meter i { height: .4rem; border-radius: 999px; background: rgb(255 255 255 / .1); transition: background .4s; }
+.u-meter i.on { background: var(--lc); }
+/* More states of the ticket: a message on it, next in line, finished, and closed. */
+.u-pass__msg { margin-top: 1rem; padding: .7rem .85rem; border-radius: 14px; background: rgb(246 189 75 / .1); border: 1px solid rgb(246 189 75 / .3); font-size: .9rem; font-weight: 600; line-height: 1.35; }
+.u-pass__sub { color: var(--muted); font-size: .92rem; text-align: center; }
+.u-pass.is-next { border-color: rgb(61 220 132 / .45); }
+.u-pass.is-next .u-pass__place { color: var(--ok); }
+.u-pass.is-done, .u-pass.is-gone { border-color: var(--line2); background: linear-gradient(180deg, #1a201c, #111513); }
+.u-pass.is-done .u-pass__top, .u-pass.is-gone .u-pass__top { color: var(--muted); margin-bottom: .4rem; }
+.u-pass.is-done .u-perf::before, .u-pass.is-done .u-perf::after, .u-pass.is-gone .u-perf::before, .u-pass.is-gone .u-perf::after { border-color: var(--line2); }
+a.u-banner { justify-content: space-between; color: inherit; text-decoration: none; }
+.u-banner--note { display: block; font-weight: 500; background: rgb(134 185 255 / .08); border-color: rgb(134 185 255 / .3); }
+.u-banner--note::before { content: 'From the shop'; display: block; margin-bottom: .2rem; font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--info); }
+.u-ahead li.is-more { background: none; border-style: dashed; border-color: var(--line2); color: var(--muted); }
+.u-ahead li.is-none { width: auto; height: auto; padding: .3rem 0; border: 0; border-radius: 0; background: none; color: var(--muted); font: 400 1rem/1.4 'Inter Variable', system-ui, sans-serif; }
+.u-today--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.u-shops { display: grid; gap: .5rem; }
+.u-shops a { display: flex; align-items: center; gap: .7rem; padding: .8rem .95rem; border-radius: 16px; background: var(--s2); color: inherit; text-decoration: none; transition: background .15s; }
+.u-shops a:hover { background: var(--s3); }
+.u-shops__name { display: grid; flex: 1 1 auto; min-width: 0; line-height: 1.25; }
+.u-shops__name b { font: 750 1.05rem/1.2 var(--display); letter-spacing: -.02em; }
+.u-shops__name small { font-size: .8rem; color: var(--muted); }
+.u-shops__wait { display: inline-flex; align-items: baseline; gap: .25rem; flex: none; }
+.u-shops__wait b { font: 800 1.35rem/1 var(--display); letter-spacing: -.03em; }
+.u-shops__wait small { font-size: .78rem; color: var(--muted); }
+.u-shops__wait::after { content: '›'; margin-left: .45rem; color: var(--faint); font-size: 1.2rem; }
 .u-shopcard p { color: var(--muted); font-size: .92rem; }
 .u-shopcard p b { display: block; color: var(--text); font: 750 1.1rem/1.2 var(--display); letter-spacing: -.02em; }
 .u-shopcard div { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
@@ -254,3 +312,104 @@
 @media (prefers-reduced-motion: reduce) { .u-live i, .u-steps li.is-now::before { animation: none; } .u-btn, .u-hub a { transition: none; } }
 /* Inside a preview frame the action dock sits at the end of the screen rather than sticking to the window. */
 .u-frames .u-dock { position: static; margin: 0; padding: .4rem 0 0; background: none; }
+
+/* ---------- staff screens: status line, sign-in, notices, forms, action sheets ---------- */
+.u-status { min-height: 1.3em; font-size: .85rem; font-weight: 600; color: var(--muted); }
+.u-acct { padding: 1rem 1.1rem; border-radius: 18px; background: var(--s1); border: 1px solid var(--line); font-size: .92rem; color: var(--muted); }
+.u-acct:empty { display: none; }
+.u-acct strong { color: var(--text); }
+.u-acct--line { padding: 0; background: none; border: 0; }
+.u-signin { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr)); gap: .55rem; align-items: center; }
+.u-signin > b { grid-column: 1 / -1; font: 750 1.15rem/1.2 var(--display); letter-spacing: -.02em; color: var(--text); }
+.u-input { width: 100%; min-width: 0; min-height: 2.75rem; padding: 0 .9rem; border-radius: 12px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font: inherit; }
+.u-input::placeholder { color: var(--faint); }
+select.u-input { appearance: none; padding-right: 2.2rem; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 1.15rem) 50%, calc(100% - .8rem) 50%; background-size: .35rem .35rem; background-repeat: no-repeat; }
+.u-link { padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.u-hint { font-size: .85rem; color: var(--muted); }
+.u-msg { font-size: .9rem; font-weight: 600; color: var(--wait); }
+/* Anything marked hidden stays hidden, whatever layout its class gives it. */
+.ui [hidden] { display: none !important; }
+.u-banner { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; padding: .9rem 1.1rem; border-radius: 16px; background: rgb(246 189 75 / .1); border: 1px solid rgb(246 189 75 / .35); font-weight: 600; }
+.u-empty { padding: .6rem .2rem; color: var(--muted); }
+.u-stack { display: grid; gap: 1rem; }
+.u-cols { display: grid; gap: 1rem; align-items: start; }
+@media (min-width: 900px) { .u-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.u-chair.is-calling { border-color: rgb(61 220 132 / .6); animation: u-call 1.4s ease-out infinite; }
+@keyframes u-call { from { box-shadow: 0 0 0 0 rgb(61 220 132 / .4); } to { box-shadow: 0 0 0 .7rem rgb(61 220 132 / 0); } }
+
+.u-staff { display: grid; gap: .5rem; }
+.u-staff li { display: flex; flex-wrap: wrap; align-items: end; gap: .55rem .7rem; padding: .8rem .9rem; border-radius: 16px; background: var(--s2); }
+.u-staff label { display: grid; gap: .25rem; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.u-staff label.is-num { width: 4.6rem; }
+.u-staff label.is-grow { flex: 1 1 9rem; }
+.u-staff label.is-check { display: flex; align-items: center; gap: .45rem; min-height: 2.75rem; font-size: .9rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text); }
+.u-staff input[type='checkbox'] { width: 1.25rem; height: 1.25rem; accent-color: var(--ok); }
+.u-staff .is-who { display: grid; flex: 1 1 14rem; min-width: 0; }
+.u-staff .is-who small, .u-staff .is-done { font-size: .82rem; color: var(--muted); }
+.u-staff .is-done { align-self: center; }
+.u-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr)); gap: .55rem; }
+.u-field { display: grid; gap: .35rem; font-size: .9rem; font-weight: 600; }
+.u-rowline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1rem; padding: .85rem 1rem; border-radius: 16px; background: var(--s2); }
+.u-rowline > span { display: grid; flex: 1 1 12rem; }
+.u-rowline small { font-size: .82rem; color: var(--muted); }
+.u-step { display: flex; align-items: center; gap: .5rem; }
+.u-step output { min-width: 2.4rem; text-align: center; font: 800 1.7rem/1 var(--display); }
+.u-step .u-btn { width: 2.75rem; padding: 0; border-radius: 50%; font-size: 1.3rem; }
+.u-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: .5rem; }
+
+.u-sheet { width: min(26rem, calc(100vw - 1.5rem)); padding: 0; border: 1px solid var(--line2); border-radius: 22px; background: var(--s1); color: var(--text); box-shadow: 0 40px 90px rgb(0 0 0 / .7); font: 400 1rem/1.45 'Inter Variable', system-ui, sans-serif; }
+.u-sheet::backdrop { background: rgb(0 0 0 / .6); backdrop-filter: blur(3px); }
+.u-sheet[open] { animation: u-sheet .22s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes u-sheet { from { opacity: 0; transform: translateY(14px); } }
+.u-sheet__in { display: grid; gap: .5rem; padding: 1.1rem; }
+.u-sheet__in > b { font: 750 1.15rem/1.2 var(--display); letter-spacing: -.02em; margin-bottom: .3rem; }
+.u-sheet .u-btn { justify-content: flex-start; min-height: 3rem; }
+.u-sheet .u-btn--danger { color: var(--alert); border-color: rgb(255 111 100 / .35); }
+@media (max-width: 619px) {
+  .u-sheet { margin: auto auto 0; width: 100%; max-width: none; border-radius: 22px 22px 0 0; border-bottom: 0; }
+  .u-sheet__in { padding-bottom: calc(1.1rem + env(safe-area-inset-bottom)); }
+  .u-chair__act .u-btn--icon { width: 2.4rem; }
+}
+@media (prefers-reduced-motion: reduce) { .u-chair.is-calling, .u-sheet[open] { animation: none; } }
+
+/* The sign-in form folds away behind one line until it is wanted. */
+.u-acct summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; cursor: pointer; list-style: none; font: 750 1.05rem/1.2 var(--display); letter-spacing: -.02em; color: var(--text); }
+.u-acct summary::-webkit-details-marker { display: none; }
+.u-acct summary::after { content: 'Sign in'; flex: none; white-space: nowrap; padding: .5rem .9rem; border-radius: 10px; border: 1px solid var(--line2); font: 650 .85rem/1 'Inter Variable', system-ui, sans-serif; letter-spacing: 0; color: var(--text); }
+.u-acct details[open] summary { margin-bottom: .9rem; }
+.u-acct details[open] summary::after { content: 'Close'; color: var(--muted); }
+/* Barber panel: states that have no ticket number to show, and a cut that has run over. */
+.u-hero__big { margin-block: .9rem .2rem; font: 800 2rem/1.1 var(--display); letter-spacing: -.03em; }
+.u-ring.is-late { background: conic-gradient(var(--wait) 360deg, transparent 0); }
+.u-me .u-chip { flex: none; }
+/* The join sheet: a short form that rises from the bottom of a phone. */
+.u-join { max-height: calc(100svh - 1.5rem); overflow-y: auto; }
+@media (min-width: 620px) { .u-join { width: min(30rem, calc(100vw - 1.5rem)); } }
+.u-join .u-sheet__in { gap: .9rem; padding: clamp(1.1rem, 4vw, 1.5rem); }
+.u-join .u-sheet__in > b { margin-bottom: 0; font-size: 1.4rem; }
+.u-join .u-input { min-height: 3.2rem; font-size: 1.05rem; }
+.u-join__door, .u-join.is-door .u-join__home { display: none; }
+.u-join.is-door .u-join__door { display: block; }
+.u-pick { display: flex; flex-wrap: wrap; gap: .45rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+.u-pick legend { padding: 0; margin-bottom: .45rem; font-size: .9rem; font-weight: 600; }
+.u-pick label { position: relative; flex: 1 1 4.5rem; cursor: pointer; }
+.u-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.u-pick span { display: grid; place-items: center; min-height: 3rem; padding: 0 .6rem; border-radius: 12px; border: 1px solid var(--line2); background: var(--s2); font-weight: 650; font-size: .95rem; white-space: nowrap; transition: background .15s, color .15s; }
+.u-pick input:checked + span { background: var(--text); border-color: transparent; color: #0a0c0b; }
+.u-pick input:focus-visible + span { outline: 2px solid var(--brass); outline-offset: 3px; }
+.u-join__btns { display: grid; grid-template-columns: auto 1fr; gap: .5rem; }
+.u-join__btns .u-btn { justify-content: center; min-height: 3.4rem; }
+.u-join__btns .u-btn:disabled { opacity: .5; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .u-meter i, .u-pick span, .u-shops a { transition: none; } }
+/* The smallest phones (320px wide): the chair's buttons move under the barber's name so the name
+   stays readable, the ticket's steps fit on one line each, and its small buttons sit centred. */
+@media (max-width: 379px) {
+  .u-chair { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'num who' 'bar bar' 'act act'; }
+  .u-chair__act .u-btn:first-child { flex: 1 1 auto; }
+  .u-steps li { font-size: .62rem; }
+  .u-pass__acts > div { justify-content: center; }
+}
+.u-pass__acts .u-btn--quiet { padding-inline: .45rem; font-size: .9rem; }
+/* Big desktop monitors and wall screens: everything grows with the window instead of sitting
+   small in the middle. Sizes are in rem, so one root size scales the whole screen. */
+@media (min-width: 1700px) { :root:has(main.ui) { font-size: clamp(100%, .45vw + .52rem, 160%); } }

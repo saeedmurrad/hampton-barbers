@@ -53,7 +53,8 @@ const waitText = async (pg, sel, re, ms = 20000) => {
 const signIn = async (pg, form) => { await setValue(pg, `${form} input[name=email]`, 'owner@test.local'); await setValue(pg, `${form} input[name=password]`, 'test-pass-1'); await submit(pg, form); };
 // The payment step: tap a service, tap Cash or Online, save.
 const pay = async (pg, svc, how) => { await pg.waitForSelector('dialog.pay[open]', { timeout: 6000 }); await tap(pg, `.pay [data-svc="${svc}"]`); await tap(pg, `.pay [data-pay="${how}"]`); await tap(pg, '.pay [data-save]'); };
-const joinAs = async (pg, name) => { await tap(pg, '[data-join]'); await setValue(pg, '#join-dialog input[name=name]', name); await submit(pg, '[data-join-form]'); };
+// On the queue page: wait until the page knows the queue, open the join step, give a first name.
+const joinAs = async (pg, name) => { await pg.waitForSelector('[data-join]:not([disabled])', { timeout: 15000 }); await tap(pg, '[data-join]'); await setValue(pg, '#join-dialog input[name=name]', name); await submit(pg, '[data-join-form]'); };
 const shot = async (pg, name) => { await pg.bringToFront(); await sleep(700); await pg.screenshot({ path: path.join(OUT, `${name}.jpg`), type: 'jpeg', quality: 80 }); };
 const PHONE = { width: 390, height: 844, isMobile: true, hasTouch: true };
 const LAPTOP = { width: 1366, height: 900 };
@@ -73,12 +74,12 @@ try {
   await tap(A, '[data-open]');
   ok(await waitText(A, '#qd-status', /Live for everyone/), 'desk: opens today’s queue', await txt(A, '#qd-status'));
   await setValue(A, '[data-barber="b2"] input[data-f="name"]', 'Ali');
-  ok(await waitText(A, '[data-chairs]', /Chair 2 · Ali/), 'desk: a barber profile gets a name', (await txt(A, '[data-chairs]')).slice(0, 80));
+  ok(await waitText(A, '[data-chairs]', /Ali Chair 2/), 'desk: a barber profile gets a name', (await txt(A, '[data-chairs]')).slice(0, 80));
   for (const name of ['Tom', '', '', '']) { await setValue(A, '[data-add] input', name); await submit(A, '[data-add]'); await sleep(500); }
   ok(await waitText(A, '[data-queue]', /1.*Tom.*2.*Walk-in.*3.*4/), 'desk: four walk-ins get numbers 1 to 4', (await txt(A, '[data-queue]')).slice(0, 120));
   for (const b of ['b1', 'b2', 'b3']) { await tap(A, `[data-call="${b}"]`); await sleep(600); }
-  ok(await waitText(A, '[data-chairs]', /Chair 1 1 Tom.*Chair 2 · Ali 2.*Chair 3 3/), 'desk: three barbers call numbers 1, 2 and 3 to their chairs', (await txt(A, '[data-chairs]')).slice(0, 140));
-  ok(/^4 Walk-in In the shop/.test(await txt(A, '[data-queue]')), 'desk: number 4 is left waiting in the shop', (await txt(A, '[data-queue]')).slice(0, 60));
+  ok(await waitText(A, '[data-chairs]', /1 \w Barber 1 Chair 1 · Tom.*2 \w Ali Chair 2 · Walk-in.*3 \w Barber 3 Chair 3 · Walk-in/), 'desk: three barbers call numbers 1, 2 and 3 to their chairs', (await txt(A, '[data-chairs]')).slice(0, 140));
+  ok(/^4 Walk-in Waiting \d+ min In the shop/.test(await txt(A, '[data-queue]')), 'desk: number 4 is left waiting in the shop', (await txt(A, '[data-queue]')).slice(0, 60));
 
   // ---------- the shop TV ----------
   const T = await open(await browser.createBrowserContext(), '/board/hampton-vale/?emulator', TV, 'tv');
@@ -88,20 +89,30 @@ try {
   ok(!/Tom/.test(await txt(T, 'main')), 'tv: never shows a customer’s name');
   ok(/about 20 min/.test(await txt(T, '[data-wait]')), 'tv: tells a walk-in the wait is about 20 minutes', await txt(T, '[data-wait]'));
 
-  // ---------- a customer joins from home on their phone ----------
+  // ---------- a customer looks at the website on their phone, then takes a ticket ----------
   const custCtx = await browser.createBrowserContext();
-  const C = await open(custCtx, '/street/?emulator', PHONE, 'customer');
-  ok(await waitText(C, '#live [data-live="waiting"]', /^1$/), 'customer: sees 1 person waiting', await txt(C, '#live [data-live="waiting"]'));
-  ok(/~20/.test(await txt(C, '#live [data-live="headline"]')), 'customer: sees about 20 minutes', await txt(C, '#live [data-live="headline"]'));
-  ok((await C.$$('[data-shop-key]')).length === 3, 'customer: sees all three shops');
-  await joinAs(C, 'Sam');
-  ok(await waitText(C, '[data-ticket] .tk__big', /^5/), 'customer: gets ticket number 5 straight away', await txt(C, '[data-ticket] .tk__big'));
-  ok(/You’re in the queue at Hampton Vale, Sam/.test(await txt(C, '[data-ticket]')) && /2nd in line, 1 person ahead/.test(await txt(C, '[data-ticket]')), 'customer: is told 2nd in line, 1 person ahead', (await txt(C, '[data-ticket]')).slice(0, 110));
-  ok(/You’re 2nd in line/.test(await txt(C, '.lchip')), 'customer: the first-screen card says "You’re 2nd in line"', (await txt(C, '.lchip')).slice(-30));
-  ok((await C.$$('#live .live__queue li.me')).length === 1, 'customer: sees their own number marked "You"');
-  await C.evaluate(() => document.querySelector('[data-ticket]').scrollIntoView({ block: 'start' }));
+  const W = await open(custCtx, '/street/?emulator', PHONE, 'website');
+  ok(await waitText(W, '#live [data-live="waiting"]', /^1$/), 'website: sees 1 person waiting', await txt(W, '#live [data-live="waiting"]'));
+  ok(/~20/.test(await txt(W, '#live [data-live="headline"]')), 'website: sees about 20 minutes', await txt(W, '#live [data-live="headline"]'));
+  ok((await W.$$('[data-shop-key]')).length === 3, 'website: sees all three shops');
+  const joinHref = await W.$eval('#live [data-join]', (a) => a.getAttribute('href'));
+  ok(joinHref.endsWith('/queue/hampton-vale/?join=1&emulator') && (await W.$$('#join-dialog')).length === 0, 'website: "Join the queue" opens the queue page', joinHref);
+  const C = await open(custCtx, '/queue/hampton-vale/?join=1&emulator', PHONE, 'customer');
+  ok(await waitText(C, '[data-wait] [data-live="headline"]', /~20/) && /1 waiting/.test(await txt(C, '[data-line-sum]')), 'customer: the queue page shows about 20 minutes and 1 waiting', `${await txt(C, '[data-wait] [data-live="headline"]')} | ${await txt(C, '[data-line-sum]')}`);
+  await C.waitForSelector('#join-dialog[open]', { timeout: 8000 }).catch(() => {});
+  ok(await C.$eval('#join-dialog', (d) => d.open) && !C.url().includes('join='), 'customer: the join step opens by itself, once', C.url());
+  await shot(C, 'p1-customer-join');
+  await setValue(C, '#join-dialog input[name=name]', 'Sam');
+  await submit(C, '[data-join-form]');
+  ok(await waitText(C, '[data-ticket] .u-pass__n', /^5$/), 'customer: gets ticket number 5 straight away', await txt(C, '[data-ticket] .u-pass__n'));
+  ok(/Your ticket/.test(await txt(C, '[data-ticket]')) && /2nd in line/.test(await txt(C, '[data-ticket]')) && /1 person ahead of you/.test(await txt(C, '[data-line-sum]')) && /Hi, Sam/.test(await txt(C, '[data-hi]')), 'customer: is told 2nd in line, 1 person ahead', `${(await txt(C, '[data-ticket]')).slice(0, 90)} | ${await txt(C, '[data-line-sum]')} | ${await txt(C, '[data-hi]')}`);
+  ok(await C.$eval('[data-wait]', (e) => e.hidden) && (await C.$$('[data-line] li.is-me')).length === 1 && /hold your place until/.test(await txt(C, '[data-line-note]')), 'customer: the ticket replaces the join card and their number is marked in the line', await txt(C, '[data-line-note]'));
+  ok(await waitText(W, '.lchip', /You’re 2nd in line/) && (await W.$eval('.lchip', (a) => a.getAttribute('href'))).includes('/queue/hampton-vale/'), 'website: the first-screen card says "You’re 2nd in line" and opens the ticket', (await txt(W, '.lchip')).slice(-30));
+  ok(await waitText(W, '[data-my-ticket]', /5 .*You’re 2nd in line .*Sam.*Open my ticket/) && await W.$eval('[data-my-ticket]', (a) => !a.hidden && a.getAttribute('href').includes('/queue/hampton-vale/')), 'website: shows a short ticket strip that opens the ticket', await txt(W, '[data-my-ticket]'));
+  ok((await W.$$('#live .live__queue li.me')).length === 1 && await W.$eval('#live [data-join]', (a) => getComputedStyle(a).display === 'none'), 'website: marks their own number "You" and stops offering to join');
+  await C.evaluate(() => scrollTo(0, 0));
   await shot(C, 'p1-customer-way');
-  ok(await waitText(A, '[data-queue]', /5 Sam On the way/), 'desk: sees number 5, Sam, on the way', (await txt(A, '[data-queue]')).slice(0, 140));
+  ok(await waitText(A, '[data-queue]', /5 Sam Due [\d:]+ [ap]m On the way/), 'desk: sees number 5, Sam, on the way', (await txt(A, '[data-queue]')).slice(0, 140));
   ok(await waitText(T, '[data-line]', /2 5 On the way/), 'tv: lists number 5 as on the way', await txt(T, '[data-line]'));
   await tap(C, '[data-late]');
   ok(await waitText(C, '[data-ticket]', /held 10 minutes longer/), 'customer: "Running late" holds the place longer');
@@ -109,8 +120,8 @@ try {
 
   // ---------- the customer reaches the shop and scans the code on the door ----------
   const D = await open(custCtx, '/queue/hampton-vale/?here=1&emulator', PHONE, 'door');
-  ok(await waitText(D, '[data-ticket]', /Checked in at Hampton Vale, Sam/), 'door code: checks the customer in', (await txt(D, '[data-ticket]')).slice(0, 80));
-  ok(await waitText(A, '[data-queue]', /5 Sam In the shop · joined on their phone/), 'desk: number 5 now shows as in the shop', (await txt(A, '[data-queue]')).slice(0, 160));
+  ok(await waitText(D, '[data-ticket]', /Checked in/) && /Hi, Sam/.test(await txt(D, '[data-hi]')) && /In the shop/.test(await D.$eval('[data-ticket] .u-steps .is-now', (e) => e.textContent)), 'door code: checks the customer in', (await txt(D, '[data-ticket]')).slice(0, 80));
+  ok(await waitText(A, '[data-queue]', /5 Sam Joined on their phone · waiting \d+ min In the shop/), 'desk: number 5 now shows as in the shop', (await txt(A, '[data-queue]')).slice(0, 160));
   await shot(D, 'p1-customer-here');
 
   // ---------- a barber on their own phone ----------
@@ -137,13 +148,13 @@ try {
   await tap(B, '.pay [data-pay="cash"]');
   await tap(B, '.pay [data-save]');
   ok(await waitText(B, '.staff-toast', /Number 1 finished: £20 cash/), 'barber: corrects a wrong tap from online to cash', await txt(B, '.staff-toast'));
-  ok(/Your cuts today: 1/.test(await txt(B, '[data-chair]')), 'barber: their own count shows 1 cut today');
+  ok(await waitText(B, '[data-today]', /Cuts 1 /), 'barber: their own count shows 1 cut today', await txt(B, '[data-today]'));
   await shot(B, 'p1-barber');
   await tap(B, '[data-call]');
   ok(await waitText(T, '[data-call]', /Number 4 Chair 1/, 8000) && await T.$eval('[data-call]', (el) => !el.hidden), 'tv: announces "Number 4, chair 1" full screen', await txt(T, '[data-call]'));
   await shot(T, 'p1-tv-call');
   ok(await waitText(D, '[data-ticket]', /You’re next\./), 'customer: is told "You’re next"', (await txt(D, '[data-ticket]')).slice(0, 110));
-  ok(await waitText(A, '[data-chairs]', /Chair 1 4 /), 'desk: follows the barber’s phone without a refresh', (await txt(A, '[data-chairs]')).slice(0, 60));
+  ok(await waitText(A, '[data-chairs]', /4 \w Barber 1 Chair 1/), 'desk: follows the barber’s phone without a refresh', (await txt(A, '[data-chairs]')).slice(0, 60));
 
   // ---------- the desk seats the online customer ----------
   await tap(A, '[data-finish="b2"]');
@@ -153,8 +164,10 @@ try {
   ok(await waitText(A, '.staff-toast', /Number 2 finished: £17 cash/), 'desk: records a Gents Cut paid in cash', await txt(A, '.staff-toast'));
   await sleep(700);
   await tap(A, '[data-call="b2"]');
-  ok(await waitText(D, '[data-ticket]', /It’s your turn, Sam! Chair 2 with Ali\./), 'customer: "It’s your turn, Sam! Chair 2 with Ali."', await txt(D, '[data-ticket]'));
-  ok(await waitText(C, '.lchip', /It’s your turn!/), 'customer: their other open page says so too');
+  ok(await waitText(D, '[data-ticket]', /It’s your turn, Sam!.*Chair 2 with Ali/) && await D.$eval('[data-ticket] .u-pass', (e) => e.classList.contains('is-turn')), 'customer: "It’s your turn, Sam!" with "Chair 2 with Ali"', await txt(D, '[data-ticket]'));
+  ok(await waitText(C, '[data-ticket]', /It’s your turn, Sam!/), 'customer: their other open ticket page says so too');
+  await W.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  ok(await waitText(W, '.lchip', /It’s your turn!/) && /It’s your turn!/.test(await txt(W, '[data-my-ticket]')), 'website: the card and the strip say "It’s your turn!" when the customer looks again', await txt(W, '[data-my-ticket]'));
   await shot(D, 'p1-customer-turn');
   await sleep(8500);
   await shot(T, 'p1-tv');
@@ -163,6 +176,11 @@ try {
   await tap(A, '[data-finish="b2"]');
   await pay(A, 1, 'online');
   ok(await waitText(D, '[data-ticket]', /All done, Sam/), 'customer: sees "All done" when the cut is finished', await txt(D, '[data-ticket]'));
+  await tap(D, '[data-done]');
+  ok(await D.waitForSelector('[data-ticket][hidden]', { timeout: 10000 }).then(() => true, () => false) && await D.$eval('[data-wait]', (e) => !e.hidden) && await D.$eval('[data-hi]', (e) => e.hidden), 'customer: closing the finished ticket brings the join card back');
+  await W.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await sleep(900);
+  ok(await W.$eval('[data-my-ticket]', (a) => a.hidden) && await W.$eval('.lchip', (a) => a.getAttribute('href')) === '#live' && await W.$eval('#live [data-join]', (a) => getComputedStyle(a).display !== 'none'), 'website: the strip goes away and "Join the queue" comes back');
 
   // ---------- the owner's reports ----------
   const R = await open(A.browserContext(), '/admin/reports/?emulator', LAPTOP, 'reports');
@@ -194,13 +212,9 @@ try {
   await submit(A, '[data-new-login]');
   ok(await waitText(A, '[data-login-list]', /Omar omar@test\.local · barber at Hampton Vale, chair 3/), 'desk: the owner creates a login for the barber on chair 3', await txt(A, '[data-login-list]'));
   ok(/Signed in as owner@test\.local/.test(await txt(A, '#qd-account')), 'desk: the owner is still signed in afterwards', await txt(A, '#qd-account'));
-  await A.$eval('.qd__more', (el) => { el.open = true; });
-  await A.$eval('[data-logins]', (el) => el.scrollIntoView({ block: 'start' }));
+  await tap(A, '[data-view-link="barbers"]');
   await shot(A, 'p2-desk-logins');
-  await A.setViewport(PHONE);
-  await A.$eval('[data-logins]', (el) => el.scrollIntoView({ block: 'start' }));
-  await shot(A, 'p2-desk-logins-phone');
-  await A.setViewport(LAPTOP);
+  await tap(A, '[data-view-link="queue"]');
   const S = await open(await browser.createBrowserContext(), '/barber/?emulator', PHONE, 'staff');
   await setValue(S, '#bp-signin input[name=email]', 'omar@test.local');
   await setValue(S, '#bp-signin input[name=password]', 'barber-pass-1');
@@ -211,7 +225,7 @@ try {
   await tap(S, '[data-finish]');
   await pay(S, 2, 'cash');
   ok(await waitText(S, '.staff-toast', /Number 3 finished: £20 cash/), 'staff: records a sale with their own login', await txt(S, '.staff-toast'));
-  ok(await waitText(S, '[data-chair]', /Taken today: £20 \(cash £20, online £0\)/), 'staff: sees their own takings today, and only their own', await txt(S, '[data-chair]'));
+  ok(await waitText(S, '[data-today]', /Taken £20 Cash £20 Online £0/), 'staff: sees their own takings today, and only their own', await txt(S, '[data-today]'));
   await shot(S, 'p2-staff-phone');
   const SR = await open(S.browserContext(), '/admin/reports/?emulator', PHONE, 'staff-reports');
   ok(await waitText(SR, '#rp-account', /for the owner only/), 'staff: is told the reports are for the owner only', await txt(SR, '#rp-account'));
@@ -229,26 +243,29 @@ try {
   ok(await waitText(S, '#bp-status', /not allowed/), 'staff: a removed login can no longer change the queue', await txt(S, '#bp-status'));
 
   // ---------- another customer joins, then leaves; then online joining is paused ----------
-  const E = await open(await browser.createBrowserContext(), '/club/?emulator', PHONE, 'customer2');
+  const E = await open(await browser.createBrowserContext(), '/queue/hampton-vale/?emulator', PHONE, 'customer2');
   await joinAs(E, 'Lee');
-  ok(await waitText(A, '[data-queue]', /6 Lee On the way/), 'desk: sees a second customer, Lee, number 6', await txt(A, '[data-queue]'));
+  ok(await waitText(A, '[data-queue]', /6 Lee Due [\d:]+ [ap]m On the way/), 'desk: sees a second customer, Lee, number 6', await txt(A, '[data-queue]'));
   await tap(E, '[data-leave]');
   ok(await waitText(A, '[data-queue]', /Nobody waiting/), 'desk: Lee leaves and disappears from the queue', await txt(A, '[data-queue]'));
   await setValue(A, '#qd-online', 'off');
   await sleep(1200);
   await joinAs(E, 'Lee');
   ok(await waitText(E, '[data-join-error]', /not open at this shop/), 'customer: cannot join while the shop has paused online joining', await txt(E, '[data-join-error]'));
+  ok(await waitText(E, '[data-join-hint]', /not open at this shop/) && await E.$eval('[data-join]', (b) => b.disabled), 'customer: the join button is then switched off, with the reason', await txt(E, '[data-join-hint]'));
 
   // ---------- same-device demo, nobody signed in: desk, TV and customer in three tabs ----------
   const demo = await browser.createBrowserContext();
   const AD = await open(demo, '/admin/live/?emulator', LAPTOP, 'demo-desk');
   ok(/Demo on this device only/.test(await txt(AD, '#qd-status')), 'demo: the desk says it is a demo on this device', await txt(AD, '#qd-status'));
-  ok(/Chair 1 24 .*Chair 2 25 .*Chair 3 Free/.test(await txt(AD, '[data-chairs]')), 'demo: starts from the example queue (24 and 25 in the chairs)', (await txt(AD, '[data-chairs]')).slice(0, 90));
+  ok(/24 \w Barber 1 Chair 1.*25 \w Barber 2 Chair 2.*Free \w Barber 3 Chair 3/.test(await txt(AD, '[data-chairs]')), 'demo: starts from the example queue (24 and 25 in the chairs)', (await txt(AD, '[data-chairs]')).slice(0, 90));
   const TD = await open(demo, '/board/hampton-vale/?emulator', TV, 'demo-tv');
-  const CD = await open(demo, '/heritage/?emulator', LAPTOP, 'demo-customer');
+  const WD = await open(demo, '/heritage/?emulator', LAPTOP, 'demo-website');
+  const CD = await open(demo, '/queue/hampton-vale/?emulator', LAPTOP, 'demo-customer');
   await joinAs(CD, 'Ava');
-  ok(await waitText(CD, '[data-ticket] .tk__big', /^29/), 'demo: the customer tab gets number 29', await txt(CD, '[data-ticket] .tk__big'));
-  ok(await waitText(AD, '[data-queue]', /29 Ava On the way/), 'demo: the desk tab sees Ava, number 29', (await txt(AD, '[data-queue]')).slice(-60));
+  ok(await waitText(CD, '[data-ticket] .u-pass__n', /^29$/), 'demo: the customer tab gets number 29', await txt(CD, '[data-ticket] .u-pass__n'));
+  ok(await waitText(WD, '[data-my-ticket]', /29 .*Ava/) && await WD.$eval('[data-my-ticket]', (a) => !a.hidden), 'demo: the website tab shows Ava’s ticket strip', await txt(WD, '[data-my-ticket]'));
+  ok(await waitText(AD, '[data-queue]', /29 Ava Due [\d:]+ [ap]m On the way/), 'demo: the desk tab sees Ava, number 29', (await txt(AD, '[data-queue]')).slice(-60));
   ok(await waitText(TD, '[data-line]', /29 On the way/), 'demo: the TV tab lists number 29', await txt(TD, '[data-line]'));
   ok(/Demo on this screen/.test(await txt(TD, '[data-conn]')), 'demo: the TV tab says it is a demo, not the real queue', await txt(TD, '[data-conn]'));
   ok(/this device only/.test(await txt(AD, '#qd-status')), 'demo: changes are saved on this device only', await txt(AD, '#qd-status'));
@@ -256,7 +273,7 @@ try {
   await tap(AD, '[data-call="b3"]');
   ok(await waitText(TD, '[data-call]', /Number 26 Chair 3/, 8000), 'demo: the TV tab announces number 26, chair 3', await txt(TD, '[data-call]'));
   await tap(AD, `[data-arrived="${await AD.$eval('[data-queue] li:last-child [data-arrived]', (el) => el.dataset.arrived)}"]`);
-  ok(await waitText(CD, '[data-ticket]', /Checked in at Hampton Vale, Ava/), 'demo: the desk marks Ava as arrived and her tab shows it', (await txt(CD, '[data-ticket]')).slice(0, 70));
+  ok(await waitText(CD, '[data-ticket]', /Checked in/) && /Hi, Ava/.test(await txt(CD, '[data-hi]')), 'demo: the desk marks Ava as arrived and her tab shows it', (await txt(CD, '[data-ticket]')).slice(0, 70));
   await tap(AD, '[data-finish="b1"]');
   await pay(AD, 3, 'online');
   const RD = await open(demo, '/admin/reports/?emulator', LAPTOP, 'demo-reports');
@@ -267,7 +284,7 @@ try {
   await tap(AD, '[data-queue] li:last-child [data-seat]');
   await sleep(400);
   const seated = await txt(AD, '[data-chairs]');
-  ok(/Chair 1 (28|29) /.test(seated), 'demo: the desk can seat a waiting customer in the free chair', seated.slice(0, 80));
+  ok(/(28|29) \w Barber 1 Chair 1/.test(seated), 'demo: the desk can seat a waiting customer in the free chair', seated.slice(0, 80));
 } catch (e) {
   res.push('CRASH ' + String(e.stack ?? e.message).slice(0, 400));
 }

@@ -84,7 +84,9 @@ export function askPayment(opts: { title: string; services: Service[]; preset?: 
       end({ svc: names(), price, pay: pay as PayMethod });
     });
     dlg.addEventListener('cancel', (e) => { e.preventDefault(); end(null); });
+    dlg.tabIndex = -1; // focus lands on the step itself, not on the first service
     dlg.showModal();
+    dlg.focus();
   });
 }
 

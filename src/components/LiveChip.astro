@@ -1,6 +1,7 @@
 ---
 // Compact live status for the first screen. Tapping it jumps to the full panel.
-// When the visitor has joined the queue, it also shows their place in line.
+// When the visitor holds a ticket, it shows their place in line and opens their ticket
+// on the queue page instead (LiveNow.astro keeps it up to date).
 import { boardView, exampleBoard } from '../lib/board';
 interface Props { design: 'heritage' | 'fresh' | 'street' | 'club'; shop?: string; class?: string; }
 const { design, shop = 'hampton-vale', class: cls } = Astro.props;

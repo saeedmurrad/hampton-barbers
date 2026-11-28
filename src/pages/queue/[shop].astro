@@ -1,29 +1,492 @@
 ---
-// The customer's queue page for one shop. The code on the shop door and on the shop TV opens
-// this page with ?here, which checks the customer in or gives them a ticket on the spot.
+// The customer's own screen for one shop: the wait right now, joining the queue, and then
+// their ticket (number, place in line, "I'm here", "Running late", "Leave the queue").
+// The code on the shop door and on the shop TV opens this page with ?here, which checks the
+// customer in or gives them a ticket on the spot. The website designs link here with ?join.
+import '../../styles/ui.css';
 import Base from '../../layouts/Base.astro';
-import LiveNow from '../../components/LiveNow.astro';
-import { shops, type Shop } from '../../data/site';
+import { site, shops, type Shop } from '../../data/site';
 export function getStaticPaths() { return shops.map((shop) => ({ params: { shop: shop.id }, props: { shop } })); }
 interface Props { shop: Shop; }
 const { shop } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const others = shops.filter((s) => s.id !== shop.id);
+const etas: [number, string][] = [[5, '5 min'], [10, '10 min'], [20, '20 min'], [30, '30 min']];
+const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.geo]));
+// Only this shop's details are confirmed so far; the others show what we have.
+const main = shop.id === 'hampton-vale';
+const address = main ? `${site.address.street}, ${site.address.locality}, ${site.address.city} ${site.address.postcode}` : shop.place;
 ---
-<Base title={`Hampton Barbers ${shop.name}: the queue`} description="See the wait, take a ticket number and follow your place in the queue." themeColor="#fff8ee">
-  <main id="main" class="qp">
-    <header class="qp__top">
-      <a href={`${base}/`}>Hampton Barbers</a>
-      <span>{shop.name}</span>
-    </header>
-    <LiveNow design="fresh" shop={shop.id} title={`The queue at ${shop.name}`} />
+<Base title={`Hampton Barbers ${shop.name}: the queue`} description="See the wait, take a ticket number and follow your place in the queue." themeColor="#0a0c0b">
+  <main id="main" class="ui" data-queue-page={shop.id} data-base={base} data-level="0" data-geo={JSON.stringify(geo)} data-shops={JSON.stringify(shops.map((s) => ({ id: s.id, name: s.name })))}>
+    <div class="u-queue">
+      <h1 class="sr">The queue at Hampton Barbers {shop.name}</h1>
+      <header class="u-shopbar">
+        <a class="u-brand" href={`${base}/`}><i>HB</i><span><b>Hampton Barbers</b><small>{shop.name}</small></span></a>
+        <span data-hi hidden></span>
+      </header>
+
+      <div class="u-queue__main">
+        <a class="u-banner u-banner--link" data-elsewhere hidden></a>
+        <p class="u-banner u-banner--note" data-live="note" hidden></p>
+        <div data-ticket aria-live="polite" hidden></div>
+
+        <section class="u-wait" data-wait aria-labelledby="q-title">
+          <header class="u-pass__top"><span id="q-title">The wait right now</span><span class="u-live"><i></i>Live</span></header>
+          <p class="u-wait__label" data-live="label">Checking the queue…</p>
+          <p class="u-wait__big"><b class="u-num" data-live="headline">…</b><small data-live="unit"></small></p>
+          <p class="u-pass__time" data-live="range">One moment</p>
+          <div class="u-meter" data-live-meter role="img" aria-label="How busy the shop is"><i></i><i></i><i></i><i></i></div>
+          <div class="u-perf" aria-hidden="true"></div>
+          <div class="u-pass__acts">
+            <button type="button" class="u-btn u-btn--primary u-btn--lg u-btn--block" data-join disabled>Join the queue</button>
+            <p class="u-hint" data-join-hint>Take a ticket number now and come in when it’s nearly your turn. No booking needed.</p>
+          </div>
+          <p class="u-wait__ago" data-live="ago"></p>
+        </section>
+      </div>
+
+      <div class="u-queue__side">
+        <section class="u-panel u-ahead" aria-labelledby="q-line">
+          <div class="u-h"><h2 id="q-line">The line</h2><span data-line-sum></span></div>
+          <ol data-line aria-label="Ticket numbers in the order they will be called"><li class="is-none">Checking…</li></ol>
+          <p class="u-key"><span><i class="c"></i>In a chair</span><span><i></i>In the shop</span><span><i class="w"></i>On the way</span><span data-key-me hidden><i class="m"></i>You</span></p>
+          <p class="u-note" data-line-note>Only people in the shop are called, in number order.</p>
+        </section>
+
+        <section class="u-today u-today--3" aria-label="The shop right now">
+          <div><small>Cutting</small><b data-live="barbers">–</b></div>
+          <div><small>Chairs free</small><b data-live="free">–</b></div>
+          <div><small>Waiting</small><b data-live="waiting">–</b></div>
+        </section>
+
+        <section class="u-panel" aria-labelledby="q-shops">
+          <div class="u-h"><h2 id="q-shops">Our other shops</h2><span>Tap one to see its queue</span></div>
+          <ul class="u-shops">
+            {others.map((s) => (
+              <li><a href={`${base}/queue/${s.id}/`} data-shop-key={s.id}>
+                <span class="u-shops__name"><b>{s.name}</b><small data-sw="label">Checking…</small></span>
+                <span class="u-chip u-chip--ok u-chip--plain" data-sw="best" hidden>Quicker</span>
+                <span class="u-shops__wait"><b data-sw="headline">…</b><small data-sw="unit"></small></span>
+              </a></li>
+            ))}
+          </ul>
+        </section>
+
+        <section class="u-panel u-shopcard" aria-label="Find the shop">
+          <p><b>{main ? 'Find the shop' : `Hampton Barbers ${shop.name}`}</b>{address}</p>
+          {(shop.directionsUrl || main) && (
+            <div>
+              {shop.directionsUrl && <a class="u-btn" href={shop.directionsUrl} rel="noopener">Directions</a>}
+              {main && <a class="u-btn" href={site.phoneHref}>Call the shop</a>}
+            </div>
+          )}
+        </section>
+        <p class="u-hint u-queue__foot">Times are estimates from the shop’s own screen.</p>
+      </div>
+    </div>
+
+    <dialog class="u-sheet u-join" id="join-dialog" aria-labelledby="join-title">
+      <form class="u-sheet__in" data-join-form>
+        <b id="join-title">Join the queue at {shop.name}</b>
+        <p class="u-hint u-join__home">Take a ticket number now, then come in when it’s nearly your turn.</p>
+        <p class="u-hint u-join__door">You’re at the shop, so you go straight into the line. Take a seat and watch the screen for your number.</p>
+        <label class="u-field">Your first name
+          <input class="u-input" name="name" required maxlength="24" autocomplete="given-name" placeholder="e.g. Sam" />
+        </label>
+        <fieldset class="u-pick u-join__home">
+          <legend>How far away are you?</legend>
+          {etas.map(([m, t]) => <label><input type="radio" name="eta" value={m} checked={m === 10} /><span>{t}</span></label>)}
+        </fieldset>
+        <p class="u-hint">We keep only your first name, and only until your cut is done. The shop screen shows your number, never your name. You can leave the queue at any time.</p>
+        <p class="u-msg" data-join-error role="alert" hidden></p>
+        <div class="u-join__btns">
+          <button type="button" class="u-btn" data-join-cancel>Cancel</button>
+          <button type="submit" class="u-btn u-btn--primary" data-join-submit>Join the queue</button>
+        </div>
+      </form>
+    </dialog>
   </main>
 </Base>
 
-<style is:global>
-  .qp { --bg: #fff8ee; --surface: #fff; --text: #16130f; --muted: #5d564a; --accent: #e4472b; --on-accent: #fff; --line: #ecdcc6; --radius: 999px; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; --dw: 800; background: #fff8ee; color: #16130f; min-height: 100svh; }
-  .qp__top { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; width: min(100% - 2.5rem, 74rem); margin-inline: auto; padding-block: 1.1rem .2rem; }
-  .qp__top a { font-family: var(--display); font-weight: 800; font-size: 1.35rem; letter-spacing: -.03em; text-decoration: none; }
-  .qp__top span { color: var(--muted); font-weight: 600; }
-  .qp .live { padding-top: 1.25rem; }
-  .qp .live__head h2 { letter-spacing: -.04em; }
-</style>
+<script>
+  import { agoText, arrive, boardView, clockText, join, leave, londonDay, ord, placeOf, runLate, GRACE_MIN, MAX_LINE, QueueError, type Board, type BoardView } from '../../lib/board';
+  import { TICKET_KEY, actLocal, esc, fetchBoards, metresBetween, newId, onDeviceChange, pickBoard, read, setLocalName, write, type Mine } from '../../lib/store';
+
+  const root = document.querySelector<HTMLElement>('[data-queue-page]')!;
+  const shop = root.dataset.queuePage!;
+  const base = root.dataset.base ?? '';
+  const shops = JSON.parse(root.dataset.shops!) as { id: string; name: string }[];
+  const geo = JSON.parse(root.dataset.geo || '{}') as Record<string, [number, number]>;
+  const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+  const ticketEl = $('[data-ticket]'), waitEl = $('[data-wait]'), hiEl = $('[data-hi]'), elseEl = $<HTMLAnchorElement>('[data-elsewhere]');
+  const joinBtn = $<HTMLButtonElement>('[data-join]'), joinHint = $('[data-join-hint]');
+  const lineEl = $('[data-line]'), lineSum = $('[data-line-sum]'), lineNote = $('[data-line-note]');
+  const dialog = $<HTMLDialogElement>('#join-dialog'), form = $<HTMLFormElement>('[data-join-form]'), errEl = $('[data-join-error]'), submitBtn = $<HTMLButtonElement>('[data-join-submit]');
+  const shopName = (k: string) => shops.find((s) => s.id === k)?.name ?? 'the shop';
+  const params = new URLSearchParams(location.search);
+  // The code on the shop door opens this page with ?here: the visitor is standing in the shop.
+  const atDoor = params.has('here');
+  const GEO_OK = 'hb-geo-ok';
+  const ARRIVE_M = 150;
+  const JOIN_HINT = atDoor ? 'You’re at the shop: take a ticket and you go straight into the line.' : joinHint.textContent!;
+  const CLOSED = 'Online joining is not open at this shop right now. Walk in, or call the shop.';
+  const FULL = 'The queue is full right now. Please try again in a little while.';
+
+  let cloud: Record<string, Board> = {};
+  let loaded = false;
+  let mine = read<Mine>(TICKET_KEY);
+  // A ticket from an earlier day is over, whatever became of it: forget it.
+  if (mine && londonDay(mine.at) !== londonDay(Date.now())) { mine = null; write(TICKET_KEY, null); }
+  let api: typeof import('../../lib/cloud') | null = null;
+  let stopFollow: (() => void) | null = null;
+  let lastAhead = Infinity;
+  let toldTurn = false;
+  let toldLate = false;
+  let note = '';
+  let joining = false;
+  const pick = (k: string) => pickBoard(k, cloud[k]);
+  // This page shows a ticket for its own shop only. One held at another shop gets a link instead.
+  const here = () => (mine && mine.shop === shop ? mine : null);
+  const say = (el: Element, t: string) => { if (el.textContent !== t) el.textContent = t; };
+  const fill = (el: HTMLElement, html: string) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`;
+
+  const notify = (title: string, body: string) => {
+    try { navigator.vibrate?.([220, 120, 220]); } catch { /* not supported */ }
+    try { if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body }); } catch { /* not supported */ }
+    const old = document.title; let n = 0;
+    const t = setInterval(() => { document.title = n++ % 2 ? old : `● ${title}`; if (n > 9) { clearInterval(t); document.title = old; } }, 900);
+  };
+
+  // Once this visitor holds a ticket, follow the shop's queue live instead of re-checking.
+  const follow = async () => {
+    const m = here();
+    if (!m || m.src !== 'cloud' || stopFollow) return;
+    try {
+      api ??= await import('../../lib/cloud');
+      stopFollow = api.watchBoard(shop, (b) => { if (b) { cloud = { ...cloud, [shop]: b }; loaded = true; render(); } });
+    } catch { /* the regular refresh below still runs */ }
+  };
+  const setMine = (m: Mine | null) => {
+    mine = m;
+    write(TICKET_KEY, m);
+    if (!m) { stopFollow?.(); stopFollow = null; }
+  };
+  // A change to this visitor's own ticket.
+  const act = async (fn: (b: Board, id: string, now: number) => Board): Promise<boolean> => {
+    const m = here();
+    if (!m) return false;
+    try {
+      if (m.src === 'cloud') {
+        api ??= await import('../../lib/cloud');
+        const r = await api.actCustomer(shop, fn);
+        cloud = { ...cloud, [shop]: r.board };
+      } else actLocal(shop, (b, now) => fn(b, m.id, now));
+      return true;
+    } catch (e) {
+      note = e instanceof QueueError ? 'That could not be done. The shop may have moved your ticket on.' : 'Could not reach the shop. Check your connection and try again.';
+      return false;
+    } finally {
+      render();
+    }
+  };
+
+  // ---- drawing ----
+  const paintWait = (v: BoardView, updatedAt: number, pending: boolean, now: number) => {
+    root.dataset.level = pending ? '0' : String(v.level);
+    const set = (k: string, t: string) => root.querySelectorAll<HTMLElement>(`[data-live="${k}"]`).forEach((el) => say(el, t));
+    set('label', pending ? 'Checking the queue…' : v.label);
+    set('headline', pending ? '…' : v.headline);
+    set('unit', pending ? '' : v.unit);
+    set('range', pending ? 'One moment' : cap(v.range));
+    set('barbers', pending ? '–' : String(v.barbers));
+    set('free', pending ? '–' : String(v.freeChairs));
+    set('waiting', pending ? '–' : String(v.waiting));
+    set('ago', pending ? '' : agoText(updatedAt, now));
+    $('.u-wait__big').classList.toggle('is-text', !pending && !/^~?\d/.test(v.headline));
+    const noteEl = $('[data-live="note"]');
+    say(noteEl, pending ? '' : v.note);
+    noteEl.hidden = pending || !v.note;
+    root.querySelectorAll('[data-live-meter] i').forEach((seg, i) => seg.classList.toggle('on', !pending && v.level > 0 && i < v.level));
+  };
+
+  // The line as ticket numbers, in the order they are expected to be called.
+  const paintLine = (v: BoardView, pending: boolean, mineId: string) => {
+    const dot = (cls: string, n: number, what: string) => `<li${cls ? ` class="${cls}"` : ''} title="Number ${n}, ${what}">${n}</li>`;
+    const out = v.chairs.filter((c) => c.state === 'busy' && c.n).map((c) => dot(c.tid === mineId ? 'is-me' : 'is-chair', c.n!, c.tid === mineId ? 'you, in a chair' : 'in a chair'));
+    // A long line shows its first 18 numbers, a gap, and always the visitor's own number.
+    let gap = false;
+    v.turns.forEach((x, i) => {
+      if (i < 18 || x.id === mineId) { out.push(x.id === mineId ? dot('is-me', x.n, 'you') : dot(x.s === 'way' ? 'is-way' : '', x.n, x.s === 'way' ? 'on the way' : 'in the shop')); gap = false; }
+      else if (!gap) { out.push('<li class="is-more" title="More people waiting">…</li>'); gap = true; }
+    });
+    fill(lineEl, pending ? '<li class="is-none">Checking…</li>' : out.join('') || '<li class="is-none">Nobody is waiting</li>');
+    $('[data-key-me]').hidden = !mineId;
+  };
+
+  const paintShops = (now: number, mins: number, pending: boolean) => {
+    root.querySelectorAll<HTMLElement>('[data-shop-key]').forEach((a) => {
+      const x = boardView(pick(a.dataset.shopKey!).board, now);
+      say(a.querySelector('[data-sw="headline"]')!, pending ? '…' : x.headline);
+      say(a.querySelector('[data-sw="unit"]')!, pending ? '' : x.unit);
+      say(a.querySelector('[data-sw="label"]')!, pending ? 'Checking…' : x.label);
+      a.querySelector<HTMLElement>('[data-sw="best"]')!.hidden = pending || !(x.minutes < mins);
+      a.dataset.level = pending ? '0' : String(x.level);
+    });
+  };
+
+  const steps = (at: number) => `<ol class="u-steps" aria-label="Where you are">${['Joined', 'On the way', 'In the shop', 'Your turn'].map((t, i) => `<li${i < at ? ' class="is-done"' : i === at ? ' class="is-now" aria-current="step"' : ''}>${t}</li>`).join('')}</ol>`;
+  const quiet = (label: string, attr: string) => `<button type="button" class="u-btn u-btn--quiet" ${attr}>${label}</button>`;
+  const LIVE = '<span class="u-live"><i></i>Live</span>';
+  const PERF = '<div class="u-perf" aria-hidden="true"></div>';
+
+  // Draws the ticket and says what the line summary should read.
+  const paintTicket = (now: number): { sum: string; lineNote: string; id: string } => {
+    const m = here();
+    let html = '', state = '', sum = '', lineNoteText = '';
+    if (m) {
+      const { board, source } = pick(shop);
+      const where = esc(shopName(shop));
+      const k = board.t[m.id];
+      const place = placeOf(board, m.id, now);
+      const alertBtn = 'Notification' in window && Notification.permission === 'default' ? quiet('Alert me', 'data-alert aria-label="Alert me when it’s my turn"') : '';
+      if (m.src === 'cloud' && source !== 'cloud' && !loaded) {
+        state = 'checking';
+        html = `<article class="u-pass" aria-label="Your ticket"><header class="u-pass__top"><span>Your ticket</span></header><p class="u-pass__place">Checking your place in the queue…</p><p class="u-pass__time">${where}</p></article>`;
+      } else if (k?.s === 'chair') {
+        const s = board.staff[k.b ?? ''];
+        state = 'turn';
+        sum = 'It’s your turn';
+        html = `<article class="u-pass is-turn" aria-label="Your ticket">
+          <header class="u-pass__top"><span>It’s your turn</span>${LIVE}</header>
+          <span class="u-label">Number</span>
+          <p class="u-num u-pass__n">${k.n}</p>
+          <p class="u-pass__place">It’s your turn, ${esc(m.name)}!</p>
+          <p class="u-pass__time">Come and take a seat. Your barber is ready for you now.</p>
+          ${steps(3)}
+          ${PERF}
+          <div class="u-chairline"><span class="u-avatar">${s ? esc(s.name ? s.name[0].toUpperCase() : s.chair) : '✓'}</span><span><b>${s ? `Chair ${s.chair}${s.name ? ` with ${esc(s.name)}` : ''}` : 'Take a seat'}</b><small>Your ticket closes by itself when your cut is finished.</small></span></div>
+        </article>`;
+        if (!toldTurn) { toldTurn = true; notify('It’s your turn at Hampton Barbers', s ? `Number ${k.n}, chair ${s.chair}.` : 'Come and take a seat.'); }
+        if (m.seen !== 'chair') { mine = { ...m, seen: 'chair' }; write(TICKET_KEY, mine); }
+      } else if (place) {
+        const { ahead, mins, at } = place;
+        const tk = place.k;
+        const first = ahead === 0, inShop = tk.s === 'here';
+        // Past the time they gave: warn them before the place lapses.
+        const due = tk.at + tk.eta * 60_000, lapses = clockText(due + GRACE_MIN * 60_000);
+        const overdue = !inShop && now > due;
+        const warn = overdue ? `You said you’d be here by ${clockText(due)}. Your place lapses at ${lapses} unless you check in${tk.late ? '' : ' or tap “Running late”'}.` : '';
+        state = first && inShop ? 'next' : 'waiting';
+        sum = first ? 'Nobody ahead of you' : `${people(ahead)} ahead of you`;
+        lineNoteText = inShop
+          ? `You’re checked in. Numbers are called in order, so watch the shop screen for number ${tk.n}.`
+          : `Only people in the shop are called. We hold your place until ${clockText(tk.at + (tk.eta + GRACE_MIN) * 60_000)}.`;
+        const when = mins < 0 ? 'The shop is not cutting right now'
+          : mins <= 2 ? (inShop ? 'A barber should be free for you any moment' : 'A barber should be free when you arrive')
+          : `About ${Math.max(5, Math.round(mins / 5) * 5)} minutes, around <b>${clockText(at)}</b>`;
+        const msg = note || warn;
+        html = `<article class="u-pass${state === 'next' ? ' is-next' : ''}" aria-label="Your ticket">
+          <header class="u-pass__top"><span>${inShop ? 'Checked in' : 'Your ticket'}</span>${LIVE}</header>
+          <span class="u-label">Your number</span>
+          <p class="u-num u-pass__n">${tk.n}</p>
+          <p class="u-pass__place">${first ? (inShop ? 'You’re next.' : 'You’re first in line.') : `${ord(ahead + 1)} in line`}</p>
+          <p class="u-pass__time">${when}</p>
+          ${steps(inShop ? 2 : 1)}
+          ${msg ? `<p class="u-pass__msg" role="status">${esc(msg)}</p>` : ''}
+          ${PERF}
+          <div class="u-pass__acts">
+            ${inShop ? `<p class="u-pass__sub">Take a seat and watch the shop screen for number ${tk.n}.</p>` : '<button type="button" class="u-btn u-btn--primary u-btn--lg u-btn--block" data-here>I’m here</button>'}
+            <div>${inShop || tk.late ? '' : quiet('Running late', 'data-late')}${alertBtn}${quiet('Leave the queue', 'data-leave')}</div>
+          </div>
+        </article>`;
+        if (first && inShop && lastAhead !== Infinity && lastAhead > 0) notify('You’re next at Hampton Barbers', `Number ${tk.n}: a barber will call you in a moment.`);
+        if (overdue && !toldLate) { toldLate = true; notify('Are you nearly at Hampton Barbers?', `Your place lapses at ${lapses}.`); }
+        lastAhead = ahead;
+      } else if (m.seen === 'chair') {
+        state = 'gone';
+        html = `<article class="u-pass is-done" aria-label="Your ticket">
+          <header class="u-pass__top"><span>Thank you</span></header>
+          <p class="u-pass__place">All done, ${esc(m.name)}. Thanks for coming in.</p>
+          <p class="u-pass__time">See you next time at ${where}.</p>
+          ${PERF}
+          <div class="u-pass__acts"><button type="button" class="u-btn u-btn--lg u-btn--block" data-done>Close</button></div>
+        </article>`;
+      } else {
+        state = 'gone';
+        html = `<article class="u-pass is-gone" aria-label="Your ticket">
+          <header class="u-pass__top"><span>Ticket closed</span></header>
+          <p class="u-pass__place">You’re no longer in the queue at ${where}.</p>
+          <p class="u-pass__time">A place lapses if you have not arrived 10 minutes after the time you gave. If that’s a mistake, join again or call the shop.</p>
+          ${PERF}
+          <div class="u-pass__acts"><button type="button" class="u-btn u-btn--primary u-btn--lg u-btn--block" data-again>Join again</button><div>${quiet('Close', 'data-done')}</div></div>
+        </article>`;
+      }
+    }
+    ticketEl.hidden = !m;
+    waitEl.hidden = Boolean(m);
+    ticketEl.dataset.state = state;
+    // Redraw only when something changed, so a tap never lands on a button being replaced.
+    fill(ticketEl, html);
+    say(hiEl, m ? `Hi, ${m.name}` : '');
+    hiEl.hidden = !m;
+    return { sum, lineNote: lineNoteText, id: m && state !== 'gone' ? m.id : '' };
+  };
+
+  const render = () => {
+    const now = Date.now();
+    const cur = pick(shop);
+    const view = boardView(cur.board, now);
+    // On the real site the first answer from the shop takes a moment: show that, not "closed".
+    const pending = !loaded && cur.source === 'closed';
+    paintWait(view, cur.board.updatedAt, pending, now);
+    const t = paintTicket(now);
+    paintLine(view, pending, t.id);
+    paintShops(now, view.minutes, pending);
+    say(lineSum, pending ? '' : t.sum || (view.waiting ? `${view.waiting} waiting` : 'Nobody waiting'));
+    say(lineNote, t.lineNote || 'Only people in the shop are called, in number order.');
+
+    // A live ticket at one of the other shops: link to it instead of offering a second one here.
+    const other = mine && mine.shop !== shop && pick(mine.shop).board.t[mine.id] ? mine : null;
+    elseEl.hidden = !other;
+    if (other) { elseEl.href = `${base}/queue/${other.shop}/${params.has('emulator') ? '?emulator' : ''}`; fill(elseEl, `<span>You have a ticket at ${esc(shopName(other.shop))}.</span><b>Open my ticket →</b>`); }
+    const open = cur.source !== 'closed' && cur.board.online;
+    const full = Object.keys(cur.board.t).length >= MAX_LINE;
+    joinBtn.disabled = pending || !open || full || Boolean(other);
+    say(joinHint, pending ? JOIN_HINT : other ? `You already have a ticket at ${shopName(other.shop)}. Leave that queue first to join this one.` : !open ? CLOSED : full ? FULL : JOIN_HINT);
+  };
+
+  // ---- arriving ----
+  const manual = 'When you’re at the shop, scan the code on the door or tell your barber your number.';
+  const checkIn = (silent = false) => {
+    const m = here();
+    if (!m) return;
+    const tell = (t: string) => { if (!silent) { note = t; render(); } };
+    const g = geo[shop];
+    if (!g || !navigator.geolocation) return tell(manual);
+    tell('Checking where you are…');
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      const d = metresBetween(p.coords, g);
+      if (d - Math.min(p.coords.accuracy || 0, 100) <= ARRIVE_M) {
+        write(GEO_OK, 1);
+        note = '';
+        await act((b, id, now) => arrive(b, id, now));
+      } else {
+        tell(`You look about ${d < 950 ? `${Math.max(50, Math.round(d / 50) * 50)} metres` : `${(d / 1609).toFixed(d < 16_090 ? 1 : 0)} miles`} from the shop. ${manual}`);
+      }
+    }, () => tell(`We couldn’t check your location. ${manual}`), { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 });
+  };
+  // If the visitor already allowed location once, check quietly as they get close.
+  const autoCheckIn = async () => {
+    const m = here();
+    if (!m || !read(GEO_OK) || document.visibilityState !== 'visible' || pick(shop).board.t[m.id]?.s !== 'way') return;
+    try { if ((await navigator.permissions.query({ name: 'geolocation' })).state === 'granted') checkIn(true); } catch { /* not supported */ }
+  };
+
+  // ---- joining and leaving ----
+  const openJoin = () => {
+    errEl.hidden = true;
+    if (joinBtn.disabled || here() || dialog.open) return;
+    dialog.classList.toggle('is-door', atDoor);
+    dialog.showModal();
+    dialog.querySelector<HTMLInputElement>('input[name="name"]')!.focus();
+  };
+  const leaveQueue = async () => {
+    const m = here();
+    if (!m) return;
+    const n = pick(shop).board.t[m.id]?.n;
+    if (!confirm(`Leave the queue${n ? ` and give up number ${n}` : ''}?`)) return;
+    if (!(await act((b, id, now) => leave(b, id, now)))) return;
+    if (m.src === 'cloud') api?.dropName(shop, m.id).catch(() => { /* the shop tidies up */ });
+    else setLocalName(shop, m.id, null);
+    note = '';
+    setMine(null);
+    render();
+  };
+  root.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('[data-again]')) { setMine(null); note = ''; render(); openJoin(); }
+    else if (t.closest('[data-join]')) openJoin();
+    else if (t.closest('[data-join-cancel]')) dialog.close();
+    else if (t.closest('[data-leave]')) leaveQueue();
+    else if (t.closest('[data-here]')) checkIn();
+    else if (t.closest('[data-late]')) act((b, id, now) => runLate(b, id, now)).then((ok) => { if (ok) { toldLate = false; note = 'Thanks for letting us know. Your place is held 10 minutes longer.'; render(); } });
+    else if (t.closest('[data-done]')) { setMine(null); note = ''; render(); }
+    else if (t.closest('[data-alert]')) Notification.requestPermission().then(render);
+  });
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    const name = String(data.get('name') ?? '').trim().replace(/\s+/g, ' ').slice(0, 24);
+    const eta = Number(data.get('eta') ?? 10);
+    const src = atDoor ? 'qr' : 'web';
+    if (!name) { errEl.textContent = 'Please add your first name.'; errEl.hidden = false; return; }
+    if (joining) return; // a second tap while the first is still being saved
+    joining = true;
+    submitBtn.disabled = true; submitBtn.textContent = 'Joining…';
+    try {
+      const source = pick(shop).source;
+      if (source === 'closed') throw new QueueError('closed');
+      let m: Mine;
+      if (source === 'cloud') {
+        api ??= await import('../../lib/cloud');
+        const r = await api.actCustomer(shop, (b, id, now) => (b.t[id] ? b : join(b, id, now, eta, src)));
+        cloud = { ...cloud, [shop]: r.board };
+        api.setName(shop, r.id, name).catch(() => { /* the number still works without a name */ });
+        m = { shop, id: r.id, name, src: 'cloud', at: Date.now() };
+      } else {
+        const id = newId('l');
+        actLocal(shop, (b, now) => join(b, id, now, eta, src));
+        setLocalName(shop, id, name);
+        m = { shop, id, name, src: 'local', at: Date.now() };
+      }
+      setMine(m);
+      lastAhead = Infinity; toldTurn = false; toldLate = false; note = '';
+      form.reset();
+      dialog.close();
+      follow();
+      render();
+      scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      errEl.textContent = err instanceof QueueError
+        ? ({ closed: CLOSED, full: FULL }[err.code] ?? 'Could not join. Please try again.')
+        : 'Could not join. Check your connection and try again.';
+      errEl.hidden = false;
+      if (err instanceof QueueError) refresh(); // the shop has changed something since this page last looked
+    } finally {
+      joining = false;
+      submitBtn.disabled = false; submitBtn.textContent = 'Join the queue';
+    }
+  });
+
+  // ---- keeping up to date ----
+  render();
+  const refresh = async () => {
+    const got = await fetchBoards();
+    if (got) for (const [k, b] of Object.entries(got)) if (!cloud[k] || b.updatedAt >= cloud[k].updatedAt) cloud = { ...cloud, [k]: b };
+    loaded = true;
+    render();
+  };
+  refresh().then(() => {
+    const m = here();
+    // Scanned the code on the door: check in a ticket already held for this shop, or offer one.
+    if (atDoor && m && pick(shop).board.t[m.id]?.s === 'way') act((b, id, now) => arrive(b, id, now)).then((ok) => { if (ok) { note = ''; render(); } });
+    else if ((atDoor || params.has('join')) && !m) openJoin();
+    // Asked to join once: a reload or the back button should not ask again.
+    if (params.has('join')) { params.delete('join'); const rest = params.toString(); history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}`); }
+  });
+  follow();
+  let tick = 0;
+  setInterval(() => {
+    tick++;
+    if (tick % 4 === 0 && document.visibilityState === 'visible') refresh(); else render();
+    if (tick % 3 === 0) autoCheckIn();
+  }, 15_000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+  // When the queue desk (or another tab) changes things on this device, follow straight away.
+  onDeviceChange(() => { mine = read<Mine>(TICKET_KEY); render(); });
+</script>

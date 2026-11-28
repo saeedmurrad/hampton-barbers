@@ -1,116 +1,156 @@
 ---
 // The queue desk: the shop's own screen for running the queue. Add walk-ins, mark online
-// customers as arrived, call people to a chair, finish cuts, and manage barbers and settings.
+// customers as arrived, call people to a chair, finish cuts and record how they paid, and
+// (under Barbers and Settings) manage barber profiles, staff logins and the queue's settings.
+import '../../styles/ui.css';
 import '../../styles/staff.css';
 import Base from '../../layouts/Base.astro';
 import { shops, menu } from '../../data/site';
 import { penceOf } from '../../lib/sales';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: penceOf(i.price) })));
+const icons = {
+  queue: 'M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01',
+  barbers: 'M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21a8 8 0 0 1 16 0',
+  reports: 'M5 20V10M12 20V4M19 20v-7',
+  settings: 'M4 7h10M18 7h2M4 17h4M12 17h8M14 7a2 2 0 1 0 4 0 2 2 0 0 0-4 0ZM8 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z',
+};
 ---
-<Base noindex title="Hampton Barbers: queue desk" description="Run the walk-in queue: add walk-ins, call customers to a chair and keep the shop screen up to date.">
-  <main id="main" class="qd" data-base={base} data-services={JSON.stringify(services)}>
-    <header class="qd__top">
-      <div>
-        <p class="qd__back"><a href={`${base}/admin/`}>← Prices and hours</a><a href={`${base}/admin/reports/`}>Takings and reports →</a></p>
-        <h1>Queue desk</h1>
+<Base noindex title="Hampton Barbers: queue desk" description="Run the walk-in queue: add walk-ins, call customers to a chair and keep the shop screen up to date." themeColor="#0a0c0b">
+  <main id="main" class="ui" data-desk data-base={base} data-services={JSON.stringify(services)}>
+    <h1 class="sr">Queue desk</h1>
+    <header class="u-top">
+      <a class="u-brand" href={`${base}/`}><i>HB</i><span><b>Hampton Barbers</b><small>Queue desk</small></span></a>
+      <nav class="u-seg" aria-label="Which shop">
+        {shops.map((s, i) => <button type="button" data-tab={s.id} aria-pressed={i === 0 ? 'true' : 'false'}><span>{s.name}</span></button>)}
+      </nav>
+      <div class="u-top__right">
+        <nav class="u-nav" aria-label="Sections">
+          <a href="#queue" data-view-link="queue" aria-current="page">Queue</a>
+          <a href="#barbers" data-view-link="barbers">Barbers</a>
+          <a href="#settings" data-view-link="settings">Settings</a>
+          <a href={`${base}/admin/reports/`}>Reports</a>
+        </nav>
+        <span class="u-live" data-live><i></i><span>Demo</span></span>
+        <time data-clock></time>
       </div>
-      <p id="qd-status" role="status" aria-live="polite">Loading…</p>
     </header>
 
-    <section class="qd__acct" id="qd-account" aria-label="Your account"></section>
+    <div class="u-desk__body">
+      <p class="u-status" id="qd-status" role="status" aria-live="polite">Loading…</p>
+      <section class="u-acct" id="qd-account" aria-label="Your account"></section>
+      <p class="u-banner" data-banner hidden></p>
 
-    <nav class="qd__tabs" aria-label="Which shop">
-      {shops.map((s, i) => <button type="button" data-tab={s.id} aria-pressed={i === 0 ? 'true' : 'false'}><span>{s.name}</span></button>)}
-    </nav>
-    <p class="qd__links" data-links></p>
-    <p class="qd__banner" data-banner hidden></p>
-
-    <div class="qd__grid">
-      <section class="qd__card" aria-labelledby="qd-h-chairs">
-        <div class="qd__head"><h2 id="qd-h-chairs">Chairs</h2><p data-summary></p></div>
-        <ul class="qd__chairs" data-chairs></ul>
-      </section>
-
-      <section class="qd__card" aria-labelledby="qd-h-line">
-        <div class="qd__head"><h2 id="qd-h-line">Waiting, in number order</h2><p>People who join on their phones appear here by themselves.</p></div>
-        <form class="qd__add" data-add>
-          <input name="name" maxlength="24" autocomplete="off" placeholder="First name (optional)" aria-label="Walk-in’s first name (optional)" />
-          <button type="submit" class="primary">+ Add walk-in</button>
-        </form>
-        <ol class="qd__line" data-queue></ol>
-      </section>
-    </div>
-
-    <details class="qd__card qd__more">
-      <summary>Barbers and settings</summary>
-      <div class="qd__set">
-        <div>
-          <h3>Barbers at this shop</h3>
-          <p class="qd__hint">Each barber has their own profile and chair. Customers are assigned to a barber when they are called.</p>
-          <ul class="qd__staff" data-staff></ul>
-          <button type="button" data-add-barber>+ Add a barber</button>
-        </div>
-        <div class="qd__opts">
-          <h3>Queue settings</h3>
-          <div class="qd__step">
-            <div><b>Usual minutes per cut</b><small>Used for the wait estimates. Timed cuts fine-tune it through the day.</small></div>
-            <div class="qd__ctl"><button type="button" data-avg="-5" aria-label="Fewer minutes per cut">−</button><output data-avg-val>20</output><button type="button" data-avg="5" aria-label="More minutes per cut">+</button></div>
-          </div>
-          <label class="qd__field">Joining from a phone
-            <select id="qd-online">
-              <option value="on">On: customers can join from their phones</option>
-              <option value="off">Paused: walk-ins only</option>
-            </select>
-          </label>
-          <label class="qd__field">How busy we look
-            <select id="qd-mode">
-              <option value="auto">Work it out from the queue (recommended)</option>
-              <option value="quiet">Quiet: walk straight in</option>
-              <option value="steady">Short wait</option>
-              <option value="busy">Busy</option>
-              <option value="very-busy">Very busy</option>
-              <option value="paused">Not cutting right now (break or closing)</option>
-            </select>
-          </label>
-          <label class="qd__field">Short message for customers (optional)
-            <input id="qd-note" maxlength="120" placeholder="e.g. Back from lunch at 2pm" />
-          </label>
-          <div class="qd__row" data-demo-only>
-            <span>Fill the queue with an example:</span>
-            <button type="button" data-example="quiet">Quiet</button>
-            <button type="button" data-example="steady">Steady</button>
-            <button type="button" data-example="busy">Busy</button>
-          </div>
-          <div class="qd__row"><button type="button" data-clear>Clear the queue</button><small>Removes everyone waiting and in the chairs. Ticket numbers carry on.</small></div>
-        </div>
-        <div class="qd__logins" data-logins hidden>
-          <h3>Staff logins</h3>
-          <p class="qd__hint">Give each barber their own login, and one for the shop tablet. A staff login can run the queue and record payments. It cannot open the takings, the percentages or this list.</p>
-          <ul class="qd__staff" data-login-list></ul>
-          <form class="qd__newlogin" data-new-login>
-            <input name="name" placeholder="First name" required maxlength="30" autocomplete="off" aria-label="First name" />
-            <input name="email" type="email" placeholder="Their email" required autocomplete="off" aria-label="Their email" />
-            <input name="password" type="text" placeholder="A password for them" required minlength="8" autocomplete="off" aria-label="A password for them, 8 or more characters" />
-            <select name="for" aria-label="Who the login is for" data-login-for></select>
-            <button type="submit" class="primary">Create login</button>
-          </form>
-          <p class="qd__hint">They sign in on the barber panel with that email and password, and can change the password there. No email is sent.</p>
-          <p class="qd__msg" data-login-msg role="status" hidden></p>
+      <div class="u-stack" data-view="queue">
+        <section class="u-stats" aria-label="Right now" data-stats></section>
+        <div class="u-main">
+          <section class="u-panel" aria-labelledby="qd-h-chairs">
+            <div class="u-h"><h2 id="qd-h-chairs">Chairs</h2><span data-summary></span></div>
+            <div class="u-chairs" data-chairs></div>
+          </section>
+          <section class="u-panel" aria-labelledby="qd-h-line">
+            <div class="u-h">
+              <h2 id="qd-h-line">Waiting <em data-count>0</em></h2>
+              <form class="u-add" data-add>
+                <input name="name" maxlength="24" autocomplete="off" placeholder="Walk-in’s first name (optional)" aria-label="Walk-in’s first name (optional)" />
+                <button type="submit" class="u-btn u-btn--primary">Add walk-in</button>
+              </form>
+            </div>
+            <ol class="u-line" data-queue></ol>
+          </section>
         </div>
       </div>
-    </details>
+
+      <div class="u-stack" data-view="barbers" hidden>
+        <section class="u-panel" aria-labelledby="qd-h-barbers">
+          <div class="u-h"><h2 id="qd-h-barbers">Barbers at this shop</h2><button type="button" class="u-btn" data-add-barber>Add a barber</button></div>
+          <p class="u-hint" style="margin-bottom:.9rem">Each barber has their own profile and chair. Customers are assigned to a barber when they are called.</p>
+          <ul class="u-staff" data-staff></ul>
+        </section>
+        <section class="u-panel" aria-labelledby="qd-h-logins" data-logins hidden>
+          <div class="u-h"><h2 id="qd-h-logins">Staff logins</h2></div>
+          <p class="u-hint" style="margin-bottom:.9rem">Give each barber their own login, and one for the shop tablet. A staff login can run the queue and record payments. It cannot open the takings, the percentages or this list.</p>
+          <ul class="u-staff" data-login-list></ul>
+          <form class="u-form" data-new-login style="margin-top:.9rem">
+            <input class="u-input" name="name" placeholder="First name" required maxlength="30" autocomplete="off" aria-label="First name" />
+            <input class="u-input" name="email" type="email" placeholder="Their email" required autocomplete="off" aria-label="Their email" />
+            <input class="u-input" name="password" type="text" placeholder="A password for them" required minlength="8" autocomplete="off" aria-label="A password for them, 8 or more characters" />
+            <select class="u-input" name="for" aria-label="Who the login is for" data-login-for></select>
+            <button type="submit" class="u-btn u-btn--primary">Create login</button>
+          </form>
+          <p class="u-hint" style="margin-top:.7rem">They sign in on the barber panel with that email and password, and can change the password there. No email is sent.</p>
+          <p class="u-msg" data-login-msg role="status" hidden></p>
+        </section>
+      </div>
+
+      <div class="u-stack" data-view="settings" hidden>
+        <div class="u-cols">
+          <section class="u-panel u-stack" aria-labelledby="qd-h-settings">
+            <div class="u-h" style="margin-bottom:0"><h2 id="qd-h-settings">Queue settings</h2></div>
+            <div class="u-rowline">
+              <span><b>Usual minutes per cut</b><small>Used for the wait estimates. Timed cuts fine-tune it through the day.</small></span>
+              <div class="u-step"><button type="button" class="u-btn" data-avg="-5" aria-label="Fewer minutes per cut">−</button><output data-avg-val>20</output><button type="button" class="u-btn" data-avg="5" aria-label="More minutes per cut">+</button></div>
+            </div>
+            <label class="u-field">Joining from a phone
+              <select class="u-input" id="qd-online">
+                <option value="on">On: customers can join from their phones</option>
+                <option value="off">Paused: walk-ins only</option>
+              </select>
+            </label>
+            <label class="u-field">How busy we look
+              <select class="u-input" id="qd-mode">
+                <option value="auto">Work it out from the queue (recommended)</option>
+                <option value="quiet">Quiet: walk straight in</option>
+                <option value="steady">Short wait</option>
+                <option value="busy">Busy</option>
+                <option value="very-busy">Very busy</option>
+                <option value="paused">Not cutting right now (break or closing)</option>
+              </select>
+            </label>
+            <label class="u-field">Short message for customers (optional)
+              <input class="u-input" id="qd-note" maxlength="120" placeholder="e.g. Back from lunch at 2pm" />
+            </label>
+          </section>
+          <div class="u-stack">
+            <section class="u-panel" aria-labelledby="qd-h-screens">
+              <div class="u-h"><h2 id="qd-h-screens">Screens for this shop</h2></div>
+              <div class="u-links" data-links></div>
+            </section>
+            <section class="u-panel u-stack" aria-labelledby="qd-h-tidy">
+              <div class="u-h" style="margin-bottom:0"><h2 id="qd-h-tidy">Clean-up</h2></div>
+              <div class="u-rowline" data-demo-only>
+                <span><b>Fill the demo queue with an example</b><small>Only in the demo. Replaces the queue on this device.</small></span>
+                <div class="u-step"><button type="button" class="u-btn u-btn--sm" style="width:auto;border-radius:10px;font-size:.85rem" data-example="quiet">Quiet</button><button type="button" class="u-btn u-btn--sm" style="width:auto;border-radius:10px;font-size:.85rem" data-example="steady">Steady</button><button type="button" class="u-btn u-btn--sm" style="width:auto;border-radius:10px;font-size:.85rem" data-example="busy">Busy</button></div>
+              </div>
+              <div class="u-rowline">
+                <span><b>Clear the queue</b><small>Removes everyone waiting and in the chairs. Ticket numbers carry on.</small></span>
+                <button type="button" class="u-btn" data-clear>Clear the queue</button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="u-tabbar" aria-label="Sections">
+      <a href="#queue" data-view-link="queue" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={icons.queue} /></svg>Queue</a>
+      <a href="#barbers" data-view-link="barbers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={icons.barbers} /></svg>Barbers</a>
+      <a href={`${base}/admin/reports/`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={icons.reports} /></svg>Reports</a>
+      <a href="#settings" data-view-link="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={icons.settings} /></svg>Settings</a>
+    </nav>
+
+    <dialog class="u-sheet" data-sheet aria-label="More actions"><div class="u-sheet__in"><b data-sheet-title></b><div class="u-stack" style="gap:.45rem" data-sheet-acts></div><button type="button" class="u-btn u-btn--quiet" data-sheet-close>Cancel</button></div></dialog>
   </main>
 </Base>
 
 <script>
-  import { addWalkIn, arrive, boardView, callNext, clearQueue, clockText, dropBarber, exampleBoard, lapsed, minsText, removeTicket, setBarber, setOptions, uncall, type LiveMode } from '../../lib/board';
+  import { addWalkIn, arrive, barberLabel, boardView, callNext, clearQueue, clockText, cutMinutes, dropBarber, exampleBoard, lapsed, minsText, removeTicket, setBarber, setOptions, uncall, type LiveMode } from '../../lib/board';
   import { createDesk } from '../../lib/desk';
   import { finishAndPay, loadServices, type Service } from '../../lib/paysheet';
   import { esc, newId } from '../../lib/store';
   import * as cloud from '../../lib/cloud';
 
-  const root = document.querySelector<HTMLElement>('.qd')!;
+  const root = document.querySelector<HTMLElement>('[data-desk]')!;
   let services = JSON.parse(root.dataset.services || '[]') as Service[];
   loadServices(services).then((list) => { services = list; });
   const base = root.dataset.base ?? '';
@@ -119,8 +159,9 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   const shops = tabs.map((b) => ({ id: b.dataset.tab!, name: b.textContent!.trim() }));
   const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
   const statusEl = $('#qd-status'), account = $('#qd-account'), linksEl = $('[data-links]'), bannerEl = $('[data-banner]');
-  const chairsEl = $('[data-chairs]'), queueEl = $('[data-queue]'), staffEl = $('[data-staff]'), summaryEl = $('[data-summary]');
+  const chairsEl = $('[data-chairs]'), queueEl = $('[data-queue]'), staffEl = $('[data-staff]'), summaryEl = $('[data-summary]'), statsEl = $('[data-stats]');
   const modeEl = $<HTMLSelectElement>('#qd-mode'), onlineEl = $<HTMLSelectElement>('#qd-online'), noteEl = $<HTMLInputElement>('#qd-note');
+  const sheet = $<HTMLDialogElement>('[data-sheet]');
   const fill = (el: HTMLElement, html: string) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
   const shopName = (id: string) => shops.find((s) => s.id === id)?.name ?? 'the shop';
 
@@ -147,6 +188,18 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     setTimeout(() => t.remove(), action ? 12_000 : 4500);
   };
 
+  // The three sections of the desk. Only one shows at a time; the others stay in the page.
+  const showView = (name: string) => {
+    document.querySelectorAll<HTMLElement>('[data-view]').forEach((el) => { el.hidden = el.dataset.view !== name; });
+    document.querySelectorAll<HTMLElement>('[data-view-link]').forEach((a) => { if (a.dataset.viewLink === name) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  };
+  // A small sheet of extra actions for one chair or one person in the line.
+  const openSheet = (title: string, acts: { label: string; attr: string; danger?: boolean }[]) => {
+    $('[data-sheet-title]').textContent = title;
+    $('[data-sheet-acts]').innerHTML = acts.map((a) => `<button type="button" class="u-btn${a.danger ? ' u-btn--danger' : ''}" ${a.attr}>${esc(a.label)}</button>`).join('');
+    sheet.showModal();
+  };
+
   const desk = createDesk(shops.map((s) => s.id), () => draw());
 
   // ---------- drawing ----------
@@ -154,16 +207,18 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     const email = desk.email();
     if (drawnFor === email && !accountMsg) return;
     drawnFor = email;
-    const note = accountMsg ? `<p class="qd__msg" role="alert">${esc(accountMsg)}</p>` : '';
+    const note = accountMsg ? `<p class="u-msg" role="alert" style="margin-top:.6rem">${esc(accountMsg)}</p>` : '';
     accountMsg = '';
+    account.classList.toggle('u-acct--line', Boolean(email));
     if (!desk.connected) { account.innerHTML = '<p><strong>Not connected.</strong> Changes show on this device only.</p>'; return; }
     account.innerHTML = email
-      ? `<p>Signed in as <strong>${esc(email)}</strong>. Every change goes live straight away on the website, the barbers’ phones and the shop TV. <button type="button" class="link" data-out>Sign out</button></p>${note}`
-      : `<form id="qd-signin" class="qd__signin"><b>Sign in to run the real queue</b>
-          <input type="email" name="email" autocomplete="username" placeholder="Email" required />
-          <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
-          <button type="submit" class="primary">Sign in</button></form>${note}
-        <p class="qd__hint">Until you sign in this is a demo that stays on this device: open the shop TV, a barber panel and a customer page in other tabs and they all follow along.</p>`;
+      ? `<p>Signed in as <strong>${esc(email)}</strong>. Every change goes live straight away on the website, the barbers’ phones and the shop TV. <button type="button" class="u-link" data-out>Sign out</button></p>${note}`
+      : `<details${note ? ' open' : ''}><summary>Sign in to run the real queue</summary>
+          <form id="qd-signin" class="u-signin">
+          <input class="u-input" type="email" name="email" autocomplete="username" placeholder="Email" required />
+          <input class="u-input" type="password" name="password" autocomplete="current-password" placeholder="Password" required />
+          <button type="submit" class="u-btn u-btn--primary">Sign in</button></form>${note}
+        <p class="u-hint" style="margin-top:.7rem">Until you sign in this is a demo that stays on this device: open the shop TV, a barber panel and a customer page in other tabs and they all follow along.</p></details>`;
   };
 
   const draw = () => {
@@ -171,7 +226,12 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     const b = desk.board(tab, now);
     const v = boardView(b, now);
     const signedIn = Boolean(desk.email());
-    statusEl.textContent = desk.offline(tab) ? 'No connection. Showing the last known queue.' : desk.status();
+    const offline = desk.offline(tab);
+    statusEl.textContent = offline ? 'No connection. Showing the last known queue.' : desk.status();
+    $('[data-clock]').textContent = clockText(now);
+    const live = $('[data-live]');
+    live.lastElementChild!.textContent = !signedIn ? 'Demo' : offline ? 'Offline' : 'Live';
+    live.style.color = !signedIn ? 'var(--wait)' : offline ? 'var(--alert)' : '';
     drawAccount();
 
     // Announce people who joined on their phones since the last look.
@@ -184,58 +244,94 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
       const id = btn.dataset.tab!;
       btn.setAttribute('aria-pressed', String(id === tab));
       const n = boardView(desk.board(id, now), now).waiting;
-      const badge = btn.querySelector('.badge');
-      if (String(n || '') !== (badge?.textContent ?? '')) { badge?.remove(); if (n) btn.insertAdjacentHTML('beforeend', `<b class="badge" title="People waiting">${n}</b>`); }
+      const badge = btn.querySelector('em');
+      if (String(n || '') !== (badge?.textContent ?? '')) { badge?.remove(); if (n) btn.insertAdjacentHTML('beforeend', `<em title="People waiting">${n}</em>`); }
     });
     const q = emu ? '?emulator' : '';
-    fill(linksEl, `Open for ${esc(shopName(tab))}:
-      <a href="${base}/board/${tab}/${q}" target="_blank" rel="noopener">Shop TV</a>
-      <a href="${base}/barber/?shop=${tab}${emu ? '&emulator' : ''}" target="_blank" rel="noopener">Barber panel</a>
-      <a href="${base}/queue/${tab}/${q}" target="_blank" rel="noopener">Customer page</a>
-      <a href="${base}/queue/${tab}/?here=1${emu ? '&emulator' : ''}" target="_blank" rel="noopener">Door code link</a>
-      <a href="${base}/poster/${tab}/" target="_blank" rel="noopener">Door poster</a>`);
+    fill(linksEl, `
+      <a class="u-btn" href="${base}/board/${tab}/${q}" target="_blank" rel="noopener">Shop TV</a>
+      <a class="u-btn" href="${base}/barber/?shop=${tab}${emu ? '&emulator' : ''}" target="_blank" rel="noopener">Barber panel</a>
+      <a class="u-btn" href="${base}/queue/${tab}/${q}" target="_blank" rel="noopener">Customer page</a>
+      <a class="u-btn" href="${base}/queue/${tab}/?here=1${emu ? '&emulator' : ''}" target="_blank" rel="noopener">Door code link</a>
+      <a class="u-btn" href="${base}/poster/${tab}/" target="_blank" rel="noopener">Door poster</a>`);
     const loading = desk.loading(tab);
     const closed = signedIn && !loading && !desk.opened(tab);
     bannerEl.hidden = !closed;
-    if (closed) fill(bannerEl, `Today’s queue for ${esc(shopName(tab))} is not open yet, so customers cannot see or join it. <button type="button" class="primary" data-open>Open today’s queue</button>`);
-    summaryEl.textContent = `${v.inShop} in the shop · ${v.onWay} on the way · walk-in wait: ${v.headline === 'No wait' ? 'none' : `${v.headline} ${v.unit}`.trim()}`;
+    if (closed) fill(bannerEl, `<span>Today’s queue for ${esc(shopName(tab))} is not open yet, so customers cannot see or join it.</span> <button type="button" class="u-btn u-btn--primary" data-open>Open today’s queue</button>`);
 
     if (loading) {
       summaryEl.textContent = '';
-      fill(chairsEl, '<li class="none">Loading the queue…</li>');
-      fill(queueEl, '<li class="empty">Loading the queue…</li>');
+      fill(statsEl, '');
+      fill(chairsEl, '<p class="u-empty">Loading the queue…</p>');
+      fill(queueEl, '<li class="u-empty">Loading the queue…</li>');
       return;
     }
+    const wait = v.headline === 'No wait' ? 'None' : v.headline;
+    fill(statsEl, `<div class="u-stat"><span class="u-label">In the shop</span><b>${v.inShop}</b></div>
+      <div class="u-stat"><span class="u-label">On the way</span><b>${v.onWay}</b></div>
+      <div class="u-stat${v.level >= 3 ? ' u-stat--wait' : ''}"><span class="u-label">Walk-in wait</span><b>${wait}${v.unit ? `<small>${v.unit}</small>` : ''}</b></div>
+      <div class="u-stat"><span class="u-label">Cuts today</span><b>${b.done}</b></div>`);
+    const cutting = v.chairs.filter((c) => c.state !== 'break').length, onBreak = v.chairs.length - cutting;
+    summaryEl.textContent = `${cutting} on shift${onBreak ? ` · ${onBreak} on a break` : ''}`;
+    $('[data-count]').textContent = String(v.waiting);
+
     const next = v.line.find((x) => x.s === 'here');
+    const cut = cutMinutes(b);
     fill(chairsEl, v.chairs.map((c) => {
-      const who = `Chair ${c.chair}${c.name ? ` · ${esc(c.name)}` : ''}`;
+      const s = b.staff[c.id];
+      const who = esc(barberLabel(s));
+      const avatar = `<span class="u-avatar u-avatar--sm">${esc(barberLabel(s)[0].toUpperCase())}</span>`;
+      const more = `<button type="button" class="u-btn u-btn--icon" data-more="chair:${c.id}" aria-label="More for ${who}">⋯</button>`;
       if (c.state === 'busy') {
-        const nm = desk.name(tab, c.tid!);
-        return `<li class="busy${c.calling ? ' calling' : ''}"><div><small>${who}</small><b>${c.n}</b><span>${nm ? `${esc(nm)} · ` : ''}${c.calling ? 'called just now' : `${c.mins} min so far`}</span></div>
-          <div class="qd__btns"><button type="button" class="primary" data-finish="${c.id}">Finish</button><button type="button" data-uncall="${c.tid}">Undo</button></div></li>`;
+        const k = b.t[c.tid!];
+        const nm = desk.name(tab, c.tid!) || (k?.src === 'desk' ? 'Walk-in' : 'Online customer');
+        const mins = c.mins ?? 0, late = mins > cut;
+        return `<article class="u-chair is-busy${late ? ' is-late' : ''}${c.calling ? ' is-calling' : ''}">
+          <p class="u-num u-chair__num">${c.n}</p>
+          <div class="u-chair__who">${avatar}<b>${who}</b><small>Chair ${c.chair} · ${esc(nm)}</small></div>
+          <div class="u-bar"><i style="width:${Math.min(100, Math.round(mins / cut * 100))}%"></i></div>
+          <p class="u-chair__meta"><span>${c.calling ? 'Called just now' : `${mins} min so far`}</span><span>${late ? `${mins - cut} min over` : `${cut - mins} min left`}</span></p>
+          <div class="u-chair__act"><button type="button" class="u-btn u-btn--primary" data-finish="${c.id}">Finish</button>${more}</div>
+        </article>`;
       }
-      if (c.state === 'break') return `<li class="break"><div><small>${who}</small><b>Break</b><span>Not taking customers</span></div>
-        <div class="qd__btns"><button type="button" data-brk-off="${c.id}">Back from break</button></div></li>`;
-      return `<li class="free"><div><small>${who}</small><b>Free</b><span>${next ? `Next is number ${next.n}` : v.onWay ? 'Nobody in the shop yet' : 'Nobody waiting'}</span></div>
-        <div class="qd__btns"><button type="button" class="primary" data-call="${c.id}">Call next</button><button type="button" data-brk-on="${c.id}">Break</button></div></li>`;
-    }).join('') || '<li class="none">No barbers are on shift. Open “Barbers and settings” below to put someone on shift.</li>');
+      if (c.state === 'break') return `<article class="u-chair is-break">
+          <p class="u-num u-chair__num">Break</p>
+          <div class="u-chair__who">${avatar}<b>${who}</b><small>Chair ${c.chair} · not taking customers</small></div>
+          <div class="u-chair__act"><button type="button" class="u-btn" data-brk-off="${c.id}">End break</button>${more}</div>
+        </article>`;
+      return `<article class="u-chair is-free">
+          <p class="u-num u-chair__num">Free</p>
+          <div class="u-chair__who">${avatar}<b>${who}</b><small>Chair ${c.chair} · ${next ? `next is ${next.n}` : v.onWay ? 'nobody in the shop yet' : 'nobody waiting'}</small></div>
+          <div class="u-chair__act"><button type="button" class="u-btn${next ? ' u-btn--go' : ''}" data-call="${c.id}">${next ? `Call ${next.n}` : 'Call next'}</button>${more}</div>
+        </article>`;
+    }).join('') || '<p class="u-empty">No barbers are on shift. Open “Barbers” to put someone on shift.</p>');
 
     fill(queueEl, v.line.map((x) => {
       const k = b.t[x.id];
       const nm = desk.name(tab, x.id);
       const title = nm ? esc(nm) : k.src === 'desk' ? 'Walk-in' : 'Online customer';
-      const sub = x.s === 'here' ? `In the shop${k.src === 'desk' ? '' : ' · joined on their phone'}` : `On the way · due ${clockText(x.due)}${k.late ? ' · running late' : ''}`;
-      return `<li class="${x.s}"><span class="n">${x.n}</span><span class="who"><b>${title}</b><small>${sub}</small></span><span class="eta">${minsText(x.mins)}</span>
-        <span class="qd__btns">${x.s === 'way' ? `<button type="button" data-arrived="${x.id}">Arrived</button>` : ''}<button type="button" class="primary" data-seat="${x.id}">Seat</button><button type="button" data-remove="${x.id}" aria-label="Remove number ${x.n} from the queue">Remove</button></span></li>`;
-    }).join('') || '<li class="empty">Nobody waiting</li>');
+      const waited = Math.max(0, Math.round((now - (k.arr ?? k.at)) / 60_000));
+      const sub = x.s === 'way' ? `Due ${clockText(x.due)}${k.late ? ' · running late' : ''}`
+        : `${k.src !== 'desk' ? 'Joined on their phone · w' : nm ? 'Walk-in · w' : 'W'}aiting ${waited} min`;
+      const first = next?.id === x.id;
+      return `<li class="u-row${first ? ' is-next' : ''}${x.s === 'way' ? ' is-way' : ''}">
+        <b class="u-num u-row__n">${x.n}</b>
+        <span class="u-row__who"><b>${title}</b><small>${sub}</small></span>
+        <span class="u-row__tags"><span class="u-chip u-chip--${x.s === 'way' ? 'wait' : 'ok'}">${x.s === 'way' ? 'On the way' : 'In the shop'}</span></span>
+        <span class="u-row__eta">${minsText(x.mins)}</span>
+        <span class="u-row__act">${x.s === 'way'
+          ? `<button type="button" class="u-btn u-btn--sm" data-arrived="${x.id}">Arrived</button>`
+          : `<button type="button" class="u-btn u-btn--sm${first ? ' u-btn--primary' : ''}" data-seat="${x.id}">Seat</button>`}<button type="button" class="u-btn u-btn--icon u-btn--sm" data-more="row:${x.id}" aria-label="More for number ${x.n}">⋯</button></span>
+      </li>`;
+    }).join('') || '<li class="u-empty">Nobody waiting</li>');
 
     if (!staffEl.contains(document.activeElement)) {
       fill(staffEl, Object.entries(b.staff).sort((x, y) => x[1].chair - y[1].chair).map(([id, s]) => `<li data-barber="${id}">
-        <label class="num">Chair<input type="number" min="1" max="30" value="${s.chair}" data-f="chair" /></label>
-        <label class="grow">Name<input maxlength="20" value="${esc(s.name)}" placeholder="First name" data-f="name" /></label>
-        <label class="chk"><input type="checkbox" ${s.on ? 'checked' : ''} data-f="on" />On shift</label>
-        <span class="done">${s.done} cut${s.done === 1 ? '' : 's'} today</span>
-        <button type="button" data-drop-barber="${id}" aria-label="Remove ${esc(s.name || `the barber on chair ${s.chair}`)}">Remove</button></li>`).join('') || '<li class="none">No barbers yet.</li>');
+        <label class="is-num">Chair<input class="u-input" type="number" min="1" max="30" value="${s.chair}" data-f="chair" /></label>
+        <label class="is-grow">Name<input class="u-input" maxlength="20" value="${esc(s.name)}" placeholder="First name" data-f="name" /></label>
+        <label class="is-check"><input type="checkbox" ${s.on ? 'checked' : ''} data-f="on" />On shift</label>
+        <span class="is-done">${s.done} cut${s.done === 1 ? '' : 's'} today</span>
+        <button type="button" class="u-btn u-btn--sm" data-drop-barber="${id}" aria-label="Remove ${esc(s.name || `the barber on chair ${s.chair}`)}">Remove</button></li>`).join('') || '<li class="u-empty">No barbers yet.</li>');
     }
     $('[data-avg-val]').textContent = String(b.avg);
     modeEl.value = b.mode;
@@ -249,7 +345,7 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     if (!isOwner) { logins = null; loginsAsked = false; return; }
     if (!loginsAsked) reloadLogins();
     const chairOf = (l: cloud.StaffInfo) => { const x = desk.board(l.shop, now).staff[l.b]; return x ? `chair ${x.chair}${x.name ? `, ${esc(x.name)}` : ''}` : 'a profile that has been removed'; };
-    fill(loginList, logins === null ? '<li class="none">Loading…</li>' : logins.map((l) => `<li><span class="who"><b>${esc(l.name)}</b><small>${esc(l.email)} · ${l.role === 'barber' ? `barber at ${esc(shopName(l.shop))}, ${chairOf(l)}` : 'front desk'}</small></span><button type="button" data-remove-login="${l.uid}" aria-label="Remove the login for ${esc(l.name)}">Remove</button></li>`).join('') || '<li class="none">No staff logins yet. The only login is yours.</li>');
+    fill(loginList, logins === null ? '<li class="u-empty">Loading…</li>' : logins.map((l) => `<li><span class="is-who"><b>${esc(l.name)}</b><small>${esc(l.email)} · ${l.role === 'barber' ? `barber at ${esc(shopName(l.shop))}, ${chairOf(l)}` : 'front desk'}</small></span><button type="button" class="u-btn u-btn--sm" data-remove-login="${l.uid}" aria-label="Remove the login for ${esc(l.name)}">Remove</button></li>`).join('') || '<li class="u-empty">No staff logins yet. The only login is yours.</li>');
     if (document.activeElement !== loginFor) {
       const keep = loginFor.value;
       fill(loginFor, '<option value="">For the shop tablet (front desk)</option>' + shops.map((sh) => Object.entries(desk.board(sh.id, now).staff).sort((x, y) => x[1].chair - y[1].chair)
@@ -264,16 +360,42 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     if (!free) { toast('No chair is free. Finish a cut first.'); return; }
     desk.act(tab, (b, now) => callNext(b, free.id, now, id));
   };
+  // The extra actions behind a "more" button.
+  const more = (ref: string) => {
+    const [kind, id] = ref.split(':');
+    const b = desk.board(tab);
+    if (kind === 'chair') {
+      const s = b.staff[id];
+      if (!s) return;
+      const cur = Object.entries(b.t).find(([, k]) => k.s === 'chair' && k.b === id);
+      openSheet(`${barberLabel(s)} · Chair ${s.chair}`, cur
+        ? [{ label: `Undo the call for number ${cur[1].n}`, attr: `data-uncall="${cur[0]}"` }]
+        : [...(s.brk ? [] : [{ label: 'Take a break', attr: `data-brk-on="${id}"` }]), { label: 'End the shift for today', attr: `data-off="${id}"` }]);
+    } else {
+      const k = b.t[id];
+      if (!k) return;
+      openSheet(`Number ${k.n}${desk.name(tab, id) ? ` · ${desk.name(tab, id)}` : ''}`, [
+        ...(k.s === 'way' ? [{ label: 'Seat now (they are here)', attr: `data-seat="${id}"` }] : []),
+        { label: 'Remove from the queue', attr: `data-remove="${id}"`, danger: true },
+      ]);
+    }
+  };
   document.addEventListener('click', (e) => {
+    const link = (e.target as HTMLElement).closest<HTMLElement>('[data-view-link]');
+    if (link) { e.preventDefault(); showView(link.dataset.viewLink!); return; }
+    if (e.target === sheet) { sheet.close(); return; }
     const t = (e.target as HTMLElement).closest<HTMLElement>('button');
     if (!t) return;
     const d = t.dataset;
+    if (t.closest('[data-sheet]')) sheet.close();
     if (d.tab) { tab = d.tab; draw(); }
+    else if (d.more) more(d.more);
     else if (d.call) desk.act(tab, (b, now) => callNext(b, d.call!, now));
     else if (d.finish) finishAndPay(desk, tab, d.finish, services, toast);
     else if (d.uncall) desk.act(tab, (b, now) => uncall(b, d.uncall!, now));
     else if (d.brkOn) desk.act(tab, (b, now) => setBarber(b, d.brkOn!, { brk: true }, now));
     else if (d.brkOff) desk.act(tab, (b, now) => setBarber(b, d.brkOff!, { brk: false }, now));
+    else if (d.off) desk.act(tab, (b, now) => setBarber(b, d.off!, { on: false }, now));
     else if (d.arrived) desk.act(tab, (b, now) => arrive(b, d.arrived!, now));
     else if (d.seat) seat(d.seat);
     else if (d.remove) desk.act(tab, (b, now) => removeTicket(b, d.remove!, now));
@@ -333,6 +455,7 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   let noteTimer: number | undefined;
   // The text and the shop are taken at the moment of typing: the screen may redraw before the save.
   noteEl.addEventListener('input', () => { const note = noteEl.value, shop = tab; clearTimeout(noteTimer); noteTimer = window.setTimeout(() => desk.act(shop, (b, now) => setOptions(b, { note }, now)), 500); });
+  $('[data-sheet-close]').addEventListener('click', () => sheet.close());
 
   account.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -350,96 +473,3 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     draw();
   }, 15_000);
 </script>
-
-<style is:global>
-  .qd { --bg: #f4f2ee; --surface: #fff; --text: #15140f; --muted: #57534a; --accent: #15140f; --on-accent: #fff; --line: #d9d4c8; --ok: #1f8a4c; --warn: #b4690e; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; background: #f4f2ee; color: #15140f; min-height: 100svh; padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 3rem) 5rem; }
-  .qd > * { max-width: 76rem; margin-inline: auto; }
-  .qd__top { display: flex; justify-content: space-between; align-items: end; gap: .5rem 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; background: #f4f2ee; padding-block: .75rem; border-bottom: 1px solid var(--line); }
-  .qd__back { display: flex; flex-wrap: wrap; gap: .2rem 1.2rem; font-size: .9rem; color: var(--muted); }
-  .qd h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.8rem); letter-spacing: -.04em; margin-top: .3rem; }
-  .qd h2 { font-family: var(--display); font-weight: 750; font-size: 1.35rem; letter-spacing: -.02em; }
-  .qd h3 { font-family: inherit; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: .6rem; }
-  #qd-status { font-weight: 700; font-size: .92rem; color: var(--ok); }
-  .qd button, .qd input, .qd select { font: inherit; }
-  .qd button { min-height: 2.9rem; padding: .5rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; font-weight: 650; cursor: pointer; }
-  .qd button:hover { border-color: #15140f; }
-  .qd .primary { background: #15140f; color: #fff; border-color: #15140f; }
-  .qd .link { border: 0; background: none; text-decoration: underline; min-height: auto; padding: 0 .25rem; }
-  .qd input:not([type='checkbox']), .qd select { min-height: 2.9rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; min-width: 0; }
-  .qd__acct { margin-top: 1rem; padding: 1rem 1.1rem; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
-  .qd__signin { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-  .qd__signin b { width: 100%; }
-  .qd__signin input { flex: 1 1 12rem; }
-  .qd__hint { font-size: .85rem; color: var(--muted); margin-top: .5rem; }
-  .qd__msg { color: #8a4b00; font-weight: 600; margin-top: .5rem; }
-  .qd__tabs { display: flex; flex-wrap: wrap; gap: .4rem; margin-block: 1.25rem .6rem; }
-  .qd__tabs button[aria-pressed='true'] { background: #15140f; color: #fff; border-color: #15140f; }
-  .qd__tabs b.badge { display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; margin-left: .4rem; padding-inline: .3rem; border-radius: 999px; background: #e4472b; color: #fff; font-size: .72rem; }
-  .qd__links { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .9rem; font-size: .9rem; color: var(--muted); margin-bottom: 1rem; }
-  .qd__links a { font-weight: 650; color: #15140f; }
-  .qd__banner { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; padding: .8rem 1rem; margin-bottom: 1rem; border-radius: 14px; background: #fff3d6; border: 1px solid #e8c36a; font-weight: 600; }
-  .qd__banner[hidden] { display: none; }
-  .qd__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 1.25rem; align-items: start; }
-  .qd__card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 1.1rem 1.2rem 1.25rem; }
-  .qd__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .2rem 1rem; margin-bottom: .9rem; }
-  .qd__head p { font-size: .82rem; color: var(--muted); }
-  .qd__btns { display: flex; flex-wrap: wrap; gap: .4rem; }
-  .qd__chairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr)); gap: .7rem; }
-  .qd__chairs li { display: grid; gap: .8rem; align-content: space-between; padding: .9rem 1rem 1rem; border-radius: 14px; background: #f7f4ee; border: 1.5px solid transparent; }
-  .qd__chairs li > div:first-child { display: grid; gap: .1rem; }
-  .qd__chairs small { font-size: .78rem; font-weight: 700; color: var(--muted); }
-  .qd__chairs b { font-family: var(--display); font-weight: 800; font-size: 2.6rem; line-height: 1; letter-spacing: -.03em; }
-  .qd__chairs span { font-size: .85rem; color: var(--muted); }
-  .qd__chairs li.free { background: #eaf7ef; border-color: #9fd7b5; }
-  .qd__chairs li.free b { color: var(--ok); font-size: 1.9rem; }
-  .qd__chairs li.break b { color: var(--muted); font-size: 1.9rem; }
-  .qd__chairs li.calling { border-color: #15140f; animation: qd-call 1.2s ease-in-out infinite alternate; }
-  @keyframes qd-call { from { box-shadow: 0 0 0 0 rgb(21 20 15 / .25); } to { box-shadow: 0 0 0 6px rgb(21 20 15 / 0); } }
-  .qd__chairs li.none, .qd__staff li.none { display: block; background: none; color: var(--muted); padding: .2rem 0; }
-  .qd__chairs .qd__btns button { flex: 1 1 auto; }
-  .qd__add { display: flex; gap: .5rem; margin-bottom: .8rem; }
-  .qd__add input { flex: 1 1 8rem; }
-  .qd__line { display: grid; gap: .45rem; }
-  .qd__line li { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; align-items: center; gap: .3rem .7rem; padding: .55rem .7rem; border-radius: 12px; background: #f7f4ee; }
-  .qd__line li.way { background: #fff7e8; box-shadow: 0 0 0 1.5px #ecc46f inset; }
-  .qd__line .n { font-family: var(--display); font-weight: 800; font-size: 1.7rem; line-height: 1; text-align: center; letter-spacing: -.03em; }
-  .qd__line .who { display: grid; min-width: 0; }
-  .qd__line .who small { color: var(--muted); font-size: .8rem; }
-  .qd__line li.way .who small { color: var(--warn); font-weight: 600; }
-  .qd__line .eta { font-weight: 750; font-size: .9rem; white-space: nowrap; }
-  .qd__line .qd__btns { grid-column: 2 / -1; }
-  .qd__line .qd__btns button { min-height: 2.5rem; padding: .3rem .8rem; font-size: .88rem; }
-  .qd__line .empty { display: block; background: none; color: var(--muted); padding: .4rem .2rem; }
-  .qd__more { margin-top: 1.25rem; }
-  .qd__more summary { cursor: pointer; font-family: var(--display); font-weight: 750; font-size: 1.2rem; }
-  .qd__set { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 2rem; margin-top: 1.2rem; }
-  .qd__staff { display: grid; gap: .5rem; margin-block: .8rem; }
-  .qd__staff li { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem .7rem; padding: .7rem .8rem; border-radius: 12px; background: #f7f4ee; }
-  .qd__staff label { display: grid; gap: .2rem; font-size: .78rem; font-weight: 700; color: var(--muted); }
-  .qd__staff label.num input { width: 4.2rem; }
-  .qd__staff label.grow { flex: 1 1 8rem; }
-  .qd__staff label.chk { display: flex; align-items: center; gap: .4rem; min-height: 2.9rem; font-size: .9rem; color: inherit; }
-  .qd__staff input[type='checkbox'] { width: 1.3rem; height: 1.3rem; accent-color: #15140f; }
-  .qd__staff .done { font-size: .82rem; color: var(--muted); align-self: center; }
-  .qd__staff button { min-height: 2.5rem; font-size: .85rem; }
-  .qd__opts { display: grid; gap: .8rem; align-content: start; }
-  .qd__logins { grid-column: 1 / -1; display: grid; gap: .6rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
-  .qd__logins[hidden] { display: none; }
-  .qd__logins .qd__staff { margin-block: .2rem; }
-  .qd__logins .who { display: grid; flex: 1 1 14rem; min-width: 0; }
-  .qd__logins .who small { font-size: .82rem; color: var(--muted); }
-  .qd__newlogin { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr)); gap: .5rem; }
-  .qd__logins .qd__msg[hidden] { display: none; }
-  .qd__step { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 1rem; background: #f7f4ee; border-radius: 14px; }
-  .qd__step b { display: block; }
-  .qd__step small, .qd__row small { color: var(--muted); font-size: .82rem; }
-  .qd__ctl { display: flex; align-items: center; gap: .5rem; flex: none; }
-  .qd__ctl button { width: 3rem; height: 3rem; padding: 0; border-radius: 50%; font-size: 1.5rem; line-height: 1; }
-  .qd__ctl output { min-width: 2.2rem; text-align: center; font-family: var(--display); font-size: 1.8rem; font-weight: 700; }
-  .qd__field { display: grid; gap: .35rem; font-weight: 650; font-size: .9rem; }
-  .qd__row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .7rem; font-size: .9rem; }
-  .qd__row[hidden] { display: none; }
-  @media (max-width: 900px) { .qd__grid, .qd__set { grid-template-columns: 1fr; } }
-  @media (max-width: 520px) { .qd__line li { grid-template-columns: 2.6rem minmax(0, 1fr) auto; } .qd__add { flex-wrap: wrap; } .qd__add button { flex: 1 1 100%; } }
-  @media (prefers-reduced-motion: reduce) { .qd__chairs li.calling { animation: none; } }
-</style>

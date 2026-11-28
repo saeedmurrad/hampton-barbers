@@ -1,6 +1,6 @@
 // Drawing helpers for the customer-facing live panel (LiveNow.astro) and the first-screen
 // card (LiveChip.astro). The numbers themselves come from board.ts.
-import { agoText, type BoardView } from './board';
+import { agoText, ord, placeOf, type Board, type BoardView } from './board';
 
 const CHAIR = '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h20a3 3 0 0 1 3 3v13H11V9a3 3 0 0 1 3-3Z"/><path d="M8 24h32a2 2 0 0 1 2 2v4H6v-4a2 2 0 0 1 2-2Z"/><path d="M22 30h4v8h-4z"/><path d="M13 39h22a2 2 0 0 1 0 4H13a2 2 0 0 1 0-4Z"/></svg>';
 
@@ -39,4 +39,12 @@ export function paintLive(root: HTMLElement, v: BoardView, updatedAt: number, mi
   const fill = (sel: string, html: string) => { const el = root.querySelector<HTMLElement>(sel); if (el && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
   fill('[data-live-chairs]', chairsHtml(v));
   fill('[data-live-queue]', queueHtml(v, mine));
+}
+
+// One short line about a visitor's own ticket, or '' when it is no longer in the queue.
+export function mineText(b: Board, id: string, now: number): string {
+  if (b.t[id]?.s === 'chair') return 'It’s your turn!';
+  const p = placeOf(b, id, now);
+  if (!p) return '';
+  return p.ahead === 0 ? (p.k.s === 'here' ? 'You’re next!' : 'You’re first in line') : `You’re ${ord(p.ahead + 1)} in line`;
 }

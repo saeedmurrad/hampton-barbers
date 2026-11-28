@@ -1,6 +1,7 @@
 ---
 // The barber panel: each barber's own screen, made for a phone. Your chair, who is next,
-// call and finish with one tap, breaks and shifts, and your cuts today.
+// call and finish with one tap, breaks and shifts, and your own cuts and takings today.
+import '../styles/ui.css';
 import '../styles/staff.css';
 import Base from '../layouts/Base.astro';
 import { shops, menu } from '../data/site';
@@ -8,48 +9,51 @@ import { penceOf } from '../lib/sales';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: penceOf(i.price) })));
 ---
-<Base noindex title="Hampton Barbers: barber panel" description="Each barber’s own screen: your chair, who is next, and your cuts today." themeColor="#f4f2ee">
-  <main id="main" class="bp" data-base={base} data-shops={JSON.stringify(shops.map((s) => ({ id: s.id, name: s.name })))} data-services={JSON.stringify(services)}>
-    <header class="bp__top">
-      <div class="bp__who" data-who><b>Barber panel</b></div>
-      <p id="bp-status" role="status" aria-live="polite">Loading…</p>
-    </header>
+<Base noindex title="Hampton Barbers: barber panel" description="Each barber’s own screen: your chair, who is next, and your cuts today." themeColor="#0a0c0b">
+  <main id="main" class="ui" data-barber-app data-base={base} data-shops={JSON.stringify(shops.map((s) => ({ id: s.id, name: s.name })))} data-services={JSON.stringify(services)}>
+    <div class="u-phone">
+      <h1 class="sr">Barber panel</h1>
+      <header class="u-me" data-who><span class="u-avatar u-avatar--lg">HB</span><span><b>Barber panel</b><small>Hampton Barbers</small></span></header>
+      <p class="u-status" id="bp-status" role="status" aria-live="polite">Loading…</p>
 
-    <section class="bp__card bp__setup" data-setup hidden></section>
+      <section class="u-panel u-stack" data-setup hidden></section>
+      <section class="u-hero" data-chair aria-live="polite" hidden></section>
+      <section class="u-today" data-today aria-label="Your day so far" hidden></section>
 
-    <section class="bp__card bp__chair" data-chair aria-live="polite" hidden></section>
+      <section class="u-panel" data-waiting hidden>
+        <div class="u-h"><h2>Next up <em data-count>0</em></h2><span data-summary></span></div>
+        <ol class="u-line" data-queue></ol>
+        <form class="u-add" data-add style="margin-top:.8rem;max-width:none">
+          <input name="name" maxlength="24" autocomplete="off" placeholder="Walk-in’s first name (optional)" aria-label="Walk-in’s first name (optional)" />
+          <button type="submit" class="u-btn">Add walk-in</button>
+        </form>
+      </section>
 
-    <section class="bp__card" data-waiting hidden>
-      <div class="bp__head"><h2>Waiting</h2><p data-summary></p></div>
-      <ol class="bp__line" data-queue></ol>
-      <form class="bp__add" data-add>
-        <input name="name" maxlength="24" autocomplete="off" placeholder="First name (optional)" aria-label="Walk-in’s first name (optional)" />
-        <button type="submit">+ Add walk-in</button>
-      </form>
-    </section>
-
-    <section class="bp__card bp__acct" id="bp-account" aria-label="Your account"></section>
-    <p class="bp__links"><a href={`${base}/admin/live/`}>Queue desk</a></p>
+      <section class="u-acct" id="bp-account" aria-label="Your account"></section>
+      <p class="u-hint" style="text-align:center"><a class="u-link" href={`${base}/admin/live/`}>Open the queue desk</a><span data-switch-wrap hidden> · <button type="button" class="u-link" data-switch>Switch barber</button></span></p>
+      <footer class="u-dock" data-dock hidden></footer>
+    </div>
   </main>
 </Base>
 
 <script>
-  import { addWalkIn, barberLabel, boardView, callNext, clockText, minsText, removeTicket, setBarber, uncall } from '../lib/board';
+  import { addWalkIn, barberLabel, boardView, callNext, clockText, cutMinutes, minsText, removeTicket, setBarber, uncall } from '../lib/board';
   import { createDesk } from '../lib/desk';
   import { finishAndPay, loadServices, type Service } from '../lib/paysheet';
   import { money, type Sale } from '../lib/sales';
   import { changePassword } from '../lib/cloud';
   import { BARBER_KEY, esc, newId, read, write } from '../lib/store';
 
-  const root = document.querySelector<HTMLElement>('.bp')!;
+  const root = document.querySelector<HTMLElement>('[data-barber-app]')!;
   const shops = JSON.parse(root.dataset.shops!) as { id: string; name: string }[];
   let services = JSON.parse(root.dataset.services || '[]') as Service[];
   loadServices(services).then((list) => { services = list; });
   const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
-  const statusEl = $('#bp-status'), whoEl = $('[data-who]'), setupEl = $('[data-setup]'), chairEl = $('[data-chair]');
+  const statusEl = $('#bp-status'), whoEl = $('[data-who]'), setupEl = $('[data-setup]'), chairEl = $('[data-chair]'), todayEl = $('[data-today]'), dockEl = $('[data-dock]');
   const waitingEl = $('[data-waiting]'), queueEl = $('[data-queue]'), summaryEl = $('[data-summary]'), account = $('#bp-account');
   const fill = (el: HTMLElement, html: string) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
   const shopName = (id: string) => shops.find((s) => s.id === id)?.name ?? 'the shop';
+  const plainHead = '<span class="u-avatar u-avatar--lg">HB</span><span><b>Barber panel</b><small>Hampton Barbers</small></span>';
 
   // Which shop and barber this phone belongs to. Remembered, so the panel opens ready to use.
   type Me = { shop: string; id: string };
@@ -92,16 +96,18 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     const state = `${email}|${pwOpen}`;
     if (drawnFor === state && !accountMsg) return;
     drawnFor = state;
-    const note = accountMsg ? `<p class="bp__msg" role="alert">${esc(accountMsg)}</p>` : '';
+    const note = accountMsg ? `<p class="u-msg" role="alert" style="margin-top:.6rem">${esc(accountMsg)}</p>` : '';
     accountMsg = '';
+    account.classList.toggle('u-acct--line', Boolean(email));
     if (!desk.connected) { account.innerHTML = '<p><strong>Not connected.</strong> Changes show on this device only.</p>'; return; }
     account.innerHTML = email
-      ? `<p>Signed in as <strong>${esc(email)}</strong>. <button type="button" class="link" data-pw>Change password</button> <button type="button" class="link" data-out>Sign out</button></p>${pwOpen ? '<form id="bp-pw" class="bp__signin"><input type="text" name="pw" minlength="8" required autocomplete="off" placeholder="New password (8 or more characters)" aria-label="New password" /><button type="submit" class="primary">Save password</button></form>' : ''}${note}`
-      : `<form id="bp-signin" class="bp__signin"><b>Sign in to run the real queue</b>
-          <input type="email" name="email" autocomplete="username" placeholder="Email" required />
-          <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
-          <button type="submit" class="primary">Sign in</button></form>${note}
-        <p class="bp__hint">Until you sign in this is a demo that stays on this device.</p>`;
+      ? `<p style="text-align:center">Signed in as <strong>${esc(email)}</strong>. <button type="button" class="u-link" data-pw>Change password</button> · <button type="button" class="u-link" data-out>Sign out</button></p>${pwOpen ? '<form id="bp-pw" class="u-signin" style="margin-top:.7rem"><input class="u-input" type="text" name="pw" minlength="8" required autocomplete="off" placeholder="New password (8 or more characters)" aria-label="New password" /><button type="submit" class="u-btn u-btn--primary">Save password</button></form>' : ''}${note}`
+      : `<details${note ? ' open' : ''}><summary>Sign in to run the real queue</summary>
+          <form id="bp-signin" class="u-signin">
+          <input class="u-input" type="email" name="email" autocomplete="username" placeholder="Email" required />
+          <input class="u-input" type="password" name="password" autocomplete="current-password" placeholder="Password" required />
+          <button type="submit" class="u-btn u-btn--primary">Sign in</button></form>${note}
+        <p class="u-hint" style="margin-top:.7rem">Until you sign in this is a demo that stays on this device.</p></details>`;
   };
 
   const draw = () => {
@@ -115,71 +121,94 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     statusEl.textContent = desk.offline(me.shop) ? 'No connection. Showing the last known queue.' : desk.status();
     drawAccount();
     if (takingsFor !== `${desk.email()}|${desk.role()}|${me.shop}|${me.id}`) loadTakings();
-    setupEl.hidden = Boolean(s);
-    chairEl.hidden = waitingEl.hidden = !s;
+    const working = Boolean(s) && !desk.loading(me.shop) && desk.role() !== 'none';
+    setupEl.hidden = working;
+    chairEl.hidden = todayEl.hidden = waitingEl.hidden = dockEl.hidden = !working;
+    // Only a shared phone can switch barber; a barber's own login always opens on their own profile.
+    $('[data-switch-wrap]').hidden = !working || Boolean(linked);
 
     if (desk.loading(me.shop)) {
-      chairEl.hidden = waitingEl.hidden = true;
-      setupEl.hidden = false;
-      fill(setupEl, '<h2>Loading the queue…</h2>');
+      fill(whoEl, plainHead);
+      fill(setupEl, '<h2 class="u-pass__place">Loading the queue…</h2>');
       return;
     }
     if (desk.role() === 'none') {
-      chairEl.hidden = waitingEl.hidden = true;
-      setupEl.hidden = false;
-      fill(whoEl, '<b>Barber panel</b>');
-      fill(setupEl, '<h2>This login has not been added yet</h2><p class="bp__hint">Ask the owner to add this email under “Staff logins” on the queue desk. Then sign in here again.</p>');
+      fill(whoEl, plainHead);
+      fill(setupEl, '<h2 class="u-pass__place">This login has not been added yet</h2><p class="u-hint">Ask the owner to add this email under “Staff logins” on the queue desk. Then sign in here again.</p>');
       return;
     }
     if (!s) {
-      fill(whoEl, '<b>Barber panel</b>');
+      fill(whoEl, plainHead);
       const staff = Object.entries(b.staff).sort((x, y) => x[1].chair - y[1].chair);
-      fill(setupEl, `<h2>Which shop are you at?</h2>
-        <div class="bp__pick">${shops.map((x) => `<button type="button" data-shop="${x.id}" aria-pressed="${x.id === me.shop}">${esc(x.name)}</button>`).join('')}</div>
-        <h2>Who are you?</h2>
-        <div class="bp__pick">${staff.map(([id, x]) => `<button type="button" data-me="${id}"><b>${esc(barberLabel(x))}</b><small>Chair ${x.chair}</small></button>`).join('') || '<p class="bp__hint">No barbers have been added for this shop yet. Add them on the queue desk.</p>'}</div>
-        <p class="bp__hint">This phone remembers your choice. Barbers and their names are managed on the queue desk.</p>`);
+      fill(setupEl, `<div class="u-h" style="margin:0"><h2>Which shop are you at?</h2></div>
+        <div class="u-links">${shops.map((x) => `<button type="button" class="u-btn${x.id === me.shop ? ' u-btn--primary' : ''}" data-shop="${x.id}" aria-pressed="${x.id === me.shop}">${esc(x.name)}</button>`).join('')}</div>
+        <div class="u-h" style="margin:.4rem 0 0"><h2>Who are you?</h2></div>
+        <div class="u-links">${staff.map(([id, x]) => `<button type="button" class="u-btn u-btn--lg" style="justify-content:flex-start;gap:.7rem" data-me="${id}"><span class="u-avatar u-avatar--sm">${esc(barberLabel(x)[0].toUpperCase())}</span><span style="display:grid;text-align:left;line-height:1.2"><b>${esc(barberLabel(x))}</b><small style="font-weight:500;color:var(--muted);font-size:.8rem">Chair ${x.chair}</small></span></button>`).join('') || '<p class="u-hint">No barbers have been added for this shop yet. Add them on the queue desk.</p>'}</div>
+        <p class="u-hint">This phone remembers your choice. Barbers and their names are managed on the queue desk.</p>`);
       return;
     }
 
-    fill(whoEl, `<b>${esc(barberLabel(s))}</b><span>Chair ${s.chair} · ${esc(shopName(me.shop))}</span>${linked ? '' : '<button type="button" class="link" data-switch>Change</button>'}`);
+    const state = !s.on ? 'off' : s.brk ? 'break' : 'on';
+    fill(whoEl, `<span class="u-avatar u-avatar--lg">${esc(barberLabel(s)[0].toUpperCase())}</span><span><b>${esc(barberLabel(s))}</b><small>Chair ${s.chair} · ${esc(shopName(me.shop))}</small></span>
+      <span class="u-chip u-chip--${state === 'on' ? 'ok' : state === 'break' ? 'wait' : ''}">${state === 'on' ? 'On shift' : state === 'break' ? 'On a break' : 'Off shift'}</span>`);
+
     const mine = v.chairs.find((c) => c.id === me.id);
     const next = v.line.find((x) => x.s === 'here');
-    let html: string;
-    if (!s.on) {
-      html = `<p class="bp__state">You’re off shift</p><p class="bp__sub">Customers are not sent to your chair.</p>
-        <div class="bp__btns"><button type="button" class="primary big" data-shift="on">Start my shift</button></div>`;
+    const cut = cutMinutes(b);
+    const quiet = (label: string, attr: string) => `<button type="button" class="u-btn u-btn--quiet" ${attr}>${label}</button>`;
+    let hero: string, dock: string;
+    if (state === 'off') {
+      hero = '<span class="u-label">Not working</span><p class="u-hero__big">You’re off shift</p><p class="u-hero__time">Customers are not sent to your chair.</p>';
+      dock = '<button type="button" class="u-btn u-btn--primary u-btn--lg u-btn--block" data-shift="on">Start my shift</button>';
     } else if (mine?.state === 'busy') {
-      const nm = desk.name(me.shop, mine.tid!);
-      html = `<p class="bp__label">In your chair</p><p class="bp__num">${mine.n}</p>
-        <p class="bp__sub">${nm ? `${esc(nm)} · ` : ''}${mine.calling ? 'called just now' : `${mine.mins} min so far`}</p>
-        <div class="bp__btns"><button type="button" class="primary big" data-finish>Finish and take payment</button><button type="button" data-noshow="${mine.tid}">Didn’t come</button><button type="button" data-uncall="${mine.tid}">Undo call</button></div>`;
-    } else if (s.brk) {
-      html = `<p class="bp__state">On a break</p><p class="bp__sub">Customers are not sent to your chair.</p>
-        <div class="bp__btns"><button type="button" class="primary big" data-brk="off">Back from my break</button></div>`;
+      const k = b.t[mine.tid!];
+      const nm = desk.name(me.shop, mine.tid!) || (k?.src === 'desk' ? 'Walk-in' : 'Online customer');
+      const mins = mine.mins ?? 0;
+      hero = `<span class="u-label">In your chair</span>
+        <div class="u-ring${mins > cut ? ' is-late' : ''}" style="--p:${Math.min(1, mins / cut).toFixed(2)}"><b class="u-num">${mine.n}</b></div>
+        <p class="u-hero__who">${esc(nm)}</p>
+        <p class="u-hero__time">${mine.calling ? 'Called just now' : `${mins} min so far`} · usual ${cut}</p>`;
+      dock = `<button type="button" class="u-btn u-btn--primary u-btn--lg u-btn--block" data-finish>Finish and take payment</button>
+        <div>${quiet('Didn’t come', `data-noshow="${mine.tid}"`)}${quiet('Undo call', `data-uncall="${mine.tid}"`)}</div>`;
+    } else if (state === 'break') {
+      hero = '<span class="u-label">Paused</span><p class="u-hero__big">On a break</p><p class="u-hero__time">Customers are not sent to your chair.</p>';
+      dock = `<button type="button" class="u-btn u-btn--primary u-btn--lg u-btn--block" data-brk="off">Back from my break</button><div>${quiet('End my shift', 'data-shift="off"')}</div>`;
     } else if (next) {
-      const nm = desk.name(me.shop, next.id);
-      html = `<p class="bp__label">Next for you</p><p class="bp__num">${next.n}</p>
-        <p class="bp__sub">${nm ? `${esc(nm)} · ` : ''}in the shop</p>
-        <div class="bp__btns"><button type="button" class="primary big" data-call>Call number ${next.n}</button><button type="button" data-brk="on">Take a break</button><button type="button" data-shift="off">End my shift</button></div>`;
+      const nm = desk.name(me.shop, next.id) || (b.t[next.id]?.src === 'desk' ? 'Walk-in' : 'Online customer');
+      hero = `<span class="u-label">Next for you</span>
+        <div class="u-ring" style="--p:0"><b class="u-num">${next.n}</b></div>
+        <p class="u-hero__who">${esc(nm)}</p>
+        <p class="u-hero__time"><span class="u-chip u-chip--ok">In the shop</span></p>`;
+      dock = `<button type="button" class="u-btn u-btn--go u-btn--lg u-btn--block" data-call>Call number ${next.n}</button>
+        <div>${quiet('Take a break', 'data-brk="on"')}${quiet('End my shift', 'data-shift="off"')}</div>`;
     } else {
-      html = `<p class="bp__state">Your chair is free</p><p class="bp__sub">${v.onWay ? `${v.onWay} on the way, nobody in the shop yet.` : 'Nobody is waiting.'}</p>
-        <div class="bp__btns"><button type="button" data-brk="on">Take a break</button><button type="button" data-shift="off">End my shift</button></div>`;
+      hero = `<span class="u-label">Ready</span><p class="u-hero__big" style="color:var(--ok)">Your chair is free</p>
+        <p class="u-hero__time">${v.onWay ? `${v.onWay} on the way, nobody in the shop yet.` : 'Nobody is waiting.'}</p>`;
+      dock = `<div>${quiet('Take a break', 'data-brk="on"')}${quiet('End my shift', 'data-shift="off"')}</div>`;
     }
-    const mineToday = (takings ?? []).filter((x) => !x.void);
-    const sum = (how?: string) => mineToday.filter((x) => !how || x.pay === how).reduce((a, x) => a + x.price, 0);
-    const taken = takings === null ? '' : `<span>Taken today: <b>${money(sum())}</b>${mineToday.length ? ` (cash ${money(sum('cash'))}, online ${money(sum('online'))})` : ''}</span>`;
-    fill(chairEl, `${html}<p class="bp__today"><span>Your cuts today: <b>${s.done}</b></span>${taken}</p>`);
+    fill(chairEl, hero);
+    fill(dockEl, dock);
 
-    const free = s.on && !s.brk && mine?.state === 'free';
+    const mineToday = (takings ?? []).filter((x) => !x.void);
+    const sum = (how?: string) => money(mineToday.filter((x) => !how || x.pay === how).reduce((a, x) => a + x.price, 0));
+    const cell = (label: string, value: string) => `<div><small>${label}</small><b>${value}</b></div>`;
+    fill(todayEl, cell('Cuts', String(s.done)) + (takings === null ? cell('Taken', '—') + cell('Cash', '—') + cell('Online', '—') : cell('Taken', sum()) + cell('Cash', sum('cash')) + cell('Online', sum('online'))));
+
+    const free = state === 'on' && mine?.state === 'free';
     summaryEl.textContent = `${v.inShop} in the shop · ${v.onWay} on the way`;
+    $('[data-count]').textContent = String(v.waiting);
     fill(queueEl, v.line.map((x) => {
       const k = b.t[x.id];
       const nm = desk.name(me.shop, x.id);
       const title = nm ? esc(nm) : k.src === 'desk' ? 'Walk-in' : 'Online customer';
-      const sub = x.s === 'here' ? 'In the shop' : `On the way · due ${clockText(x.due)}`;
-      return `<li class="${x.s}"><span class="n">${x.n}</span><span class="who"><b>${title}</b><small>${sub}</small></span><span class="eta">${minsText(x.mins)}</span>${free ? `<button type="button" data-call-id="${x.id}" aria-label="Call number ${x.n} to my chair">Call</button>` : ''}</li>`;
-    }).join('') || '<li class="empty">Nobody waiting</li>');
+      return `<li class="u-row${next?.id === x.id ? ' is-next' : ''}${x.s === 'way' ? ' is-way' : ''}">
+        <b class="u-num u-row__n">${x.n}</b>
+        <span class="u-row__who"><b>${title}</b>${x.s === 'way' ? `<small>Due ${clockText(x.due)}</small>` : ''}</span>
+        <span class="u-row__tags"><span class="u-chip u-chip--${x.s === 'way' ? 'wait' : 'ok'}">${x.s === 'way' ? 'On the way' : 'In the shop'}</span></span>
+        <span class="u-row__eta">${minsText(x.mins)}</span>
+        <span class="u-row__act">${free ? `<button type="button" class="u-btn u-btn--sm" data-call-id="${x.id}" aria-label="Call number ${x.n} to my chair">Call</button>` : ''}</span>
+      </li>`;
+    }).join('') || '<li class="u-empty">Nobody waiting</li>');
   };
 
   document.addEventListener('click', (e) => {
@@ -228,57 +257,3 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   setInterval(draw, 15_000);
   setInterval(loadTakings, 120_000);
 </script>
-
-<style is:global>
-  .bp { --bg: #f4f2ee; --text: #15140f; --muted: #57534a; --accent: #15140f; --on-accent: #fff; --line: #d9d4c8; --ok: #1f8a4c; --warn: #b4690e; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; background: #f4f2ee; color: #15140f; min-height: 100svh; padding: 0 clamp(.9rem, 4vw, 2rem) 4rem; display: grid; gap: .9rem; align-content: start; }
-  .bp > * { width: min(100%, 34rem); margin-inline: auto; }
-  .bp__top { position: sticky; top: 0; z-index: 5; background: #f4f2ee; padding-block: .9rem .6rem; border-bottom: 1px solid var(--line); display: grid; gap: .3rem; }
-  .bp__who { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .7rem; }
-  .bp__who b { font-family: var(--display); font-weight: 800; font-size: 1.7rem; letter-spacing: -.03em; line-height: 1.1; }
-  .bp__who span { color: var(--muted); font-size: .92rem; }
-  #bp-status { font-weight: 700; font-size: .85rem; color: var(--ok); }
-  .bp h2 { font-family: var(--display); font-weight: 750; font-size: 1.25rem; letter-spacing: -.02em; }
-  .bp button, .bp input { font: inherit; }
-  .bp button { min-height: 3rem; padding: .55rem 1rem; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: inherit; font-weight: 650; cursor: pointer; }
-  .bp button:hover { border-color: #15140f; }
-  .bp .primary { background: #15140f; color: #fff; border-color: #15140f; }
-  .bp .big { min-height: 4.2rem; font-size: 1.25rem; flex: 1 1 100%; border-radius: 16px; }
-  .bp .link { border: 0; background: none; text-decoration: underline; min-height: auto; padding: 0 .1rem; font-size: .9rem; }
-  .bp input { min-height: 3rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 12px; background: #fff; min-width: 0; }
-  .bp__card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 1.1rem 1.15rem 1.2rem; }
-  .bp__card[hidden] { display: none; }
-  .bp__setup { display: grid; gap: .7rem; }
-  .bp__pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .5rem; margin-bottom: .5rem; }
-  .bp__pick button { display: grid; gap: .1rem; text-align: left; min-height: 3.6rem; }
-  .bp__pick button small { color: var(--muted); font-weight: 500; font-size: .82rem; }
-  .bp__pick button[aria-pressed='true'] { background: #15140f; color: #fff; border-color: #15140f; }
-  .bp__chair { text-align: center; }
-  .bp__label { font-size: .78rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-  .bp__num { font-family: var(--display); font-weight: 800; font-size: clamp(5rem, 28vw, 8rem); line-height: .95; letter-spacing: -.04em; }
-  .bp__state { font-family: var(--display); font-weight: 800; font-size: 2rem; letter-spacing: -.03em; line-height: 1.1; padding-top: .6rem; }
-  .bp__sub { color: var(--muted); margin-top: .2rem; }
-  .bp__btns { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.1rem; }
-  .bp__btns button { flex: 1 1 8rem; }
-  .bp__today { display: grid; gap: .2rem; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .92rem; }
-  .bp__today b { color: #15140f; font-size: 1.1rem; }
-  .bp__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .2rem 1rem; margin-bottom: .8rem; }
-  .bp__head p { font-size: .85rem; color: var(--muted); }
-  .bp__line { display: grid; gap: .45rem; }
-  .bp__line li { display: grid; grid-template-columns: 2.8rem minmax(0, 1fr) auto auto; align-items: center; gap: .3rem .7rem; padding: .55rem .7rem; border-radius: 12px; background: #f7f4ee; }
-  .bp__line li.way { background: #fff7e8; box-shadow: 0 0 0 1.5px #ecc46f inset; }
-  .bp__line .n { font-family: var(--display); font-weight: 800; font-size: 1.6rem; line-height: 1; text-align: center; letter-spacing: -.03em; }
-  .bp__line .who { display: grid; min-width: 0; }
-  .bp__line .who small { color: var(--muted); font-size: .8rem; }
-  .bp__line li.way .who small { color: var(--warn); font-weight: 600; }
-  .bp__line .eta { font-weight: 750; font-size: .88rem; white-space: nowrap; }
-  .bp__line button { min-height: 2.5rem; padding: .3rem .8rem; font-size: .88rem; }
-  .bp__line .empty { display: block; background: none; color: var(--muted); padding: .3rem .1rem; }
-  .bp__add { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
-  .bp__add input { flex: 1 1 9rem; }
-  .bp__signin { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-  .bp__signin b { width: 100%; }
-  .bp__signin input { flex: 1 1 10rem; }
-  .bp__hint { font-size: .85rem; color: var(--muted); }
-  .bp__msg { color: #8a4b00; font-weight: 600; margin-top: .5rem; }
-  .bp__links { font-size: .9rem; text-align: center; color: var(--muted); }
-</style>

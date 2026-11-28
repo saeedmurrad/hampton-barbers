@@ -38,7 +38,7 @@ const next = [
           <section class="u-panel">
             <div class="u-h"><h2>Next up <em>3</em></h2><span>2 in the shop</span></div>
             <ol class="u-line">
-              {next.map((r, i) => (
+              {next.map((r) => (
                 <li class:list={['u-row', { 'is-way': r.kind === 'wait' }]}>
                   <b class="u-num u-row__n">{r.n}</b>
                   <span class="u-row__who"><b>{r.name}</b></span>

@@ -53,8 +53,8 @@ try {
 
   const C = await open(await browser.createBrowserContext(), '/admin/live/?emulator', LAPTOP, 'desk2');
   await signIn(C, '#qd-signin');
-  const seen = await waitText(C, '[data-chairs]', new RegExp(`Chair ${winner === 'b1' ? 1 : 2} 1 Solo`));
-  ok(seen && /1 Solo/.test(await txt(A, '[data-chairs]')), 'same instant: both desks show the customer in the chair', `winner ${winner} | A: ${await txt(A, '[data-chairs]')} | C: ${await txt(C, '[data-chairs]')} | C account: ${(await txt(C, '#qd-account')).slice(0, 60)}`);
+  const seen = await waitText(C, '[data-chairs]', new RegExp(`1 \\w Barber ${winner === 'b1' ? 1 : 2} Chair ${winner === 'b1' ? 1 : 2} · Solo`));
+  ok(seen && /· Solo/.test(await txt(A, '[data-chairs]')), 'same instant: both desks show the customer in the chair', `winner ${winner} | A: ${await txt(A, '[data-chairs]')} | C: ${await txt(C, '[data-chairs]')} | C account: ${(await txt(C, '#qd-account')).slice(0, 60)}`);
   for (const pg of [A, C]) {
     await tap(pg, `[data-finish="${winner}"]`);
     await pg.waitForSelector('dialog.pay[open]', { timeout: 6000 });
@@ -67,8 +67,9 @@ try {
   const both = `${await txt(A, '#qd-status')} | ${await txt(C, '#qd-status')}`;
   ok(/already finished on another screen/.test(both), 'same instant: the second screen is told the cut was already finished', both);
 
-  const C1 = await open(await browser.createBrowserContext(), '/fresh/?emulator', PHONE, 'customer1');
-  const C2 = await open(await browser.createBrowserContext(), '/club/?emulator', PHONE, 'customer2');
+  const C1 = await open(await browser.createBrowserContext(), '/queue/hampton-vale/?emulator', PHONE, 'customer1');
+  const C2 = await open(await browser.createBrowserContext(), '/queue/hampton-vale/?emulator', PHONE, 'customer2');
+  for (const pg of [C1, C2]) await pg.waitForSelector('[data-join]:not([disabled])', { timeout: 15000 });
   await tap(C1, '[data-join]');
   await setValue(C1, '#join-dialog input[name=name]', EVIL);
   await tap(C2, '[data-join]');
@@ -87,6 +88,7 @@ try {
   await waitText(T, '[data-conn]', /^Live$/);
   ok(await waitText(A, '[data-queue]', /<img src=x onerror=1>/), 'hostile text: the desk shows a name typed as code as plain text', (await txt(A, '[data-queue]')).slice(0, 160));
   ok(await waitText(C2, '[data-live="note"]', /<img src=x onerror=1>/), 'hostile text: the shop message shows as plain text on a customer’s phone', await txt(C2, '[data-live="note"]'));
+  ok(/Hi, <img src=x onerror=1>/.test(await txt(C1, '[data-hi]')), 'hostile text: a customer’s own name typed as code shows as plain text on their ticket', await txt(C1, '[data-hi]'));
   for (const [name, pg] of [['queue desk', A], ['second desk', C], ['barber phone', B], ['shop TV', T], ['first customer phone', C1], ['second customer phone', C2]]) {
     ok(await clean(pg), `hostile text: nothing was injected into the ${name}`);
   }
@@ -125,7 +127,6 @@ try {
   await waitText(B, '[data-chair]', /Next for you/);
   await tap(B, '[data-call]');
   await waitText(B, '[data-chair]', /In your chair/);
-  await A.$eval('.qd__more', (el) => { el.open = true; });
   await tap(A, '[data-drop-barber="b2"]');
   ok(await waitText(A, '#qd-status', /has a customer in the chair/), 'shop floor: a barber with a customer in the chair cannot be removed', await txt(A, '#qd-status'));
   ok(Boolean((await readBoard()).staff.b2), 'shop floor: and their profile is still there');
@@ -137,7 +138,7 @@ try {
   await tap(C2, '[data-again]');
   await setValue(C2, '#join-dialog input[name=name]', 'Late');
   await submit(C2, '[data-join-form]');
-  await waitText(C2, '[data-ticket]', /You’re in the queue/);
+  await waitText(C2, '[data-ticket]', /Your ticket/);
   const late = Object.entries((await readBoard()).t).find(([, k]) => k.s === 'way');
   await editBoard({ [`t.\`${late[0]}\`.at`]: Date.now() - 40 * 60_000, updatedAt: Date.now() });
   ok(await waitText(C2, '[data-ticket]', /no longer in the queue/), 'no-show: a place 30 minutes overdue lapses on the customer’s phone', (await txt(C2, '[data-ticket]')).slice(0, 80));
@@ -168,6 +169,33 @@ try {
   await addWalkIn(A, 'Back');
   ok(await waitText(A, '[data-queue]', /Back/, 30000), 'no internet: the desk works again when the connection returns', (await txt(A, '[data-queue]')).slice(0, 120));
   ok((await tickets()).length <= 3, 'no internet: nothing was added more than once', String((await tickets()).length));
+  // ---------- the customer's ticket page on its own ----------
+  const qctx = await browser.createBrowserContext();
+  const Q = await open(qctx, '/queue/hampton-vale/?join=1&emulator', PHONE, 'ticket-page');
+  await Q.waitForSelector('#join-dialog[open]', { timeout: 10000 }).catch(() => {});
+  await setValue(Q, '#join-dialog input[name=name]', '   ');
+  await submit(Q, '[data-join-form]');
+  ok(await waitText(Q, '[data-join-error]', /first name/) && await Q.$eval('#join-dialog', (d) => d.open), 'ticket page: a name of only spaces is refused', await txt(Q, '[data-join-error]'));
+  await setValue(Q, '#join-dialog input[name=name]', 'Quinn');
+  await submit(Q, '[data-join-form]');
+  ok(await waitText(Q, '[data-ticket]', /Your ticket/) && /Hi, Quinn/.test(await txt(Q, '[data-hi]')), 'ticket page: the link from the website opens the join step and gives a ticket', (await txt(Q, '[data-ticket]')).slice(0, 60));
+  const held = (await tickets()).length;
+  const Q2 = await open(qctx, '/queue/shop-2/?join=1&emulator', PHONE, 'other-shop');
+  ok(await waitText(Q2, '[data-elsewhere]', /You have a ticket at Hampton Vale/) && (await Q2.$eval('[data-elsewhere]', (a) => a.getAttribute('href'))).includes('/queue/hampton-vale/'), 'ticket page: another shop’s page points to the ticket already held', await txt(Q2, '[data-elsewhere]'));
+  ok(await Q2.$eval('[data-join]', (b) => b.disabled) && !(await Q2.$eval('#join-dialog', (d) => d.open)) && /already have a ticket at Hampton Vale/.test(await txt(Q2, '[data-join-hint]')), 'ticket page: and does not hand out a second ticket', await txt(Q2, '[data-join-hint]'));
+  const Q3 = await open(qctx, '/queue/hampton-vale/?join=1&emulator', PHONE, 'ticket-again');
+  ok(await waitText(Q3, '[data-ticket]', /Your ticket/) && !(await Q3.$eval('#join-dialog', (d) => d.open)), 'ticket page: someone who already has a ticket is not asked to join again');
+  await tap(Q3, '[data-leave]');
+  const hiddenTicket = (pg) => pg.waitForSelector('[data-ticket][hidden]', { timeout: 15000 }).then(() => true, () => false);
+  ok(await hiddenTicket(Q3) && await Q3.$eval('[data-wait]', (e) => !e.hidden), 'ticket page: leaving the queue brings the join card back', (await txt(Q3, '[data-ticket]')).slice(0, 80));
+  await sleep(1500);
+  ok((await tickets()).length === held - 1, 'ticket page: and the place is given up in the shop’s queue', `${held} -> ${(await tickets()).length}`);
+  ok(await hiddenTicket(Q) && await Q.$eval('[data-wait]', (e) => !e.hidden), 'ticket page: the customer’s other open tab follows');
+  await Q3.evaluate(() => localStorage.setItem('hb-ticket-v2', JSON.stringify({ shop: 'hampton-vale', id: 'old', name: 'Old', src: 'cloud', at: Date.now() - 3 * 86_400_000, seen: 'chair' })));
+  await Q3.reload({ waitUntil: 'load' });
+  await sleep(1500);
+  ok(await Q3.$eval('[data-ticket]', (e) => e.hidden) && await Q3.evaluate(() => localStorage.getItem('hb-ticket-v2') === null), 'ticket page: a ticket from an earlier day is forgotten', await txt(Q3, '[data-ticket]'));
+  for (const [name, pg] of [['ticket page', Q], ['other shop’s page', Q2]]) ok(await clean(pg), `hostile text: nothing was injected into the ${name}`);
 } catch (e) {
   res.push('CRASH ' + String(e.stack ?? e.message).slice(0, 500));
 }

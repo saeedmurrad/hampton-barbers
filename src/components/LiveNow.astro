@@ -1,21 +1,21 @@
 ---
-// Live wait, chairs and queue for one shop, the owner's three shops side by side, and the
-// customer's own ticket: join, number, place in line, "I'm here", "Running late", leave.
+// Live wait, chairs and queue for one shop, and the owner's three shops side by side.
+// Joining and the customer's own ticket live on the queue page (/queue/<shop>/): this panel
+// links there, and shows a short strip when the visitor already holds a ticket.
 import { site, shops } from '../data/site';
 import { boardView, exampleBoard } from '../lib/board';
 import { chairsHtml, queueHtml } from '../lib/live';
 interface Props { design: 'heritage' | 'fresh' | 'street' | 'club'; shop?: string; title?: string; }
 const { design, shop = 'hampton-vale', title = 'Right now at Hampton Barbers' } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const now = Date.now();
 const order = [shop, ...shops.map((s) => s.id).filter((id) => id !== shop)];
 const entries = order.map((id) => ({ shop: shops.find((s) => s.id === id)!, v: boardView(exampleBoard(id, now), now) }));
 const v = entries[0].v;
 const best = entries.reduce((a, b) => (b.v.minutes < a.v.minutes ? b : a)).shop;
 const steps = ['Quiet', 'Short wait', 'Busy', 'Very busy'];
-const etas: [number, string][] = [[5, '5 min'], [10, '10 min'], [20, '20 min'], [30, '30 min']];
-const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.geo]));
 ---
-<section class:list={['live', `live--${design}`]} id="live" data-live-root={shop} data-geo={JSON.stringify(geo)} data-level={v.level} aria-labelledby="live-title">
+<section class:list={['live', `live--${design}`]} id="live" data-live-root={shop} data-base={base} data-level={v.level} aria-labelledby="live-title">
   <div class="live__in">
     <header class="live__head">
       <p class="live__badge"><i aria-hidden="true"></i>Live</p>
@@ -23,7 +23,11 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
       <p class="live__ago" data-live="ago">Example status for this demo</p>
     </header>
 
-    <div class="live__ticket" data-ticket aria-live="polite" hidden></div>
+    <a class="live__mine" data-my-ticket href={`${base}/queue/${shop}/`} hidden>
+      <span class="live__mine-n"><b data-my="n"></b><small>your<br />number</small></span>
+      <span class="live__mine-t"><b data-my="text"></b><small data-my="shop"></small></span>
+      <span class="live__mine-go">Open my ticket →</span>
+    </a>
 
     <div class="live__grid">
       <div class="live__wait" aria-live="polite">
@@ -35,8 +39,9 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
         </div>
         <p class="live__note" data-live="note" hidden={!v.note}>{v.note}</p>
         <div class="live__join">
-          <button type="button" class="btn" data-join>Join the queue</button>
-          <p>Save your place from home. No booking, no account.</p>
+          <a class="btn" data-join href={`${base}/queue/${shop}/?join=1`}>Join the queue</a>
+          <p class="live__join-none">Save your place from home. No booking, no account.</p>
+          <p class="live__join-mine">You have a place in the queue: your ticket is just above.</p>
         </div>
       </div>
 
@@ -69,9 +74,10 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
             <span class="live__shop-wait"><b data-sw="headline">{e.v.headline}</b><small data-sw="unit">{e.v.unit}</small></span>
             <span class="live__shop-label" data-sw="label">{e.v.label}</span>
             <span class="live__shop-tags"><em class="t-best">Quickest</em>{e.shop.id === shop && <em class="t-here">This shop</em>}</span>
-            {e.shop.directionsUrl
-              ? <a class="live__shop-go" href={e.shop.directionsUrl} rel="noopener">Directions →</a>
-              : <span class="live__shop-go is-off">Directions coming soon</span>}
+            <span class="live__shop-go">
+              <a href={`${base}/queue/${e.shop.id}/`} data-queue-link>Queue and tickets →</a>
+              {e.shop.directionsUrl ? <a href={e.shop.directionsUrl} rel="noopener">Directions</a> : <span class="is-off">Directions coming soon</span>}
+            </span>
           </li>
         ))}
       </ul>
@@ -82,108 +88,34 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
       {shop === 'hampton-vale' && <div class="btns"><a class="btn btn--line" href={site.phoneHref}>Call {site.phone}</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Directions</a></div>}
     </footer>
   </div>
-
-  <dialog class:list={['qdlg', `qdlg--${design}`]} id="join-dialog" aria-labelledby="qdlg-title">
-    <form class="qdlg__form" data-join-form>
-      <h2 id="qdlg-title">Join the queue</h2>
-      <p class="qdlg__lead qdlg__home">Take a ticket number now, then come in when it’s nearly your turn. No booking and no account.</p>
-      <p class="qdlg__lead qdlg__door">You’re at the shop, so you go straight into the line. Take a seat and watch the screen for your number.</p>
-      <label class="qdlg__field">Your first name
-        <input name="name" required maxlength="24" autocomplete="given-name" placeholder="e.g. Sam" />
-      </label>
-      <fieldset class="qdlg__pick qdlg__pick--shops qdlg__home">
-        <legend>Which shop?</legend>
-        {entries.map((e, i) => (
-          <label><input type="radio" name="shop" value={e.shop.id} checked={i === 0} /><span><b>{e.shop.name}</b><small data-qshop={e.shop.id}>{e.v.headline} {e.v.unit}</small></span></label>
-        ))}
-      </fieldset>
-      <fieldset class="qdlg__pick qdlg__home">
-        <legend>How far away are you?</legend>
-        {etas.map(([m, t]) => <label><input type="radio" name="eta" value={m} checked={m === 10} /><span>{t}</span></label>)}
-      </fieldset>
-      <p class="qdlg__small">We keep only your first name, and only until your cut is done. The shop screen shows your number, never your name. You can leave the queue at any time.</p>
-      <p class="qdlg__err" data-join-error role="alert" hidden></p>
-      <div class="qdlg__btns">
-        <button type="button" class="btn btn--line" data-join-cancel>Cancel</button>
-        <button type="submit" class="btn" data-join-submit>Join the queue</button>
-      </div>
-    </form>
-  </dialog>
 </section>
 
 <script>
-  import { arrive, boardView, clockText, join, leave, ord, placeOf, runLate, GRACE_MIN, QueueError, type Board } from '../lib/board';
-  import { TICKET_KEY, actLocal, esc, fetchBoards, metresBetween, newId, onDeviceChange, pickBoard, read, setLocalName, write, type Mine } from '../lib/store';
-  import { paintLive } from '../lib/live';
+  import { boardView, londonDay, type Board } from '../lib/board';
+  import { TICKET_KEY, fetchBoards, onDeviceChange, pickBoard, read, type Mine } from '../lib/store';
+  import { mineText, paintLive } from '../lib/live';
 
   const panel = document.querySelector<HTMLElement>('section.live[data-live-root]');
   if (panel) {
     const shop = panel.dataset.liveRoot!;
-    const geo = JSON.parse(panel.dataset.geo || '{}') as Record<string, [number, number]>;
+    const base = panel.dataset.base ?? '';
     const keys = [...panel.querySelectorAll<HTMLElement>('[data-shop-key]')].map((li) => li.dataset.shopKey!);
-    const chips = [...document.querySelectorAll<HTMLElement>('.lchip[data-live-root]')];
-    const ticketEl = panel.querySelector<HTMLElement>('[data-ticket]')!;
-    const dialog = panel.querySelector<HTMLDialogElement>('#join-dialog')!;
-    const form = dialog.querySelector<HTMLFormElement>('[data-join-form]')!;
-    const errEl = dialog.querySelector<HTMLElement>('[data-join-error]')!;
-    const submitBtn = dialog.querySelector<HTMLButtonElement>('[data-join-submit]')!;
+    const chips = [...document.querySelectorAll<HTMLAnchorElement>('a.lchip[data-live-root]')];
+    const strip = panel.querySelector<HTMLAnchorElement>('[data-my-ticket]')!;
     const shopName = (k: string) => panel.querySelector<HTMLElement>(`[data-shop-key="${k}"]`)?.dataset.name ?? 'the shop';
-    // The code on the shop door opens this page with ?here: the visitor is standing in the shop.
-    const atDoor = new URLSearchParams(location.search).has('here');
-    const GEO_OK = 'hb-geo-ok';
-    const ARRIVE_M = 150;
+    // Local testing only: keep ?emulator on the links to the queue page.
+    const emulator = new URLSearchParams(location.search).has('emulator');
+    const queueUrl = (k: string, join = false) => `${base}/queue/${k}/${join ? `?join=1${emulator ? '&emulator' : ''}` : emulator ? '?emulator' : ''}`;
+    if (emulator) {
+      panel.querySelector<HTMLAnchorElement>('[data-join]')!.href = queueUrl(shop, true);
+      panel.querySelectorAll<HTMLAnchorElement>('[data-queue-link]').forEach((a) => { a.href = queueUrl(a.closest<HTMLElement>('[data-shop-key]')!.dataset.shopKey!); });
+    }
 
     let cloud: Record<string, Board> = {};
-    let loaded = false;
-    let mine = read<Mine>(TICKET_KEY);
-    let api: typeof import('../lib/cloud') | null = null;
-    let stopFollow: (() => void) | null = null;
-    let lastAhead = Infinity;
-    let toldTurn = false;
-    let toldLate = false;
-    let note = '';
-    let joining = false;
     const pick = (k: string) => pickBoard(k, cloud[k]);
-
-    const notify = (title: string, body: string) => {
-      try { navigator.vibrate?.([220, 120, 220]); } catch { /* not supported */ }
-      try { if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body }); } catch { /* not supported */ }
-      const old = document.title; let n = 0;
-      const t = setInterval(() => { document.title = n++ % 2 ? old : `● ${title}`; if (n > 9) { clearInterval(t); document.title = old; } }, 900);
-    };
-
-    // Once this visitor holds a ticket, follow that shop's queue live instead of re-checking.
-    const follow = async () => {
-      if (!mine || mine.src !== 'cloud' || stopFollow) return;
-      const s = mine.shop;
-      try {
-        api ??= await import('../lib/cloud');
-        stopFollow = api.watchBoard(s, (b) => { if (b) { cloud = { ...cloud, [s]: b }; loaded = true; render(); } });
-      } catch { /* the regular refresh below still runs */ }
-    };
-    const setMine = (m: Mine | null) => {
-      mine = m;
-      write(TICKET_KEY, m);
-      if (!m) { stopFollow?.(); stopFollow = null; }
-    };
-    // A change to this visitor's own ticket.
-    const act = async (fn: (b: Board, id: string, now: number) => Board): Promise<boolean> => {
-      const m = mine;
-      if (!m) return false;
-      try {
-        if (m.src === 'cloud') {
-          api ??= await import('../lib/cloud');
-          const r = await api.actCustomer(m.shop, fn);
-          cloud = { ...cloud, [m.shop]: r.board };
-        } else actLocal(m.shop, (b, now) => fn(b, m.id, now));
-        return true;
-      } catch (e) {
-        note = e instanceof QueueError ? 'That could not be done. The shop may have moved your ticket on.' : 'Could not reach the shop. Check your connection and try again.';
-        return false;
-      } finally {
-        render();
-      }
-    };
+    // The visitor's ticket, if they took one today on the queue page.
+    const myTicket = () => { const m = read<Mine>(TICKET_KEY); return m && londonDay(m.at) === londonDay(Date.now()) ? m : null; };
+    const say = (el: Element | null, t: string) => { if (el && el.textContent !== t) el.textContent = t; };
 
     const paintShops = (now: number) => {
       const views = Object.fromEntries(keys.map((k) => [k, boardView(pick(k).board, now)]));
@@ -192,102 +124,42 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
         const k = li.dataset.shopKey!;
         li.dataset.level = String(views[k].level);
         li.classList.toggle('best', k === best);
-        li.querySelector('[data-sw="headline"]')!.textContent = views[k].headline;
-        li.querySelector('[data-sw="unit"]')!.textContent = views[k].unit;
-        li.querySelector('[data-sw="label"]')!.textContent = views[k].label;
+        say(li.querySelector('[data-sw="headline"]'), views[k].headline);
+        say(li.querySelector('[data-sw="unit"]'), views[k].unit);
+        say(li.querySelector('[data-sw="label"]'), views[k].label);
       });
       const bv = views[best];
-      panel.querySelector<HTMLElement>('[data-shops-tip]')!.textContent = best === shop
+      say(panel.querySelector('[data-shops-tip]'), best === shop
         ? 'This shop is the quickest right now.'
-        : `${shopName(best)} is the quickest right now: ${bv.headline === 'No wait' ? 'no wait' : `${bv.headline} ${bv.unit}`}.`;
-      dialog.querySelectorAll<HTMLElement>('[data-qshop]').forEach((el) => { const x = views[el.dataset.qshop!]; el.textContent = `${x.headline} ${x.unit}`.trim(); });
+        : `${shopName(best)} is the quickest right now: ${bv.headline === 'No wait' ? 'no wait' : `${bv.headline} ${bv.unit}`}.`);
     };
 
-    const paintTicket = (now: number) => {
-      const m = mine;
-      let html = '', state = '', chipText = '';
-      if (m) {
-        const { board, source } = pick(m.shop);
-        const where = esc(shopName(m.shop));
-        const k = board.t[m.id];
-        const place = placeOf(board, m.id, now);
-        const alertBtn = 'Notification' in window && Notification.permission === 'default' ? '<button type="button" class="btn btn--line" data-alert>Alert me when it’s my turn</button>' : '';
-        if (m.src === 'cloud' && source !== 'cloud' && !loaded) {
-          state = 'waiting';
-          html = `<div class="tk"><p class="tk__kicker">${where}</p><p class="tk__turn">Checking your place in the queue…</p></div>`;
-        } else if (k?.s === 'chair') {
-          const s = board.staff[k.b ?? ''];
-          state = 'turn';
-          html = `<div class="tk">
-            <p class="tk__kicker">${where}, number ${k.n}</p>
-            <p class="tk__turn">It’s your turn, ${esc(m.name)}! ${s ? `Chair ${s.chair}${s.name ? ` with ${esc(s.name)}` : ''}.` : 'Come and take a seat.'}</p>
-            <div class="tk__btns"><button type="button" class="btn" data-done>Done</button></div>
-          </div>`;
-          chipText = 'It’s your turn!';
-          if (!toldTurn) { toldTurn = true; notify('It’s your turn at Hampton Barbers', s ? `Number ${k.n}, chair ${s.chair}.` : 'Come and take a seat.'); }
-          if (m.seen !== 'chair') { mine = { ...m, seen: 'chair' }; write(TICKET_KEY, mine); }
-        } else if (place) {
-          const { ahead, mins, at } = place;
-          const tk = place.k;
-          const pos = ahead + 1, first = ahead === 0, here = tk.s === 'here';
-          // Past the time they gave: warn them before the place lapses.
-          const due = tk.at + tk.eta * 60_000, lapses = clockText(due + GRACE_MIN * 60_000);
-          const overdue = !here && now > due;
-          const warn = overdue ? `You said you’d be here by ${clockText(due)}. Your place lapses at ${lapses} unless you check in${tk.late ? '' : ' or tap “Running late”'}.` : '';
-          state = first && here ? 'next' : 'waiting';
-          const when = mins < 0 ? 'The shop is not cutting right now'
-            : mins <= 2 ? (here ? 'A barber should be free for you any moment' : 'A barber should be free when you arrive')
-            : `About ${Math.max(5, Math.round(mins / 5) * 5)} minutes, around ${clockText(at)}`;
-          html = `<div class="tk">
-            <p class="tk__kicker">${here ? 'Checked in at' : 'You’re in the queue at'} ${where}, ${esc(m.name)}</p>
-            <div class="tk__main">
-              <p class="tk__big"><b>${tk.n}</b><small>your<br />number</small></p>
-              <div class="tk__info">
-                <p class="tk__line">${first ? (here ? 'You’re next.' : 'You’re first in line.') : `${ord(pos)} in line, ${ahead} ${ahead === 1 ? 'person' : 'people'} ahead of you`}</p>
-                <p class="tk__wait">${when}</p>
-                <p class="tk__sub">${here
-                  ? `You’re checked in. Watch the shop screen for number ${tk.n}.`
-                  : `Only people in the shop are called. When you get here, tap “I’m here” or scan the code on the door. We’ll hold your place until ${clockText(tk.at + (tk.eta + GRACE_MIN) * 60_000)}.`}</p>
-              </div>
-            </div>
-            ${note || warn ? `<p class="tk__msg" role="status">${esc(note || warn)}</p>` : ''}
-            <div class="tk__btns">
-              ${here ? '' : '<button type="button" class="btn" data-here>I’m here</button>'}
-              ${here || tk.late ? '' : '<button type="button" class="btn btn--line" data-late>Running late</button>'}
-              ${alertBtn}
-              <button type="button" class="btn btn--line" data-leave>Leave the queue</button>
-            </div>
-          </div>`;
-          chipText = first ? (here ? 'You’re next!' : 'You’re first in line') : `You’re ${ord(pos)} in line`;
-          if (first && here && lastAhead !== Infinity && lastAhead > 0) notify('You’re next at Hampton Barbers', `Number ${tk.n}: a barber will call you in a moment.`);
-          if (overdue && !toldLate) { toldLate = true; notify('Are you nearly at Hampton Barbers?', `Your place lapses at ${lapses}.`); }
-          lastAhead = ahead;
-        } else if (m.seen === 'chair') {
-          state = 'gone';
-          html = `<div class="tk">
-            <p class="tk__turn">All done, ${esc(m.name)}. Thanks for coming in.</p>
-            <p class="tk__sub">See you next time at ${where}.</p>
-            <div class="tk__btns"><button type="button" class="btn btn--line" data-done>Close</button></div>
-          </div>`;
-        } else {
-          state = 'gone';
-          html = `<div class="tk">
-            <p class="tk__turn">You’re no longer in the queue at ${where}.</p>
-            <p class="tk__sub">A place lapses if you have not arrived 10 minutes after the time you gave. If that’s a mistake, join again or call the shop.</p>
-            <div class="tk__btns"><button type="button" class="btn" data-again>Join again</button><button type="button" class="btn btn--line" data-done>Close</button></div>
-          </div>`;
-        }
+    // A short line about the visitor's own ticket, here and on the first-screen card. Both
+    // open the queue page, where the ticket itself lives.
+    const paintMine = (now: number) => {
+      const m = myTicket();
+      const board = m ? pick(m.shop).board : null;
+      const text = m && board ? mineText(board, m.id, now) : '';
+      const url = m ? queueUrl(m.shop) : '';
+      strip.hidden = !text;
+      if (m && board && text) {
+        strip.href = url;
+        say(strip.querySelector('[data-my="n"]'), String(board.t[m.id]?.n ?? ''));
+        say(strip.querySelector('[data-my="text"]'), text);
+        say(strip.querySelector('[data-my="shop"]'), `${m.name ? `${m.name}, ` : ''}Hampton Barbers ${shopName(m.shop)}`);
       }
-      ticketEl.hidden = !m;
-      panel.classList.toggle('has-ticket', Boolean(m) && state !== 'gone');
-      if (state) ticketEl.dataset.state = state;
-      // Redraw only when something changed, so a tap never lands on a button being replaced.
-      if (ticketEl.dataset.html !== html) { ticketEl.innerHTML = html; ticketEl.dataset.html = html; }
+      panel.classList.toggle('has-ticket', Boolean(text));
       chips.forEach((c) => {
+        const href = text ? url : '#live';
+        if (c.getAttribute('href') !== href) {
+          c.setAttribute('href', href);
+          c.setAttribute('aria-label', text ? `Your ticket: ${text} Open my ticket` : 'Live wait time. See how busy the shop is, or join the queue');
+        }
         const old = c.querySelector<HTMLElement>('[data-mine]');
-        if ((old?.textContent ?? '') === chipText) return;
+        if ((old?.textContent ?? '') === text) return;
         old?.remove();
-        if (chipText) c.querySelector('.lchip__meta')?.insertAdjacentHTML('beforeend', `<span class="lchip__mine" data-mine>${chipText}</span>`);
+        if (text) c.querySelector('.lchip__meta')?.insertAdjacentHTML('beforeend', '<span class="lchip__mine" data-mine></span>');
+        say(c.querySelector('[data-mine]'), text);
       });
     };
 
@@ -295,137 +167,29 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
       const now = Date.now();
       const cur = pick(shop);
       const view = boardView(cur.board, now);
-      paintLive(panel, view, cur.board.updatedAt, mine?.shop === shop ? mine.id : undefined);
+      const m = myTicket();
+      paintLive(panel, view, cur.board.updatedAt, m?.shop === shop ? m.id : undefined);
       chips.forEach((c) => paintLive(c, view, cur.board.updatedAt));
       paintShops(now);
-      paintTicket(now);
+      paintMine(now);
     };
-
-    // ---- arriving ----
-    const manual = 'When you’re at the shop, scan the code on the door or tell your barber your number.';
-    const checkIn = (quiet = false) => {
-      const m = mine;
-      if (!m) return;
-      const tell = (t: string) => { if (!quiet) { note = t; render(); } };
-      const g = geo[m.shop];
-      if (!g || !navigator.geolocation) return tell(manual);
-      tell('Checking where you are…');
-      navigator.geolocation.getCurrentPosition(async (p) => {
-        const d = metresBetween(p.coords, g);
-        if (d - Math.min(p.coords.accuracy || 0, 100) <= ARRIVE_M) {
-          write(GEO_OK, 1);
-          note = '';
-          await act((b, id, now) => arrive(b, id, now));
-        } else {
-          tell(`You look about ${d < 950 ? `${Math.max(50, Math.round(d / 50) * 50)} metres` : `${(d / 1609).toFixed(d < 16_090 ? 1 : 0)} miles`} from the shop. ${manual}`);
-        }
-      }, () => tell(`We couldn’t check your location. ${manual}`), { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 });
-    };
-    // If the visitor already allowed location once, check quietly as they get close.
-    const autoCheckIn = async () => {
-      const m = mine;
-      if (!m || !read(GEO_OK) || document.visibilityState !== 'visible' || pick(m.shop).board.t[m.id]?.s !== 'way') return;
-      try { if ((await navigator.permissions.query({ name: 'geolocation' })).state === 'granted') checkIn(true); } catch { /* not supported */ }
-    };
-
-    // ---- joining and leaving ----
-    const openJoin = () => {
-      errEl.hidden = true;
-      if (mine && (placeOf(pick(mine.shop).board, mine.id, Date.now()) || pick(mine.shop).board.t[mine.id])) { ticketEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
-      dialog.classList.toggle('is-door', atDoor);
-      dialog.showModal();
-      dialog.querySelector<HTMLInputElement>('input[name="name"]')!.focus();
-    };
-    const leaveQueue = async () => {
-      const m = mine;
-      if (!m) return;
-      if (!(await act((b, id, now) => leave(b, id, now)))) return;
-      if (m.src === 'cloud') api?.dropName(m.shop, m.id).catch(() => { /* the shop tidies up */ });
-      else setLocalName(m.shop, m.id, null);
-      note = '';
-      setMine(null);
-      render();
-    };
-    panel.addEventListener('click', (e) => {
-      const t = e.target as HTMLElement;
-      if (t.closest('[data-join]') || t.closest('[data-again]')) { if (t.closest('[data-again]')) setMine(null); openJoin(); }
-      else if (t.closest('[data-join-cancel]')) dialog.close();
-      else if (t.closest('[data-leave]')) leaveQueue();
-      else if (t.closest('[data-here]')) checkIn();
-      else if (t.closest('[data-late]')) act((b, id, now) => runLate(b, id, now)).then((ok) => { if (ok) { toldLate = false; note = 'Thanks for letting us know. Your place is held 10 minutes longer.'; render(); } });
-      else if (t.closest('[data-done]')) { setMine(null); note = ''; render(); }
-      else if (t.closest('[data-alert]')) Notification.requestPermission().then(render);
-    });
-    dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const data = new FormData(form);
-      const name = String(data.get('name') ?? '').trim().replace(/\s+/g, ' ').slice(0, 24);
-      const s = atDoor ? shop : String(data.get('shop') ?? shop);
-      const eta = Number(data.get('eta') ?? 10);
-      const src = atDoor ? 'qr' : 'web';
-      if (!name) { errEl.textContent = 'Please add your first name.'; errEl.hidden = false; return; }
-      if (joining) return; // a second tap while the first is still being saved
-      joining = true;
-      submitBtn.disabled = true; submitBtn.textContent = 'Joining…';
-      try {
-        const source = pick(s).source;
-        if (source === 'closed') throw new QueueError('closed');
-        let m: Mine;
-        if (source === 'cloud') {
-          api ??= await import('../lib/cloud');
-          const r = await api.actCustomer(s, (b, id, now) => (b.t[id] ? b : join(b, id, now, eta, src)));
-          cloud = { ...cloud, [s]: r.board };
-          api.setName(s, r.id, name).catch(() => { /* the number still works without a name */ });
-          m = { shop: s, id: r.id, name, src: 'cloud', at: Date.now() };
-        } else {
-          const id = newId('l');
-          actLocal(s, (b, now) => join(b, id, now, eta, src));
-          setLocalName(s, id, name);
-          m = { shop: s, id, name, src: 'local', at: Date.now() };
-        }
-        setMine(m);
-        lastAhead = Infinity; toldTurn = false; toldLate = false; note = '';
-        form.reset();
-        dialog.close();
-        follow();
-        render();
-        ticketEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } catch (err) {
-        errEl.textContent = err instanceof QueueError
-          ? ({ closed: 'Online joining is not open at this shop right now. Walk in, or call the shop.', full: 'The queue is full right now. Please try again in a little while.' }[err.code] ?? 'Could not join. Please try again.')
-          : 'Could not join. Check your connection and try again.';
-        errEl.hidden = false;
-      } finally {
-        joining = false;
-        submitBtn.disabled = false; submitBtn.textContent = 'Join the queue';
-      }
-    });
 
     // ---- keeping up to date ----
     render();
     const refresh = async () => {
       const got = await fetchBoards();
       if (got) for (const [k, b] of Object.entries(got)) if (!cloud[k] || b.updatedAt >= cloud[k].updatedAt) cloud = { ...cloud, [k]: b };
-      loaded = true;
       render();
     };
-    refresh().then(() => {
-      if (!atDoor) return;
-      // Scanned the code on the door: check in a ticket already held for this shop, or offer one.
-      if (mine?.shop === shop && pick(shop).board.t[mine.id]?.s === 'way') act((b, id, now) => arrive(b, id, now)).then((ok) => { if (ok) { note = ''; render(); } });
-      else if (!mine) openJoin();
-    });
-    follow();
+    refresh();
     let tick = 0;
     setInterval(() => {
       tick++;
-      if (tick % 4 === 0 && document.visibilityState === 'visible') refresh(); else render();
-      if (tick % 3 === 0) autoCheckIn();
+      // Every minute, or every half minute while the visitor is waiting for their turn.
+      if (tick % (myTicket() ? 2 : 4) === 0 && document.visibilityState === 'visible') refresh(); else render();
     }, 15_000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
-    // When the queue desk (or another tab) changes things on this device, follow straight away.
-    onDeviceChange(() => { mine = read<Mine>(TICKET_KEY); render(); });
+    // When another tab on this device changes things (a ticket taken, the demo queue desk), follow straight away.
+    onDeviceChange(() => { render(); refresh(); });
   }
 </script>

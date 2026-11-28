@@ -221,7 +221,7 @@ const qr = await QRCode.toString(joinUrl, { type: 'svg', margin: 1, errorCorrect
   .tv__state { margin-left: auto; display: grid; justify-items: end; gap: .5em; font-size: 1.05em; color: var(--dim); white-space: nowrap; }
   .tv__state span::before { content: ''; display: inline-block; width: .65em; height: .65em; margin-right: .5em; border-radius: 50%; background: var(--ok); }
   .tv__state span[data-ok='false']::before { background: #f0605f; }
-  .tv__state button { font: inherit; color: inherit; background: none; border: 1px solid var(--rule); border-radius: 999px; padding: .35em .9em; cursor: pointer; }
+  .tv__state button { font: inherit; color: inherit; background: none; border: 1px solid var(--rule); border-radius: 999px; min-height: 2.5rem; padding: .35em .9em; cursor: pointer; }
   .tv__state button:hover, .tv__state button:focus-visible { color: #f5f2ea; border-color: #f5f2ea; }
   .tv__call { position: absolute; inset: 0; z-index: 10; display: grid; place-content: center; justify-items: center; text-align: center; background: var(--ok); color: #06140c; animation: tv-call .45s cubic-bezier(.2,.8,.2,1) both; }
   .tv__call[hidden] { display: none; }

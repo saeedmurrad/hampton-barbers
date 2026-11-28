@@ -1,37 +1,57 @@
 /* Shared by the staff screens (queue desk, barber panel): the "finish and record payment" step
-   and the confirmation message with its Change button. */
-.pay { --line: #d9d4c8; --muted: #57534a; width: min(36rem, calc(100vw - 1.5rem)); max-height: calc(100svh - 1.5rem); padding: 0; border: 0; border-radius: 20px; background: #fff; color: #15140f; box-shadow: 0 40px 90px rgb(0 0 0 / .4); font-family: 'Inter Variable', system-ui, sans-serif; }
-.pay::backdrop { background: rgb(0 0 0 / .55); }
-.pay[open] { animation: pay-in .28s cubic-bezier(.2,.8,.2,1) both; }
+   and the confirmation message with its Change button. Both are added to the page outside the
+   screen's own element, so they carry the dark palette themselves. */
+.pay, .staff-toast {
+  --bg: #0a0c0b; --s1: #121614; --s2: #1a1f1c; --s3: #242b27; --line: rgb(255 255 255 / .08); --line2: rgb(255 255 255 / .16);
+  --text: #f4f1e8; --muted: #a7b0aa; --faint: #8a948e; --ok: #3ddc84; --wait: #f6bd4b; --alert: #ff6f64; --info: #86b9ff;
+  --display: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+  font-family: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text);
+}
+.pay { width: min(36rem, calc(100vw - 1.5rem)); max-height: calc(100svh - 1.5rem); padding: 0; border: 1px solid var(--line2); border-radius: 24px; background: var(--s1); box-shadow: 0 40px 90px rgb(0 0 0 / .7); }
+.pay::backdrop { background: rgb(0 0 0 / .62); backdrop-filter: blur(3px); }
+.pay[open] { animation: pay-in .26s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes pay-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-.pay__form { display: grid; gap: 1rem; padding: clamp(1.1rem, 4vw, 1.6rem); }
-.pay h2 { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-weight: 800; font-size: 1.5rem; letter-spacing: -.03em; line-height: 1.1; }
+.pay *, .pay *::before, .pay *::after { box-sizing: border-box; }
+.pay__form { display: grid; gap: 1.1rem; padding: clamp(1.1rem, 4vw, 1.6rem); }
+.pay h2 { margin: 0; font: 800 1.5rem/1.1 var(--display); letter-spacing: -.03em; }
+.pay p { margin: 0; }
 .pay__set { border: 0; margin: 0; padding: 0; min-width: 0; }
-.pay__set legend { padding: 0; margin-bottom: .5rem; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.pay__set legend { padding: 0; margin-bottom: .55rem; font-size: .7rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
 .pay button, .pay input { font: inherit; }
-.pay button { min-height: 3rem; padding: .5rem .9rem; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; color: inherit; font-weight: 650; cursor: pointer; }
-.pay button:hover { border-color: #15140f; }
-.pay button[aria-pressed='true'] { background: #15140f; border-color: #15140f; color: #fff; }
+.pay button { min-height: 3rem; padding: .5rem .9rem; border: 1px solid var(--line2); border-radius: 13px; background: var(--s2); color: var(--text); font-weight: 650; cursor: pointer; transition: background .15s, border-color .15s; }
+.pay button:hover { background: var(--s3); border-color: rgb(255 255 255 / .28); }
+.pay button[aria-pressed='true'] { background: var(--text); border-color: var(--text); color: #0a0c0b; }
+.pay :focus-visible { outline: 2px solid #d9b76e; outline-offset: 3px; }
 .pay__svcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); gap: .45rem; }
 .pay__svcs button { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; text-align: left; }
 .pay__svcs b { font-weight: 650; font-size: .92rem; line-height: 1.2; }
-.pay__svcs small { font-weight: 700; opacity: .75; }
-.pay__price { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-weight: 700; }
-.pay__price span { display: flex; align-items: center; gap: .3rem; }
-.pay__price i { font-style: normal; font-size: 1.4rem; font-weight: 700; }
-.pay__price input { width: 7rem; min-height: 3.2rem; padding: .4rem .7rem; border: 1.5px solid var(--line); border-radius: 12px; font-size: 1.5rem; font-weight: 750; text-align: right; background: #fff; color: inherit; }
+.pay__svcs small { font: 750 .95rem/1 var(--display); opacity: .8; }
+.pay__price { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-weight: 650; }
+.pay__price span { display: flex; align-items: center; gap: .35rem; }
+.pay__price i { font: 750 1.5rem/1 var(--display); font-style: normal; color: var(--muted); }
+.pay__price input { width: 7.5rem; min-height: 3.3rem; padding: .4rem .8rem; border: 1px solid var(--line2); border-radius: 13px; background: var(--bg); color: var(--text); font: 800 1.7rem/1 var(--display); text-align: right; }
 .pay__how { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
-.pay__how button { min-height: 4.2rem; display: grid; gap: .1rem; justify-items: center; align-content: center; }
-.pay__how b { font-size: 1.2rem; }
+.pay__how button { min-height: 4.4rem; display: grid; gap: .1rem; justify-items: center; align-content: center; }
+.pay__how b { font: 750 1.25rem/1.1 var(--display); letter-spacing: -.02em; }
 .pay__how small { font-size: .78rem; font-weight: 500; opacity: .75; }
-.pay__err { color: #b3261e; font-weight: 700; font-size: .92rem; }
+.pay__err { color: var(--wait); font-weight: 650; font-size: .92rem; }
 .pay__btns { display: flex; flex-wrap: wrap; gap: .5rem; }
-.pay__btns .primary { flex: 1 1 10rem; min-height: 3.4rem; background: #15140f; border-color: #15140f; color: #fff; font-size: 1.05rem; }
-.pay__note { font-size: .8rem; color: var(--muted); }
+.pay__btns .primary { flex: 1 1 10rem; min-height: 3.5rem; background: var(--text); border-color: var(--text); color: #0a0c0b; font-size: 1.05rem; border-radius: 16px; }
+.pay__btns .primary:hover { background: #fff; }
+.pay__note { font-size: .8rem; color: var(--faint); }
+@media (max-width: 619px) {
+  .pay { margin: auto auto 0; width: 100%; max-width: none; max-height: calc(100svh - 1rem); border-radius: 24px 24px 0 0; border-bottom: 0; }
+  .pay__form { padding-bottom: calc(1.1rem + env(safe-area-inset-bottom)); }
+}
 
 /* Centred with auto margins (not left: 50%), so a long message can use the full width of a phone. */
-.staff-toast { position: fixed; left: 1rem; right: 1rem; bottom: 1.25rem; margin-inline: auto; width: fit-content; max-width: min(34rem, calc(100vw - 2rem)); z-index: 80; display: flex; align-items: center; gap: .9rem; padding: .75rem 1rem .75rem 1.1rem; border-radius: 14px; background: #15140f; color: #fff; font: 700 1rem/1.3 'Inter Variable', system-ui, sans-serif; box-shadow: 0 14px 40px rgb(0 0 0 / .3); animation: staff-toast .35s cubic-bezier(.34,1.56,.64,1) both; }
-.staff-toast button { flex: none; font: inherit; min-height: 2.4rem; padding: .3rem .9rem; border-radius: 10px; border: 1.5px solid rgb(255 255 255 / .5); background: none; color: #fff; cursor: pointer; }
-.staff-toast button:hover { border-color: #fff; }
+.staff-toast { position: fixed; left: 1rem; right: 1rem; bottom: 5.4rem; margin: 0 auto; width: fit-content; max-width: min(34rem, calc(100vw - 2rem)); z-index: 80; display: flex; align-items: center; gap: .9rem; padding: .75rem 1rem .75rem 1.1rem; border-radius: 16px; background: #f4f1e8; color: #0a0c0b; font-weight: 650; font-size: .98rem; line-height: 1.3; box-shadow: 0 18px 50px rgb(0 0 0 / .6); animation: staff-toast .35s cubic-bezier(.34,1.56,.64,1) both; }
+.staff-toast button { flex: none; font: inherit; min-height: 2.4rem; padding: .3rem .9rem; border-radius: 10px; border: 1.5px solid rgb(10 12 11 / .35); background: none; color: inherit; cursor: pointer; }
+.staff-toast button:hover { border-color: #0a0c0b; }
 @keyframes staff-toast { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+/* On phones and tablets the message sits at the top, clear of the buttons under the thumb. */
+@media (max-width: 999px) { .staff-toast { top: .75rem; bottom: auto; animation-name: staff-toast-top; } }
+@keyframes staff-toast-top { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: none; } }
+@media (min-width: 1000px) { .staff-toast { bottom: 1.5rem; } }
+.pay:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) { .pay[open], .staff-toast { animation: none; } }
