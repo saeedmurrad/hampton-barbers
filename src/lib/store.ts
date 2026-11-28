@@ -1,12 +1,15 @@
 // Where a shop's queue is kept. A real shop: Firebase (see cloud.ts). A demo on one device:
 // this browser's storage. This file has no Firebase code, so ordinary page loads stay light.
 import { cleanBoard, exampleBoard, londonDay, openToday, type Board, type TicketState } from './board';
+import { cleanRules, cleanSale, type PayRules, type Sale } from './sales';
 
 export const BOARD_KEY = 'hb-board-v2';   // this device's copy of each shop's queue (demo use)
 export const NAMES_KEY = 'hb-names-v2';   // first names for tickets made on this device (demo use)
 export const TICKET_KEY = 'hb-ticket-v2'; // this visitor's own place in a queue
 export const BARBER_KEY = 'hb-barber-v1'; // which shop and barber this device belongs to
 export const DEMO_KEY = 'hb-demo-day';    // set (to today's date) while this device runs the demo queue
+export const SALES_KEY = 'hb-sales-v1';   // sales recorded on this device (demo use)
+export const PAY_KEY = 'hb-pay-v1';       // barbers' percentages set on this device (demo use)
 export const IS_DEMO = import.meta.env.PUBLIC_DEMO !== 'false';
 const PROJECT_ID = import.meta.env.PUBLIC_FB_PROJECT_ID as string | undefined;
 export const CONNECTED = Boolean(PROJECT_ID && import.meta.env.PUBLIC_FB_API_KEY);
@@ -26,7 +29,7 @@ const sameTab = new Set<() => void>();
 // Runs `cb` when the queue, names or ticket kept on this device change, in this tab or another.
 export function onDeviceChange(cb: () => void) {
   sameTab.add(cb);
-  addEventListener('storage', (e) => { if (e.key === BOARD_KEY || e.key === NAMES_KEY || e.key === TICKET_KEY || e.key === DEMO_KEY) cb(); });
+  addEventListener('storage', (e) => { if (e.key === BOARD_KEY || e.key === NAMES_KEY || e.key === TICKET_KEY || e.key === DEMO_KEY || e.key === SALES_KEY || e.key === PAY_KEY) cb(); });
 }
 export function localBoard(shop: string, now = Date.now()): Board | null {
   const all = read<Record<string, unknown>>(BOARD_KEY);
@@ -103,4 +106,22 @@ export function metresBetween(a: { latitude: number; longitude: number }, b: [nu
   const dLat = (b[0] - a.latitude) * rad, dLng = (b[1] - a.longitude) * rad;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) ** 2;
   return 6_371_000 * 2 * Math.asin(Math.sqrt(h));
+}
+
+// ---------- sales and percentages kept on this device (demo use) ----------
+export function localSales(shop: string): Sale[] {
+  return (read<Record<string, { id?: string }[]>>(SALES_KEY)?.[shop] ?? []).map((x) => cleanSale(x, String(x?.id ?? ''))).filter((x): x is Sale => Boolean(x && x.id));
+}
+export function saveLocalSale(sale: Sale) {
+  const all = read<Record<string, Sale[]>>(SALES_KEY) ?? {};
+  write(SALES_KEY, { ...all, [sale.shop]: [...(all[sale.shop] ?? []).filter((x) => x.id !== sale.id), sale].slice(-500) });
+  sameTab.forEach((cb) => cb());
+}
+export function localPay(shop: string): PayRules | null {
+  const all = read<Record<string, unknown>>(PAY_KEY);
+  return all?.[shop] ? cleanRules(all[shop]) : null;
+}
+export function saveLocalPay(shop: string, rules: PayRules) {
+  write(PAY_KEY, { ...(read<Record<string, unknown>>(PAY_KEY) ?? {}), [shop]: rules });
+  sameTab.forEach((cb) => cb());
 }

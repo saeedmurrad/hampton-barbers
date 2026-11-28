@@ -14,7 +14,8 @@
     "check": "node scripts/check-reveals.mjs && node scripts/check-spacing.mjs",
     "test:queue": "firebase emulators:exec --only auth,firestore --project hampton-barbers \"node scripts/test-queue.mjs .check\"",
     "test:board": "node scripts/test-board.mjs",
-    "test:rules": "firebase emulators:exec --only auth,firestore --project hampton-barbers \"node scripts/test-rules.mjs\""
+    "test:rules": "firebase emulators:exec --only auth,firestore --project hampton-barbers \"node scripts/test-rules.mjs\"",
+    "test:sales": "node scripts/test-sales.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.6",

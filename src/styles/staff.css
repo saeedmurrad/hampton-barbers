@@ -1,0 +1,36 @@
+/* Shared by the staff screens (queue desk, barber panel): the "finish and record payment" step
+   and the confirmation message with its Change button. */
+.pay { --line: #d9d4c8; --muted: #57534a; width: min(36rem, calc(100vw - 1.5rem)); max-height: calc(100svh - 1.5rem); padding: 0; border: 0; border-radius: 20px; background: #fff; color: #15140f; box-shadow: 0 40px 90px rgb(0 0 0 / .4); font-family: 'Inter Variable', system-ui, sans-serif; }
+.pay::backdrop { background: rgb(0 0 0 / .55); }
+.pay[open] { animation: pay-in .28s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes pay-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.pay__form { display: grid; gap: 1rem; padding: clamp(1.1rem, 4vw, 1.6rem); }
+.pay h2 { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-weight: 800; font-size: 1.5rem; letter-spacing: -.03em; line-height: 1.1; }
+.pay__set { border: 0; margin: 0; padding: 0; min-width: 0; }
+.pay__set legend { padding: 0; margin-bottom: .5rem; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.pay button, .pay input { font: inherit; }
+.pay button { min-height: 3rem; padding: .5rem .9rem; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; color: inherit; font-weight: 650; cursor: pointer; }
+.pay button:hover { border-color: #15140f; }
+.pay button[aria-pressed='true'] { background: #15140f; border-color: #15140f; color: #fff; }
+.pay__svcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); gap: .45rem; }
+.pay__svcs button { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; text-align: left; }
+.pay__svcs b { font-weight: 650; font-size: .92rem; line-height: 1.2; }
+.pay__svcs small { font-weight: 700; opacity: .75; }
+.pay__price { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-weight: 700; }
+.pay__price span { display: flex; align-items: center; gap: .3rem; }
+.pay__price i { font-style: normal; font-size: 1.4rem; font-weight: 700; }
+.pay__price input { width: 7rem; min-height: 3.2rem; padding: .4rem .7rem; border: 1.5px solid var(--line); border-radius: 12px; font-size: 1.5rem; font-weight: 750; text-align: right; background: #fff; color: inherit; }
+.pay__how { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.pay__how button { min-height: 4.2rem; display: grid; gap: .1rem; justify-items: center; align-content: center; }
+.pay__how b { font-size: 1.2rem; }
+.pay__how small { font-size: .78rem; font-weight: 500; opacity: .75; }
+.pay__err { color: #b3261e; font-weight: 700; font-size: .92rem; }
+.pay__btns { display: flex; flex-wrap: wrap; gap: .5rem; }
+.pay__btns .primary { flex: 1 1 10rem; min-height: 3.4rem; background: #15140f; border-color: #15140f; color: #fff; font-size: 1.05rem; }
+.pay__note { font-size: .8rem; color: var(--muted); }
+
+.staff-toast { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: .9rem; max-width: calc(100vw - 2rem); padding: .75rem 1rem .75rem 1.1rem; border-radius: 14px; background: #15140f; color: #fff; font: 700 1rem/1.3 'Inter Variable', system-ui, sans-serif; box-shadow: 0 14px 40px rgb(0 0 0 / .3); animation: staff-toast .35s cubic-bezier(.34,1.56,.64,1) both; }
+.staff-toast button { flex: none; font: inherit; min-height: 2.4rem; padding: .3rem .9rem; border-radius: 10px; border: 1.5px solid rgb(255 255 255 / .5); background: none; color: #fff; cursor: pointer; }
+.staff-toast button:hover { border-color: #fff; }
+@keyframes staff-toast { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .pay[open], .staff-toast { animation: none; } }

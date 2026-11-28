@@ -21,7 +21,7 @@ const open = async (ctx, p, vp, tag) => {
   const page = await ctx.newPage();
   await page.setViewport(vp);
   page.on('pageerror', (e) => errs.push(`${tag}: ${e.message}`));
-  page.on('dialog', (d) => d.accept()); // "are you sure?" boxes
+  page.on('dialog', (d) => d.accept(d.type() === 'prompt' ? 'entered twice' : undefined)); // "are you sure?" and "why?" boxes
   await page.setRequestInterception(true);
   page.on('request', async (req) => {
     const u = new URL(req.url());
@@ -51,6 +51,8 @@ const waitText = async (pg, sel, re, ms = 20000) => {
   return false;
 };
 const signIn = async (pg, form) => { await setValue(pg, `${form} input[name=email]`, 'owner@test.local'); await setValue(pg, `${form} input[name=password]`, 'test-pass-1'); await submit(pg, form); };
+// The payment step: tap a service, tap Cash or Online, save.
+const pay = async (pg, svc, how) => { await pg.waitForSelector('dialog.pay[open]', { timeout: 6000 }); await tap(pg, `.pay [data-svc="${svc}"]`); await tap(pg, `.pay [data-pay="${how}"]`); await tap(pg, '.pay [data-save]'); };
 const joinAs = async (pg, name) => { await tap(pg, '[data-join]'); await setValue(pg, '#join-dialog input[name=name]', name); await submit(pg, '[data-join-form]'); };
 const shot = async (pg, name) => { await pg.bringToFront(); await sleep(700); await pg.screenshot({ path: path.join(OUT, `${name}.jpg`), type: 'jpeg', quality: 80 }); };
 const PHONE = { width: 390, height: 844, isMobile: true, hasTouch: true };
@@ -118,7 +120,23 @@ try {
   await tap(B, '[data-me="b1"]');
   ok(await waitText(B, '[data-chair]', /In your chair 1 Tom/), 'barber: picks their profile and sees number 1, Tom, in their chair', await txt(B, '[data-chair]'));
   await tap(B, '[data-finish]');
-  ok(await waitText(B, '[data-chair]', /Next for you 4/), 'barber: finishes, and number 4 is next for them', await txt(B, '[data-chair]'));
+  await B.waitForSelector('dialog.pay[open]', { timeout: 6000 });
+  await tap(B, '.pay [data-save]');
+  ok(/Tap what they had/.test(await txt(B, '.pay__err')), 'payment: will not save without a service or a price', await txt(B, '.pay__err'));
+  await tap(B, '.pay [data-svc="1"]');
+  await tap(B, '.pay [data-save]');
+  ok(/Tap Cash or Online/.test(await txt(B, '.pay__err')), 'payment: will not save until Cash or Online is chosen', await txt(B, '.pay__err'));
+  await tap(B, '.pay [data-pay="online"]');
+  await shot(B, 'p2-pay-phone');
+  await tap(B, '.pay [data-save]');
+  ok(await waitText(B, '[data-chair]', /Next for you 4/), 'barber: records a Skin Fade paid online, and number 4 is next for them', await txt(B, '[data-chair]'));
+  ok(await waitText(B, '.staff-toast', /Number 1 finished: £20 online/), 'barber: is shown "Number 1 finished: £20 online"', await txt(B, '.staff-toast'));
+  await tap(B, '.staff-toast button');
+  await B.waitForSelector('dialog.pay[open]', { timeout: 6000 });
+  ok(await B.$eval('.pay input[name=price]', (el) => el.value) === '20' && await B.$eval('.pay [data-svc="1"]', (el) => el.getAttribute('aria-pressed')) === 'true', 'payment: "Change" reopens the step with what was entered');
+  await tap(B, '.pay [data-pay="cash"]');
+  await tap(B, '.pay [data-save]');
+  ok(await waitText(B, '.staff-toast', /Number 1 finished: £20 cash/), 'barber: corrects a wrong tap from online to cash', await txt(B, '.staff-toast'));
   ok(/Your cuts today: 1/.test(await txt(B, '[data-chair]')), 'barber: their own count shows 1 cut today');
   await shot(B, 'p1-barber');
   await tap(B, '[data-call]');
@@ -129,6 +147,10 @@ try {
 
   // ---------- the desk seats the online customer ----------
   await tap(A, '[data-finish="b2"]');
+  await A.waitForSelector('dialog.pay[open]', { timeout: 6000 });
+  await shot(A, 'p2-pay-desk');
+  await pay(A, 0, 'cash');
+  ok(await waitText(A, '.staff-toast', /Number 2 finished: £17 cash/), 'desk: records a Gents Cut paid in cash', await txt(A, '.staff-toast'));
   await sleep(700);
   await tap(A, '[data-call="b2"]');
   ok(await waitText(D, '[data-ticket]', /It’s your turn, Sam! Chair 2 with Ali\./), 'customer: "It’s your turn, Sam! Chair 2 with Ali."', await txt(D, '[data-ticket]'));
@@ -139,7 +161,29 @@ try {
   ok(/Chair 2 · Ali 5 /.test(await txt(T, '[data-chairs]')) && /Nobody waiting/.test(await txt(T, '[data-line]')), 'tv: number 5 is in chair 2 and nobody is waiting', `${await txt(T, '[data-chairs]')} | ${await txt(T, '[data-line]')}`);
   await shot(A, 'p1-desk');
   await tap(A, '[data-finish="b2"]');
+  await pay(A, 1, 'online');
   ok(await waitText(D, '[data-ticket]', /All done, Sam/), 'customer: sees "All done" when the cut is finished', await txt(D, '[data-ticket]'));
+
+  // ---------- the owner's reports ----------
+  const R = await open(A.browserContext(), '/admin/reports/?emulator', LAPTOP, 'reports');
+  ok(await waitText(R, '#rp-status', /real figures/), 'reports: the owner opens the real figures', await txt(R, '#rp-status'));
+  ok(await waitText(R, '[data-tiles]', /Customers 3 Takings £57 Cash £37 Online £20/), 'reports: today shows 3 customers and £57, of which £37 cash and £20 online', await txt(R, '[data-tiles]'));
+  const perBarber = await txt(R, '[data-barbers]');
+  ok(/Ali Hampton Vale £37 2 customers/.test(perBarber) && /Barber 1 Hampton Vale £20 1 customer/.test(perBarber), 'reports: takings are listed for each barber', perBarber);
+  ok(/no percentage set/.test(perBarber), 'reports: says when a barber has no percentage yet');
+  ok(/corrected, was £20 online/.test(await txt(R, '[data-sales]')), 'reports: a corrected sale shows what it said before', (await txt(R, '[data-sales]')).slice(0, 200));
+  await setValue(R, '[data-pct="hampton-vale/b2"]', '40');
+  await tap(R, '[data-save-pct="hampton-vale/b2"]');
+  ok(await waitText(R, '[data-barbers]', /Ali Hampton Vale £37 2 customers Cash £17 Online £20 Barber’s share £14.80 Shop keeps £22.20 40% to the barber/), 'reports: on 40%, Ali’s share of £37 is £14.80 and the shop keeps £22.20', await txt(R, '[data-barbers]'));
+  ok(/Barbers’ share £14.80 Shop keeps £42.20/.test(await txt(R, '[data-tiles]')), 'reports: the totals show the barbers’ share and what the shop keeps', await txt(R, '[data-tiles]'));
+  await shot(R, 'p2-reports');
+  await tap(R, '[data-sales] li:nth-child(2) [data-void]');
+  ok(await waitText(R, '[data-tiles]', /Customers 2 Takings £40 1 cancelled sale left out/), 'reports: the owner cancels the £17 sale and the totals drop to £40', await txt(R, '[data-tiles]'));
+  ok(/cancelled: entered twice/.test(await txt(R, '[data-sales]')), 'reports: the cancelled sale stays on the record with its reason');
+  await tap(R, '[data-kind="week"]');
+  ok(await waitText(R, '[data-days]', /2 £20 £20 £40/), 'reports: the week view lists the day with its cash, online and total', await txt(R, '[data-days]'));
+  await R.reload({ waitUntil: 'load' });
+  ok(await waitText(R, '[data-tiles]', /Customers 2 Takings £40/) && /40% to the barber/.test(await txt(R, '[data-barbers]')), 'reports: the cancellation and the percentage are still there after reloading', await txt(R, '[data-tiles]'));
 
   // ---------- another customer joins, then leaves; then online joining is paused ----------
   const E = await open(await browser.createBrowserContext(), '/club/?emulator', PHONE, 'customer2');
@@ -171,6 +215,11 @@ try {
   await tap(AD, `[data-arrived="${await AD.$eval('[data-queue] li:last-child [data-arrived]', (el) => el.dataset.arrived)}"]`);
   ok(await waitText(CD, '[data-ticket]', /Checked in at Hampton Vale, Ava/), 'demo: the desk marks Ava as arrived and her tab shows it', (await txt(CD, '[data-ticket]')).slice(0, 70));
   await tap(AD, '[data-finish="b1"]');
+  await pay(AD, 3, 'online');
+  const RD = await open(demo, '/admin/reports/?emulator', LAPTOP, 'demo-reports');
+  ok(await waitText(RD, '#rp-status', /Example figures/), 'demo: the reports page shows example figures without signing in', await txt(RD, '#rp-status'));
+  ok(await waitText(RD, '[data-sales]', /No\. 24 · Wash & Cut/), 'demo: a sale recorded on this device appears in the report', (await txt(RD, '[data-sales]')).slice(0, 120));
+  ok(Number((await txt(RD, '[data-tiles]')).match(/Customers (\d+)/)?.[1]) > 20, 'demo: the example figures give the report something to show', (await txt(RD, '[data-tiles]')).slice(0, 80));
   await sleep(400);
   await tap(AD, '[data-queue] li:last-child [data-seat]');
   await sleep(400);

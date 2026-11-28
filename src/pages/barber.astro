@@ -1,12 +1,15 @@
 ---
 // The barber panel: each barber's own screen, made for a phone. Your chair, who is next,
 // call and finish with one tap, breaks and shifts, and your cuts today.
+import '../styles/staff.css';
 import Base from '../layouts/Base.astro';
-import { shops } from '../data/site';
+import { shops, menu } from '../data/site';
+import { penceOf } from '../lib/sales';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: penceOf(i.price) })));
 ---
 <Base noindex title="Hampton Barbers: barber panel" description="Each barber’s own screen: your chair, who is next, and your cuts today." themeColor="#f4f2ee">
-  <main id="main" class="bp" data-base={base} data-shops={JSON.stringify(shops.map((s) => ({ id: s.id, name: s.name })))}>
+  <main id="main" class="bp" data-base={base} data-shops={JSON.stringify(shops.map((s) => ({ id: s.id, name: s.name })))} data-services={JSON.stringify(services)}>
     <header class="bp__top">
       <div class="bp__who" data-who><b>Barber panel</b></div>
       <p id="bp-status" role="status" aria-live="polite">Loading…</p>
@@ -31,12 +34,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </Base>
 
 <script>
-  import { addWalkIn, barberLabel, boardView, callNext, clockText, finish, minsText, removeTicket, setBarber, uncall } from '../lib/board';
+  import { addWalkIn, barberLabel, boardView, callNext, clockText, minsText, removeTicket, setBarber, uncall } from '../lib/board';
   import { createDesk } from '../lib/desk';
+  import { finishAndPay, loadServices, type Service } from '../lib/paysheet';
   import { BARBER_KEY, esc, newId, read, write } from '../lib/store';
 
   const root = document.querySelector<HTMLElement>('.bp')!;
   const shops = JSON.parse(root.dataset.shops!) as { id: string; name: string }[];
+  let services = JSON.parse(root.dataset.services || '[]') as Service[];
+  loadServices(services).then((list) => { services = list; });
   const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
   const statusEl = $('#bp-status'), whoEl = $('[data-who]'), setupEl = $('[data-setup]'), chairEl = $('[data-chair]');
   const waitingEl = $('[data-waiting]'), queueEl = $('[data-queue]'), summaryEl = $('[data-summary]'), account = $('#bp-account');
@@ -53,12 +59,18 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   let accountMsg = '';
   let drawnFor: string | null | undefined;
 
-  const toast = (msg: string) => {
-    document.querySelector('.bp__toast')?.remove();
-    const t = Object.assign(document.createElement('p'), { className: 'bp__toast', textContent: msg });
+  const toast = (msg: string, action?: { label: string; run: () => void }) => {
+    document.querySelector('.staff-toast')?.remove();
+    const t = Object.assign(document.createElement('p'), { className: 'staff-toast' });
     t.setAttribute('role', 'status');
+    t.append(msg);
+    if (action) {
+      const b = Object.assign(document.createElement('button'), { type: 'button', textContent: action.label });
+      b.addEventListener('click', () => { t.remove(); action.run(); });
+      t.append(b);
+    }
     document.body.append(t);
-    setTimeout(() => t.remove(), 4000);
+    setTimeout(() => t.remove(), action ? 12_000 : 4500);
   };
 
   const desk = createDesk(shops.map((s) => s.id), () => draw());
@@ -111,7 +123,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       const nm = desk.name(me.shop, mine.tid!);
       html = `<p class="bp__label">In your chair</p><p class="bp__num">${mine.n}</p>
         <p class="bp__sub">${nm ? `${esc(nm)} · ` : ''}${mine.calling ? 'called just now' : `${mine.mins} min so far`}</p>
-        <div class="bp__btns"><button type="button" class="primary big" data-finish>Finish</button><button type="button" data-noshow="${mine.tid}">Didn’t come</button><button type="button" data-uncall="${mine.tid}">Undo call</button></div>`;
+        <div class="bp__btns"><button type="button" class="primary big" data-finish>Finish and take payment</button><button type="button" data-noshow="${mine.tid}">Didn’t come</button><button type="button" data-uncall="${mine.tid}">Undo call</button></div>`;
     } else if (s.brk) {
       html = `<p class="bp__state">On a break</p><p class="bp__sub">Customers are not sent to your chair.</p>
         <div class="bp__btns"><button type="button" class="primary big" data-brk="off">Back from my break</button></div>`;
@@ -147,7 +159,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     else if ('switch' in d) setMe({ shop, id: '' });
     else if ('call' in d) desk.act(shop, (b, now) => callNext(b, id, now));
     else if (d.callId) desk.act(shop, (b, now) => callNext(b, id, now, d.callId));
-    else if ('finish' in d) desk.act(shop, (b, now) => finish(b, id, now));
+    else if ('finish' in d) finishAndPay(desk, shop, id, services, toast);
     else if (d.uncall) desk.act(shop, (b, now) => uncall(b, d.uncall!, now));
     else if (d.noshow) { if (confirm('Remove this customer from the queue because they didn’t come?')) desk.act(shop, (b, now) => removeTicket(b, d.noshow!, now)); }
     else if (d.brk) desk.act(shop, (b, now) => setBarber(b, id, { brk: d.brk === 'on' }, now));
@@ -227,5 +239,4 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .bp__hint { font-size: .85rem; color: var(--muted); }
   .bp__msg { color: #8a4b00; font-weight: 600; margin-top: .5rem; }
   .bp__links { font-size: .9rem; text-align: center; color: var(--muted); }
-  .bp__toast { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 80; max-width: calc(100vw - 2rem); padding: .8rem 1.1rem; border-radius: 12px; background: #15140f; color: #fff; font-weight: 700; box-shadow: 0 14px 40px rgb(0 0 0 / .3); }
 </style>

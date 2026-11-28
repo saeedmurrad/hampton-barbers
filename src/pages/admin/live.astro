@@ -1,15 +1,18 @@
 ---
 // The queue desk: the shop's own screen for running the queue. Add walk-ins, mark online
 // customers as arrived, call people to a chair, finish cuts, and manage barbers and settings.
+import '../../styles/staff.css';
 import Base from '../../layouts/Base.astro';
-import { shops } from '../../data/site';
+import { shops, menu } from '../../data/site';
+import { penceOf } from '../../lib/sales';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: penceOf(i.price) })));
 ---
 <Base noindex title="Hampton Barbers: queue desk" description="Run the walk-in queue: add walk-ins, call customers to a chair and keep the shop screen up to date.">
-  <main id="main" class="qd" data-base={base}>
+  <main id="main" class="qd" data-base={base} data-services={JSON.stringify(services)}>
     <header class="qd__top">
       <div>
-        <a class="qd__back" href={`${base}/admin/`}>← Prices and hours</a>
+        <p class="qd__back"><a href={`${base}/admin/`}>← Prices and hours</a><a href={`${base}/admin/reports/`}>Takings and reports →</a></p>
         <h1>Queue desk</h1>
       </div>
       <p id="qd-status" role="status" aria-live="polite">Loading…</p>
@@ -87,11 +90,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </Base>
 
 <script>
-  import { addWalkIn, arrive, boardView, callNext, clearQueue, clockText, dropBarber, exampleBoard, finish, lapsed, minsText, removeTicket, setBarber, setOptions, uncall, type LiveMode } from '../../lib/board';
+  import { addWalkIn, arrive, boardView, callNext, clearQueue, clockText, dropBarber, exampleBoard, lapsed, minsText, removeTicket, setBarber, setOptions, uncall, type LiveMode } from '../../lib/board';
   import { createDesk } from '../../lib/desk';
+  import { finishAndPay, loadServices, type Service } from '../../lib/paysheet';
   import { esc, newId } from '../../lib/store';
 
   const root = document.querySelector<HTMLElement>('.qd')!;
+  let services = JSON.parse(root.dataset.services || '[]') as Service[];
+  loadServices(services).then((list) => { services = list; });
   const base = root.dataset.base ?? '';
   const emu = new URLSearchParams(location.search).has('emulator');
   const tabs = [...document.querySelectorAll<HTMLElement>('[data-tab]')];
@@ -108,12 +114,18 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   let drawnFor: string | null | undefined;
   const known: Record<string, Set<string>> = {}; // tickets already seen, so new online joiners can be announced
 
-  const toast = (msg: string) => {
-    document.querySelector('.qd__toast')?.remove();
-    const t = Object.assign(document.createElement('p'), { className: 'qd__toast', textContent: msg });
+  const toast = (msg: string, action?: { label: string; run: () => void }) => {
+    document.querySelector('.staff-toast')?.remove();
+    const t = Object.assign(document.createElement('p'), { className: 'staff-toast' });
     t.setAttribute('role', 'status');
+    t.append(msg);
+    if (action) {
+      const b = Object.assign(document.createElement('button'), { type: 'button', textContent: action.label });
+      b.addEventListener('click', () => { t.remove(); action.run(); });
+      t.append(b);
+    }
     document.body.append(t);
-    setTimeout(() => t.remove(), 4500);
+    setTimeout(() => t.remove(), action ? 12_000 : 4500);
   };
 
   const desk = createDesk(shops.map((s) => s.id), () => draw());
@@ -218,7 +230,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     const d = t.dataset;
     if (d.tab) { tab = d.tab; draw(); }
     else if (d.call) desk.act(tab, (b, now) => callNext(b, d.call!, now));
-    else if (d.finish) desk.act(tab, (b, now) => finish(b, d.finish!, now));
+    else if (d.finish) finishAndPay(desk, tab, d.finish, services, toast);
     else if (d.uncall) desk.act(tab, (b, now) => uncall(b, d.uncall!, now));
     else if (d.brkOn) desk.act(tab, (b, now) => setBarber(b, d.brkOn!, { brk: true }, now));
     else if (d.brkOff) desk.act(tab, (b, now) => setBarber(b, d.brkOff!, { brk: false }, now));
@@ -279,7 +291,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .qd { --bg: #f4f2ee; --surface: #fff; --text: #15140f; --muted: #57534a; --accent: #15140f; --on-accent: #fff; --line: #d9d4c8; --ok: #1f8a4c; --warn: #b4690e; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; background: #f4f2ee; color: #15140f; min-height: 100svh; padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 3rem) 5rem; }
   .qd > * { max-width: 76rem; margin-inline: auto; }
   .qd__top { display: flex; justify-content: space-between; align-items: end; gap: .5rem 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; background: #f4f2ee; padding-block: .75rem; border-bottom: 1px solid var(--line); }
-  .qd__back { font-size: .9rem; color: var(--muted); }
+  .qd__back { display: flex; flex-wrap: wrap; gap: .2rem 1.2rem; font-size: .9rem; color: var(--muted); }
   .qd h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.8rem); letter-spacing: -.04em; margin-top: .3rem; }
   .qd h2 { font-family: var(--display); font-weight: 750; font-size: 1.35rem; letter-spacing: -.02em; }
   .qd h3 { font-family: inherit; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: .6rem; }
@@ -356,9 +368,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .qd__field { display: grid; gap: .35rem; font-weight: 650; font-size: .9rem; }
   .qd__row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .7rem; font-size: .9rem; }
   .qd__row[hidden] { display: none; }
-  .qd__toast { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 80; max-width: calc(100vw - 2rem); padding: .8rem 1.1rem; border-radius: 12px; background: #15140f; color: #fff; font-weight: 700; box-shadow: 0 14px 40px rgb(0 0 0 / .3); animation: qd-toast .35s cubic-bezier(.34,1.56,.64,1) both; }
-  @keyframes qd-toast { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
   @media (max-width: 900px) { .qd__grid, .qd__set { grid-template-columns: 1fr; } }
   @media (max-width: 520px) { .qd__line li { grid-template-columns: 2.6rem minmax(0, 1fr) auto; } .qd__add { flex-wrap: wrap; } .qd__add button { flex: 1 1 100%; } }
-  @media (prefers-reduced-motion: reduce) { .qd__chairs li.calling, .qd__toast { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .qd__chairs li.calling { animation: none; } }
 </style>

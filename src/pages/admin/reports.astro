@@ -1,0 +1,381 @@
+---
+// The owner's reports: takings by day, week or month, for each barber and each shop, split
+// into cash and online, with each barber's percentage worked out. Only the owner's login can
+// open the real figures. Without a sign-in the page shows example figures for the demo.
+import Base from '../../layouts/Base.astro';
+import { shops, menu } from '../../data/site';
+import { penceOf } from '../../lib/sales';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: penceOf(i.price) })));
+---
+<Base noindex title="Hampton Barbers: takings and reports" description="Takings by day, week and month for each barber and shop, split into cash and online.">
+  <main id="main" class="rp" data-shops={JSON.stringify(shops.map((s) => ({ id: s.id, name: s.name })))} data-services={JSON.stringify(services)}>
+    <header class="rp__top">
+      <div>
+        <p class="rp__back"><a href={`${base}/admin/live/`}>← Queue desk</a></p>
+        <h1>Takings and reports</h1>
+      </div>
+      <p id="rp-status" role="status" aria-live="polite">Loading…</p>
+    </header>
+
+    <section class="rp__acct" id="rp-account" aria-label="Your account"></section>
+
+    <div data-body hidden>
+      <div class="rp__bar">
+        <div class="rp__seg" role="group" aria-label="Period">
+          <button type="button" data-kind="day" aria-pressed="true">Day</button>
+          <button type="button" data-kind="week" aria-pressed="false">Week</button>
+          <button type="button" data-kind="month" aria-pressed="false">Month</button>
+        </div>
+        <div class="rp__nav">
+          <button type="button" data-step="-1" aria-label="Earlier">‹</button>
+          <b data-label></b>
+          <button type="button" data-step="1" aria-label="Later">›</button>
+          <button type="button" data-today>Today</button>
+        </div>
+        <label class="rp__shop"><span class="sr">Shop</span>
+          <select id="rp-shop">
+            <option value="">All shops</option>
+            {shops.map((s) => <option value={s.id}>{s.name}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <dl class="rp__tiles" data-tiles></dl>
+
+      <section class="rp__card">
+        <div class="rp__head"><h2>By barber</h2><p>Each barber’s share is their percentage of what their customers paid.</p></div>
+        <div class="rp__barbers" data-barbers></div>
+      </section>
+
+      <section class="rp__card" data-days-card>
+        <div class="rp__head"><h2>Day by day</h2></div>
+        <table class="rp__table"><thead><tr><th>Day</th><th>Customers</th><th>Cash</th><th>Online</th><th>Takings</th></tr></thead><tbody data-days></tbody></table>
+      </section>
+
+      <section class="rp__card">
+        <div class="rp__head"><h2>What sold</h2></div>
+        <ul class="rp__svcs" data-svcs></ul>
+      </section>
+
+      <section class="rp__card">
+        <div class="rp__head"><h2>Every sale</h2><div class="rp__tools"><button type="button" data-csv>Download spreadsheet</button><button type="button" data-print>Print</button></div></div>
+        <ol class="rp__sales" data-sales></ol>
+      </section>
+
+      <section class="rp__card rp__paycard">
+        <div class="rp__head"><h2>Barbers’ percentages</h2><p>The share of each cut that goes to the barber. A change applies from today; earlier days keep the percentage they had.</p></div>
+        <div data-pay></div>
+      </section>
+    </div>
+  </main>
+</Base>
+
+<script>
+  import { barberLabel, londonDay, type Board } from '../../lib/board';
+  import { dayLabel, exampleSales, money, pctFor, period, setPct, shiftPeriod, summarize, toCsv, type PayRules, type PeriodKind, type Sale } from '../../lib/sales';
+  import { CONNECTED, esc, fetchBoards, localPay, localSales, onDeviceChange, pickBoard, saveLocalPay, saveLocalSale } from '../../lib/store';
+  import * as cloud from '../../lib/cloud';
+
+  const root = document.querySelector<HTMLElement>('.rp')!;
+  const shops = JSON.parse(root.dataset.shops!) as { id: string; name: string }[];
+  const services = JSON.parse(root.dataset.services || '[]') as { name: string; price: number }[];
+  const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+  const statusEl = $('#rp-status'), account = $('#rp-account'), body = $('[data-body]');
+  const fill = (el: HTMLElement, html: string) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
+  const shopName = (id: string) => shops.find((s) => s.id === id)?.name ?? id;
+  const clock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: 'numeric', minute: '2-digit', hour12: true });
+  const EXAMPLE_PCT = [50, 45, 40, 45, 50, 40];
+  const MAX_ROWS = 150;
+
+  let kind: PeriodKind = 'day';
+  let anchor = londonDay(Date.now());
+  let shop = '';
+  let email: string | null = null;
+  let owner: boolean | null = null; // null while it is being checked
+  let accountMsg = '';
+  let boards: Record<string, Board> = {};
+  let sales: Sale[] = [];
+  let rules: Record<string, PayRules> = {};
+  let loaded = '';   // which period and shops `sales` holds
+  let loadSeq = 0;
+  let shown: Sale[] = [];
+  const real = () => Boolean(email && owner);
+  const picked = () => (shop ? [shop] : shops.map((s) => s.id));
+  const staffOf = (id: string) => Object.entries(pickBoard(id, boards[id]).board.staff).sort((x, y) => x[1].chair - y[1].chair).map(([bid, s]) => ({ id: bid, label: barberLabel(s), chair: s.chair }));
+
+  // ---------- loading ----------
+  const load = async () => {
+    const p = period(kind, anchor);
+    const key = `${real()}|${p.from}|${p.to}|${picked().join()}`;
+    const seq = ++loadSeq;
+    if (real()) {
+      if (key !== loaded) { statusEl.textContent = 'Loading the figures…'; }
+      try {
+        const got = await Promise.all(picked().map(async (id) => ({ id, sales: await cloud.loadSales(id, p.from, p.to), rules: await cloud.loadPay(id) })));
+        if (seq !== loadSeq) return;
+        sales = got.flatMap((g) => g.sales);
+        rules = Object.fromEntries(got.map((g) => [g.id, g.rules]));
+        statusEl.textContent = 'The shop’s real figures. Only the owner’s login can see this page.';
+      } catch {
+        if (seq !== loadSeq) return;
+        sales = [];
+        statusEl.textContent = 'Could not load the figures. Check the internet connection and try again.';
+      }
+    } else {
+      // Demo: example figures, plus anything recorded on this device.
+      const now = Date.now(), today = londonDay(now);
+      sales = picked().flatMap((id) => [...exampleSales(id, staffOf(id), services, now, today), ...localSales(id)]).filter((s) => s.day >= p.from && s.day <= p.to);
+      rules = Object.fromEntries(picked().map((id) => [id, localPay(id) ?? Object.fromEntries(staffOf(id).map((b, i) => [b.id, [{ from: '2000-01-01', pct: EXAMPLE_PCT[i % EXAMPLE_PCT.length] }]]))]));
+      statusEl.textContent = 'Example figures for this demo, plus anything recorded on this device.';
+    }
+    loaded = key;
+    draw();
+  };
+
+  // ---------- drawing ----------
+  const drawAccount = () => {
+    const note = accountMsg ? `<p class="rp__msg" role="alert">${esc(accountMsg)}</p>` : '';
+    accountMsg = '';
+    let html: string;
+    if (!CONNECTED) html = '<p><strong>Not connected.</strong> Showing example figures.</p>';
+    else if (!email) html = `<form id="rp-signin" class="rp__signin"><b>Sign in as the owner to see the real takings</b>
+        <input type="email" name="email" autocomplete="username" placeholder="Email" required />
+        <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
+        <button type="submit" class="primary">Sign in</button></form>${note}
+        <p class="rp__hint">Until then, this page shows example figures so you can see how the reports work.</p>`;
+    else if (owner === false) html = `<p><strong>These reports are for the owner only.</strong> You are signed in as ${esc(email)}, which can run the queue and record sales but cannot see the takings. On a new site, the first login to save a change on the queue desk becomes the owner. <button type="button" class="link" data-out>Sign out</button></p>${note}`;
+    else html = `<p>Signed in as <strong>${esc(email)}</strong>, the owner. <button type="button" class="link" data-out>Sign out</button></p>${note}`;
+    fill(account, html);
+  };
+
+  const tile = (label: string, value: string, sub = '') => `<div><dt>${label}</dt><dd>${value}</dd>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const avg = (sum: number, n: number) => (n ? `${Math.round(sum / n)} min` : '—');
+  const pctText = (p: number | null | 'mixed') => (p === null ? 'no percentage set' : p === 'mixed' ? 'percentage changed in this period' : `${p}% to the barber`);
+
+  const draw = () => {
+    drawAccount();
+    const blocked = Boolean(email) && owner !== true;
+    body.hidden = blocked;
+    if (blocked) { statusEl.textContent = owner === null ? 'Checking this login…' : 'This login cannot open the reports.'; return; }
+    const p = period(kind, anchor);
+    root.querySelectorAll<HTMLElement>('[data-kind]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === kind)));
+    $('[data-label]').textContent = p.label;
+    $<HTMLButtonElement>('[data-step="1"]').disabled = shiftPeriod(kind, p.from, 1) > londonDay(Date.now());
+
+    const rep = summarize(sales, rules);
+    const a = rep.all;
+    fill($('[data-tiles]'), [
+      tile('Customers', String(a.count), rep.free ? `${rep.free} at no charge` : ''),
+      tile('Takings', money(a.total), rep.voided ? `${rep.voided} cancelled sale${rep.voided > 1 ? 's' : ''} left out` : ''),
+      tile('Cash', money(a.cash)),
+      tile('Online', money(a.online)),
+      tile('Barbers’ share', money(a.barber)),
+      tile('Shop keeps', money(a.shop)),
+      tile('Average wait', avg(a.wait, a.count)),
+      tile('Average cut', avg(a.mins, a.count)),
+    ].join(''));
+
+    fill($('[data-barbers]'), rep.byBarber.map((r) => `<article>
+        <h3>${esc(r.label)}${shop ? '' : ` <small>${esc(shopName(r.key.split('/')[0]))}</small>`}</h3>
+        <p class="big">${money(r.total)}<small>${r.count} customer${r.count === 1 ? '' : 's'}</small></p>
+        <dl>
+          <div><dt>Cash</dt><dd>${money(r.cash)}</dd></div>
+          <div><dt>Online</dt><dd>${money(r.online)}</dd></div>
+          <div class="share"><dt>Barber’s share</dt><dd>${money(r.barber)}</dd></div>
+          <div><dt>Shop keeps</dt><dd>${money(r.shop)}</dd></div>
+        </dl>
+        <p class="note">${pctText(r.pct)} · average cut ${avg(r.mins, r.count)}</p>
+      </article>`).join('') || '<p class="rp__none">No sales in this period.</p>');
+
+    $('[data-days-card]').hidden = kind === 'day';
+    const top = Math.max(1, ...rep.byDay.map((d) => d.total));
+    fill($('[data-days]'), rep.byDay.map((d) => `<tr><th>${esc(d.label)}</th><td>${d.count}</td><td>${money(d.cash)}</td><td>${money(d.online)}</td><td class="bar"><i style="width:${Math.round(d.total / top * 100)}%"></i><b>${money(d.total)}</b></td></tr>`).join('') || '<tr><td colspan="5" class="rp__none">No sales in this period.</td></tr>');
+
+    fill($('[data-svcs]'), rep.byService.slice(0, 12).map((s) => `<li><b>${esc(s.name)}</b><span>${s.count}</span><span>${money(s.total)}</span></li>`).join('') || '<li class="rp__none">No sales in this period.</li>');
+
+    shown = [...sales].sort((x, y) => y.at - x.at);
+    fill($('[data-sales]'), shown.slice(0, MAX_ROWS).map((s) => `<li class="${s.void ? 'void' : ''}">
+        <span class="when">${kind === 'day' ? '' : `${esc(dayLabel(s.day))} `}${clock.format(s.at).replace(/\s/g, ' ').toLowerCase()}</span>
+        <span class="what"><b>No. ${s.n} · ${esc(s.svc)}</b><small>${esc(s.bn)}${shop ? '' : ` · ${esc(shopName(s.shop))}`}${s.was ? ` · corrected, was ${money(s.was.price)} ${s.was.pay}` : ''}${s.void ? ` · cancelled: ${esc(s.void.why)}` : ''}</small></span>
+        <span class="pay pay--${s.pay}">${s.pay === 'none' ? 'No charge' : s.pay === 'cash' ? 'Cash' : 'Online'}</span>
+        <span class="amt">${money(s.price)}</span>
+        ${s.void || s.id.startsWith('ex-') ? '<span></span>' : `<button type="button" data-void="${esc(s.id)}" aria-label="Cancel the sale for number ${s.n}">Cancel</button>`}
+      </li>`).join('') + (shown.length > MAX_ROWS ? `<li class="more">Showing the latest ${MAX_ROWS} of ${shown.length}. The spreadsheet has them all.</li>` : '') || '<li class="rp__none">No sales in this period.</li>');
+
+    if (!root.querySelector('[data-pay]')!.contains(document.activeElement)) {
+      const today = londonDay(Date.now());
+      fill($('[data-pay]'), picked().map((id) => `<div class="rp__payshop"><h3>${esc(shopName(id))}</h3><ul>${staffOf(id).map((b) => {
+        const cur = pctFor(rules[id], b.id, today);
+        return `<li><span><b>${esc(b.label)}</b><small>Chair ${b.chair} · ${cur === null ? 'not set yet' : `${cur}% to the barber, ${100 - cur}% to the shop`}</small></span>
+          <label><input type="number" min="0" max="100" step="1" inputmode="numeric" value="${cur ?? ''}" placeholder="0" data-pct="${id}/${b.id}" aria-label="Percentage for ${esc(b.label)}" /><i>%</i></label>
+          <button type="button" data-save-pct="${id}/${b.id}">Save</button></li>`;
+      }).join('') || '<li class="rp__none">No barbers at this shop yet. Add them on the queue desk.</li>'}</ul></div>`).join(''));
+    }
+  };
+
+  // ---------- actions ----------
+  const savePct = async (ref: string) => {
+    const [id, b] = ref.split('/');
+    const input = root.querySelector<HTMLInputElement>(`[data-pct="${ref}"]`)!;
+    const pct = Math.round(Number(input.value));
+    if (input.value.trim() === '' || !Number.isFinite(pct) || pct < 0 || pct > 100) { statusEl.textContent = 'Enter a percentage from 0 to 100.'; return; }
+    const next = setPct(rules[id] ?? {}, b, londonDay(Date.now()), pct);
+    try {
+      if (real()) await cloud.savePay(id, next); else saveLocalPay(id, next);
+      rules = { ...rules, [id]: next };
+      (document.activeElement as HTMLElement | null)?.blur();
+      draw();
+      statusEl.textContent = `Saved: ${pct}% from today.`;
+    } catch { statusEl.textContent = 'Could not save the percentage. Check the internet connection and try again.'; }
+  };
+  const cancelSale = async (id: string) => {
+    const s = sales.find((x) => x.id === id);
+    if (!s) return;
+    const why = prompt(`Cancel the sale for number ${s.n} (${money(s.price)})? It stays on the record but is left out of the totals.\n\nReason:`);
+    if (why === null) return;
+    const mark = { at: Date.now(), why: why.trim().slice(0, 120) || 'No reason given' };
+    try {
+      if (real()) await cloud.changeSale(s.shop, s.id, { void: mark }); else saveLocalSale({ ...s, void: mark });
+      sales = sales.map((x) => (x.id === id ? { ...x, void: mark } : x));
+      draw();
+      statusEl.textContent = 'Sale cancelled. It is kept on the record.';
+    } catch { statusEl.textContent = 'Could not cancel the sale. Check the internet connection and try again.'; }
+  };
+  const download = () => {
+    const p = period(kind, anchor);
+    const url = URL.createObjectURL(new Blob([`﻿${toCsv(shown, rules, shopName)}`], { type: 'text/csv;charset=utf-8' }));
+    Object.assign(document.createElement('a'), { href: url, download: `hampton-barbers-sales-${p.from}${p.to === p.from ? '' : `-to-${p.to}`}.csv` }).click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  root.addEventListener('click', (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>('button');
+    if (!t) return;
+    const d = t.dataset;
+    if (d.kind) { kind = d.kind as PeriodKind; load(); }
+    else if (d.step) { anchor = shiftPeriod(kind, period(kind, anchor).from, Number(d.step)); load(); }
+    else if ('today' in d) { anchor = londonDay(Date.now()); load(); }
+    else if (d.savePct) savePct(d.savePct);
+    else if (d.void) cancelSale(d.void);
+    else if ('csv' in d) download();
+    else if ('print' in d) print();
+    else if ('out' in d) cloud.staffSignOut();
+  });
+  $<HTMLSelectElement>('#rp-shop').addEventListener('change', (e) => { shop = (e.target as HTMLSelectElement).value; load(); });
+  account.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target as HTMLFormElement);
+    try { await cloud.staffSignIn(String(f.get('email')).trim(), String(f.get('password'))); }
+    catch { accountMsg = 'The email or password is not right.'; draw(); }
+  });
+
+  // ---------- start ----------
+  draw();
+  fetchBoards().then((got) => { if (got) { boards = got; load(); } });
+  if (CONNECTED) cloud.onStaff(async (e) => {
+    email = e;
+    owner = e ? null : false;
+    draw();
+    if (e) owner = await cloud.amOwner();
+    load();
+  });
+  else load();
+  onDeviceChange(() => { if (!real()) load(); });
+</script>
+
+<style is:global>
+  .rp { --bg: #f4f2ee; --text: #15140f; --muted: #57534a; --accent: #15140f; --on-accent: #fff; --line: #d9d4c8; --ok: #1f8a4c; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; background: #f4f2ee; color: #15140f; min-height: 100svh; padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 3rem) 5rem; }
+  .rp > *, .rp [data-body] > * { max-width: 70rem; margin-inline: auto; }
+  .rp__top { display: flex; justify-content: space-between; align-items: end; gap: .5rem 1rem; flex-wrap: wrap; padding-block: .75rem; border-bottom: 1px solid var(--line); }
+  .rp__back { font-size: .9rem; color: var(--muted); }
+  .rp h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.8rem); letter-spacing: -.04em; margin-top: .3rem; }
+  .rp h2 { font-family: var(--display); font-weight: 750; font-size: 1.35rem; letter-spacing: -.02em; }
+  .rp h3 { font-family: var(--display); font-weight: 750; font-size: 1.15rem; letter-spacing: -.02em; }
+  #rp-status { font-weight: 700; font-size: .9rem; color: var(--ok); max-width: 28rem; }
+  .rp button, .rp input, .rp select { font: inherit; }
+  .rp button { min-height: 2.8rem; padding: .45rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; font-weight: 650; cursor: pointer; }
+  .rp button:hover:not(:disabled) { border-color: #15140f; }
+  .rp button:disabled { opacity: .35; cursor: default; }
+  .rp .primary { background: #15140f; color: #fff; border-color: #15140f; }
+  .rp .link { border: 0; background: none; text-decoration: underline; min-height: auto; padding: 0 .25rem; }
+  .rp input, .rp select { min-height: 2.8rem; padding: .45rem .7rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; min-width: 0; }
+  .rp__acct { margin-top: 1rem; padding: 1rem 1.1rem; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .rp__signin { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  .rp__signin b { width: 100%; }
+  .rp__signin input { flex: 1 1 12rem; }
+  .rp__hint { font-size: .85rem; color: var(--muted); margin-top: .5rem; }
+  .rp__msg { color: #8a4b00; font-weight: 600; margin-top: .5rem; }
+  .rp__bar { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin-block: 1.25rem 1rem; }
+  .rp__seg { display: inline-flex; padding: .2rem; border-radius: 12px; background: #e7e3da; }
+  .rp__seg button { border: 0; background: none; min-height: 2.5rem; border-radius: 9px; }
+  .rp__seg button[aria-pressed='true'] { background: #15140f; color: #fff; }
+  .rp__nav { display: flex; align-items: center; gap: .4rem; flex: 1 1 18rem; }
+  .rp__nav b { font-family: var(--display); font-size: 1.15rem; letter-spacing: -.02em; padding-inline: .4rem; text-align: center; flex: 0 1 auto; }
+  .rp__nav button[data-step] { width: 2.8rem; padding: 0; font-size: 1.4rem; line-height: 1; }
+  .rp__tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: .6rem; margin: 0 auto 1rem; }
+  .rp__tiles div { padding: .9rem 1rem; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .rp__tiles dt { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .rp__tiles dd { margin: .25rem 0 0; font-family: var(--display); font-weight: 800; font-size: clamp(1.5rem, 4vw, 2.1rem); letter-spacing: -.03em; line-height: 1; }
+  .rp__tiles small { display: block; margin-top: .3rem; font-size: .78rem; color: var(--muted); }
+  .rp__card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 1.1rem 1.2rem 1.25rem; margin-bottom: 1rem; }
+  .rp__card[hidden] { display: none; }
+  .rp__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .3rem 1rem; margin-bottom: .9rem; }
+  .rp__head p { font-size: .85rem; color: var(--muted); max-width: 40rem; }
+  .rp__tools { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .rp__none { color: var(--muted); padding: .3rem 0; }
+  .rp__barbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .7rem; }
+  .rp__barbers article { padding: 1rem 1.05rem; border-radius: 14px; background: #f7f4ee; }
+  .rp__barbers h3 small { font-family: 'Inter Variable', system-ui, sans-serif; font-size: .78rem; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+  .rp__barbers .big { display: flex; align-items: baseline; gap: .6rem; margin-block: .35rem .6rem; font-family: var(--display); font-weight: 800; font-size: 2rem; letter-spacing: -.03em; line-height: 1; }
+  .rp__barbers .big small { font-family: 'Inter Variable', system-ui, sans-serif; font-size: .82rem; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+  .rp__barbers dl { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem .8rem; margin: 0; }
+  .rp__barbers dt { font-size: .72rem; font-weight: 700; color: var(--muted); }
+  .rp__barbers dd { margin: 0; font-weight: 750; }
+  .rp__barbers .share dd { color: var(--ok); }
+  .rp__barbers .note { margin-top: .6rem; font-size: .8rem; color: var(--muted); }
+  .rp__table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .rp__table th, .rp__table td { text-align: right; padding: .5rem .4rem; border-bottom: 1px solid #ece8df; font-weight: 500; }
+  .rp__table th:first-child { text-align: left; white-space: nowrap; }
+  .rp__table thead th { font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .rp__table .bar { position: relative; min-width: 6.5rem; }
+  .rp__table .bar i { position: absolute; right: 0; top: 18%; bottom: 18%; border-radius: 6px; background: #dfeee4; }
+  .rp__table .bar b { position: relative; font-weight: 750; }
+  .rp__svcs { display: grid; gap: .1rem; }
+  .rp__svcs li { display: grid; grid-template-columns: minmax(0, 1fr) 3rem 5rem; gap: .6rem; padding: .45rem 0; border-bottom: 1px solid #ece8df; font-variant-numeric: tabular-nums; }
+  .rp__svcs span { text-align: right; }
+  .rp__svcs b { font-weight: 600; }
+  .rp__sales { display: grid; gap: .35rem; }
+  .rp__sales li { display: grid; grid-template-columns: 6.2rem minmax(0, 1fr) auto 4.6rem 5.2rem; align-items: center; gap: .3rem .7rem; padding: .5rem .7rem; border-radius: 10px; background: #f7f4ee; font-variant-numeric: tabular-nums; }
+  .rp__sales .when { font-size: .82rem; color: var(--muted); }
+  .rp__sales .what { display: grid; min-width: 0; }
+  .rp__sales .what small { font-size: .8rem; color: var(--muted); }
+  .rp__sales .pay { font-size: .75rem; font-weight: 800; padding: .25rem .55rem; border-radius: 999px; background: #e3ecf7; color: #1d4f91; white-space: nowrap; }
+  .rp__sales .pay--cash { background: #e2f1e6; color: #1f6b3e; }
+  .rp__sales .pay--none { background: #ece8df; color: var(--muted); }
+  .rp__sales .amt { text-align: right; font-weight: 750; }
+  .rp__sales button { min-height: 2.2rem; padding: .2rem .6rem; font-size: .8rem; }
+  .rp__sales li.void { opacity: .6; }
+  .rp__sales li.void .what b, .rp__sales li.void .amt { text-decoration: line-through; }
+  .rp__sales li.more, .rp__sales li.rp__none { display: block; background: none; font-size: .85rem; color: var(--muted); }
+  .rp__payshop + .rp__payshop { margin-top: 1.1rem; }
+  .rp__payshop ul { display: grid; gap: .45rem; margin-top: .5rem; }
+  .rp__payshop li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; padding: .6rem .8rem; border-radius: 12px; background: #f7f4ee; }
+  .rp__payshop li > span { display: grid; flex: 1 1 12rem; }
+  .rp__payshop small { font-size: .8rem; color: var(--muted); }
+  .rp__payshop label { display: flex; align-items: center; gap: .3rem; font-weight: 700; }
+  .rp__payshop input { width: 5rem; text-align: right; font-weight: 700; }
+  .rp__payshop i { font-style: normal; }
+  @media (max-width: 640px) {
+    .rp__sales li { grid-template-columns: minmax(0, 1fr) auto auto; }
+    .rp__sales .when { grid-column: 1 / -1; }
+    .rp__sales button { grid-column: 1 / -1; justify-self: start; }
+    .rp__table th, .rp__table td { padding-inline: .2rem; font-size: .88rem; }
+    .rp__table .bar { min-width: 4.6rem; }
+  }
+  @media print {
+    .rp { background: #fff; padding: 0; }
+    .rp__acct, .rp__bar .rp__seg, .rp__nav button, .rp__shop, .rp__tools, .rp__sales button, .rp__paycard, .skip, .rp__back { display: none !important; }
+    .rp__card, .rp__tiles div { break-inside: avoid; border-color: #bbb; }
+  }
+</style>

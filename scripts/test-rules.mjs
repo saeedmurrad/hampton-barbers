@@ -15,6 +15,7 @@ const enc = (v) => v === null ? { nullValue: null }
   : typeof v === 'boolean' ? { booleanValue: v }
   : typeof v === 'number' ? (Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v })
   : typeof v === 'string' ? { stringValue: v }
+  : Array.isArray(v) ? { arrayValue: { values: v.map(enc) } }
   : { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, enc(x)])) } };
 const call = async (method, url, body, token) => {
   const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
@@ -29,6 +30,8 @@ const signUp = async (email) => {
 const put = (who, path, data) => call('POST', `${DOCS}:commit`, { writes: [{ update: { name: NAME(path), fields: enc(data).mapValue.fields } }] }, who?.token);
 // Sends only the listed fields, as the website does. A listed field missing from `data` is removed.
 const patch = (who, path, data, mask) => call('POST', `${DOCS}:commit`, { writes: [{ update: { name: NAME(path), fields: enc(data).mapValue.fields }, updateMask: { fieldPaths: mask }, currentDocument: { exists: true } }] }, who?.token);
+// Saves a sale the way the website does: the server stamps its own time on it.
+const putSale = (who, path, data) => call('POST', `${DOCS}:commit`, { writes: [{ update: { name: NAME(path), fields: enc(data).mapValue.fields }, updateTransforms: [{ fieldPath: 'ts', setToServerValue: 'REQUEST_TIME' }] }] }, who?.token);
 const get = (who, path) => call('GET', `${DOCS}/${path}`, undefined, who?.token);
 const del = (who, path) => call('DELETE', `${DOCS}/${path}`, undefined, who?.token);
 const f = (uid, field) => 't.`' + uid + '`' + (field ? '.' + field : '');
@@ -106,6 +109,43 @@ allowed(await put(owner, BOARD, full), 'the owner can save a queue of 40');
 refused(await join(c, ticket(41), 41), 'a full queue takes no more online places');
 refused(await put(owner, BOARD, { ...full, secret: 'x' }), 'even the owner cannot add unknown fields to a queue');
 refused(await put(a, 'tickets/old-style', { shop: 'street', name: 'Sam', eta: 10, uid: a.uid, status: 'waiting' }), 'the old ticket list no longer accepts anything');
+
+// ---------- money: sales and percentages ----------
+const SALES = `${BOARD}/sales`;
+const saleDoc = (who, extra = {}) => ({ shop: 'hampton-vale', day: '2026-11-28', at: Date.now(), b: 'b1', bn: 'Barber 1', chair: 1, n: 1, src: 'desk', svc: 'Skin Fade', price: 2000, pay: 'cash', wait: 5, mins: 20, by: who.uid, ...extra });
+refused(await putSale(a, `${SALES}/s1`, saleDoc(a)), 'a visitor cannot record a sale');
+refused(await putSale(other, `${SALES}/s1`, saleDoc(other)), 'an email account that is not staff cannot record a sale');
+allowed(await putSale(owner, `${SALES}/s1`, saleDoc(owner)), 'the owner can record a sale');
+refused(await putSale(owner, `${SALES}/s2`, saleDoc(owner, { price: -5 })), 'a negative price is refused');
+refused(await putSale(owner, `${SALES}/s2`, saleDoc(owner, { pay: 'cheque' })), 'only cash, online or no charge are accepted');
+refused(await putSale(owner, `${SALES}/s2`, saleDoc(owner, { shop: 'shop-2' })), 'a sale cannot be filed under a different shop');
+refused(await put(owner, `${SALES}/s2`, saleDoc(owner)), 'a sale must carry the server’s own time');
+refused(await put(owner, `${SALES}/s2`, saleDoc(owner, { ts: 12345 })), 'a sale cannot carry a made-up save time');
+refused(await putSale(owner, `${SALES}/s2`, saleDoc(owner, { by: other.uid })), 'a sale cannot be recorded in someone else’s name');
+refused(await putSale(owner, `${SALES}/s2`, saleDoc(owner, { void: { at: 1, why: 'x' } })), 'a sale cannot start out cancelled');
+refused(await get(a, `${SALES}/s1`), 'a visitor cannot read a sale');
+refused(await get(null, SALES), 'nobody can list the takings without signing in');
+refused(await get(a, SALES), 'a visitor cannot list the takings');
+allowed(await get(owner, SALES), 'the owner can list the takings');
+refused(await del(owner, `${SALES}/s1`), 'nobody can delete a sale, not even the owner');
+allowed(await put(owner, `${BOARD}/private/pay`, { rules: { b1: [{ from: '2026-11-28', pct: 40 }] }, updatedAt: now }), 'the owner can save the barbers’ percentages');
+allowed(await get(owner, `${BOARD}/private/pay`), 'and read them back');
+refused(await get(a, `${BOARD}/private/pay`), 'a visitor cannot read the percentages');
+refused(await get(null, `${BOARD}/private/pay`), 'nor can someone who is not signed in');
+allowed(await put(owner, 'site/owner', { uid: owner.uid, admins: [other.uid] }), 'the owner adds a staff login');
+allowed(await putSale(other, `${SALES}/s3`, saleDoc(other)), 'a staff login can record a sale');
+allowed(await get(other, `${SALES}/s3`), 'and read back the sale it just recorded');
+refused(await get(other, `${SALES}/s1`), 'but not a sale someone else recorded');
+refused(await get(other, SALES), 'a staff login cannot list the takings');
+refused(await get(other, `${BOARD}/private/pay`), 'a staff login cannot read the percentages');
+refused(await put(other, `${BOARD}/private/pay`, { rules: {} }), 'or change them');
+allowed(await patch(other, `${SALES}/s3`, { pay: 'online', was: { svc: 'Skin Fade', price: 2000, pay: 'cash' } }, ['pay', 'was']), 'a staff login can correct its own sale straight away');
+refused(await patch(other, `${SALES}/s3`, { void: { at: now, why: 'x' } }, ['void']), 'but cannot cancel a sale');
+refused(await patch(other, `${SALES}/s3`, { b: 'b2' }, ['b']), 'or move it to another barber');
+refused(await patch(other, `${SALES}/s1`, { pay: 'online' }, ['pay']), 'or change a sale someone else recorded');
+allowed(await patch(owner, `${SALES}/s3`, { void: { at: now, why: 'entered twice' } }, ['void']), 'the owner can cancel a sale, with a reason');
+refused(await patch(other, `${SALES}/s3`, { pay: 'cash' }, ['pay']), 'a cancelled sale cannot be changed by staff');
+refused(await patch(owner, `${SALES}/s3`, { n: 99 }, ['n']), 'even the owner cannot rewrite which ticket a sale was for');
 
 console.log(res.join('\n'));
 console.log(`\n${res.filter((r) => r.startsWith('PASS')).length} of ${res.length} passed`);

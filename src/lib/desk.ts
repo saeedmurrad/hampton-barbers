@@ -1,7 +1,8 @@
 // Shared by the queue desk and the barber panel: who is signed in, which copy of each shop's
 // queue to use (Firebase when signed in, this device otherwise), and saving changes.
-import { expire, londonDay, openToday, QueueError, type Board } from './board';
-import { CONNECTED, actLocal, localNames, onDeviceChange, pickBoard, setDemoDevice, setLocalName } from './store';
+import { expire, finish, londonDay, openToday, QueueError, type Board } from './board';
+import { cleanInput, saleFor, type Sale, type SaleInput } from './sales';
+import { CONNECTED, actLocal, localNames, newId, onDeviceChange, pickBoard, saveLocalSale, setDemoDevice, setLocalName } from './store';
 import * as cloud from './cloud';
 
 const SAY: Record<string, string> = {
@@ -22,6 +23,9 @@ export function createDesk(shops: string[], onChange: () => void) {
   const noNames = new Set<string>(); // shops whose names could not be read yet
   const stamp = () => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date());
   const say = (s: string) => { status = s; onChange(); };
+  const explain = (e: unknown) => e instanceof QueueError ? SAY[e.code] ?? 'That could not be done.'
+    : cloud.denied(e) ? 'This account is not allowed to do that. Sign in with the account that set the site up.'
+    : 'Could not save. Check the internet connection and try again.';
 
   // The promise to customers: a first name is kept only until the cut is done.
   const tidy = (shop: string) => {
@@ -85,10 +89,45 @@ export function createDesk(shops: string[], onChange: () => void) {
         tidy(shop);
         return true;
       } catch (e) {
-        say(e instanceof QueueError ? SAY[e.code] ?? 'That could not be done.'
-          : cloud.denied(e) ? 'This account is not allowed to run the queue. Sign in with the account that set the site up.'
-          : 'Could not save. Check the internet connection and try again.');
+        say(explain(e));
         return false;
+      }
+    },
+    // Finishes the cut in a barber's chair and writes down what was sold and how it was paid.
+    async finishSale(shop: string, barberId: string, input: SaleInput): Promise<Sale | null> {
+      try {
+        let sale: Sale;
+        if (email) {
+          say('Saving…');
+          const r = await cloud.finishSale(shop, (b, now) => { const cur = expire(b, now); return { board: finish(cur, barberId, now), sale: saleFor(cur, shop, barberId, now, input) }; });
+          boards[shop] = r.board;
+          sale = r.sale;
+          say(`Live for everyone ✓ ${stamp()}`);
+        } else {
+          let made: Omit<Sale, 'id'> | undefined;
+          actLocal(shop, (b, now) => { const cur = expire(b, now); made = saleFor(cur, shop, barberId, now, input); return finish(cur, barberId, now); });
+          sale = { ...made!, id: newId('s') };
+          saveLocalSale(sale);
+          say(`Saved on this device only ✓ ${stamp()}`);
+        }
+        tidy(shop);
+        return sale;
+      } catch (e) {
+        say(explain(e));
+        return null;
+      }
+    },
+    // Corrects a sale that was just recorded. The first version is kept on the record.
+    async fixSale(sale: Sale, input: SaleInput): Promise<Sale | null> {
+      const next: Sale = { ...sale, ...cleanInput(input), was: sale.was ?? { svc: sale.svc, price: sale.price, pay: sale.pay } };
+      try {
+        if (email) await cloud.changeSale(sale.shop, sale.id, { svc: next.svc, price: next.price, pay: next.pay, was: next.was });
+        else saveLocalSale(next);
+        say(`Corrected ✓ ${stamp()}`);
+        return next;
+      } catch (e) {
+        say(cloud.denied(e) ? 'Too late to change this here. Ask the owner to correct it in the reports.' : explain(e));
+        return null;
       }
     },
     setName(shop: string, id: string, name: string) {

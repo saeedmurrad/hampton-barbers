@@ -17,6 +17,12 @@ service cloud.firestore {
             || request.auth.uid in get(ownerPath()).data.get('admins', []));
     }
 
+    // The owner alone: the account that set the site up. Money (takings, percentages) is for
+    // the owner only; other staff logins can run the queue and record sales but not read them back.
+    function isOwner() {
+      return isAccount() && exists(ownerPath()) && get(ownerPath()).data.uid == request.auth.uid;
+    }
+
     // The published price list: anyone can read it, only admins can change it.
     match /site/menu {
       allow read: if true;
@@ -120,6 +126,45 @@ service cloud.firestore {
           && request.resource.data.name.size() <= 24
           && request.resource.data.at is int;
         allow delete: if request.auth != null && (request.auth.uid == id || isAdmin());
+      }
+
+      // Sales: one record per finished cut (what they had, the price, cash or online, which
+      // barber). No payment is taken here; it is only written down. Staff can add a sale and
+      // correct their own within ten minutes. Only the owner can read them all, correct them
+      // later or cancel one, and a cancelled sale keeps its record. Nothing is ever deleted.
+      match /sales/{id} {
+        function sale() { return request.resource.data; }
+        function validSale() {
+          return sale().keys().hasOnly(['shop', 'day', 'at', 'ts', 'b', 'bn', 'chair', 'n', 'src', 'svc', 'price', 'pay', 'wait', 'mins', 'by', 'was', 'void'])
+            && sale().shop == shop
+            && sale().day is string && sale().day.size() == 10
+            && sale().at is int
+            && sale().b is string && sale().b.size() <= 40
+            && sale().bn is string && sale().bn.size() <= 30
+            && sale().n is int && sale().chair is int
+            && sale().svc is string && sale().svc.size() >= 1 && sale().svc.size() <= 80
+            && sale().price is int && sale().price >= 0 && sale().price <= 100000
+            && sale().pay in ['cash', 'online', 'none']
+            && sale().wait is int && sale().mins is int;
+        }
+        allow create: if isAdmin() && validSale()
+          && sale().by == request.auth.uid
+          && !('void' in sale()) && !('was' in sale())
+          && sale().ts == request.time; // stamped by the server, not by the phone's clock
+        allow get: if isOwner() || (isAdmin() && resource.data.by == request.auth.uid);
+        allow list: if isOwner();
+        allow update: if validSale()
+          && ((isOwner() && sale().diff(resource.data).affectedKeys().hasOnly(['svc', 'price', 'pay', 'was', 'void']))
+            || (isAdmin() && resource.data.by == request.auth.uid
+              && request.time < resource.data.ts + duration.value(10, 'm')
+              && !('void' in resource.data)
+              && sale().diff(resource.data).affectedKeys().hasOnly(['svc', 'price', 'pay', 'was'])));
+        allow delete: if false;
+      }
+
+      // The owner's private settings for this shop, such as each barber's percentage.
+      match /private/{doc} {
+        allow read, write: if isOwner();
       }
     }
 
