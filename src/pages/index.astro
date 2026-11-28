@@ -24,7 +24,13 @@ const shot = (id: string) => shots[`../assets/previews/${id}.jpg`]?.default;
         </li>
       ))}
     </ol>
-    <a class="pick__admin" href={`${base}/admin/live/`}><strong>Live shop status</strong><span>Tell customers how busy the shop is right now: barbers, free chairs, people waiting and the wait time.</span></a>
+    <h2 class="pick__sub">The queue system</h2>
+    <div class="pick__tools">
+      <a class="pick__admin" href={`${base}/admin/live/`}><strong>Queue desk</strong><span>The shop's screen: add walk-ins, call customers to a chair, manage barbers.</span></a>
+      <a class="pick__admin" href={`${base}/barber/`}><strong>Barber panel</strong><span>Each barber's own phone screen: who is next, call, finish, breaks.</span></a>
+      <a class="pick__admin" href={`${base}/board/hampton-vale/`}><strong>Shop TV</strong><span>Ticket numbers, chairs and waits. Open it on the TV in the shop.</span></a>
+      <a class="pick__admin" href={`${base}/queue/hampton-vale/`}><strong>Customer queue page</strong><span>What a customer sees after scanning the code on the door.</span></a>
+    </div>
     <a class="pick__admin" href={`${base}/admin/`}><strong>Admin page</strong><span>Change prices, add services and add categories. The four designs update to match.</span></a>
   </main>
 </Base>}
@@ -45,5 +51,7 @@ const shot = (id: string) => shots[`../assets/previews/${id}.jpg`]?.default;
   .pick__admin { display: grid; gap: .3rem; margin-top: clamp(1.25rem, 3vw, 2.5rem); padding: 1.4rem 1.6rem; border-radius: 16px; background: #15140f; color: #fff; text-decoration: none; }
   .pick__admin strong { font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif; font-size: 1.5rem; letter-spacing: -.02em; }
   .pick__admin span { color: #c9c4b8; font-size: 1rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
-  @media (max-width: 800px) { .pick ol { grid-template-columns: 1fr; } }
+  .pick__sub { margin-top: clamp(2rem, 5vw, 3.5rem); font-size: 1.9rem; }
+  .pick__tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 clamp(1.25rem, 3vw, 2.5rem); }
+  @media (max-width: 800px) { .pick ol, .pick__tools { grid-template-columns: 1fr; } }
 </style>

@@ -1,0 +1,29 @@
+---
+// The customer's queue page for one shop. The code on the shop door and on the shop TV opens
+// this page with ?here, which checks the customer in or gives them a ticket on the spot.
+import Base from '../../layouts/Base.astro';
+import LiveNow from '../../components/LiveNow.astro';
+import { shops, type Shop } from '../../data/site';
+export function getStaticPaths() { return shops.map((shop) => ({ params: { shop: shop.id }, props: { shop } })); }
+interface Props { shop: Shop; }
+const { shop } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title={`Hampton Barbers ${shop.name}: the queue`} description="See the wait, take a ticket number and follow your place in the queue." themeColor="#fff8ee">
+  <main id="main" class="qp">
+    <header class="qp__top">
+      <a href={`${base}/`}>Hampton Barbers</a>
+      <span>{shop.name}</span>
+    </header>
+    <LiveNow design="fresh" shop={shop.id} title={`The queue at ${shop.name}`} />
+  </main>
+</Base>
+
+<style is:global>
+  .qp { --bg: #fff8ee; --surface: #fff; --text: #16130f; --muted: #5d564a; --accent: #e4472b; --on-accent: #fff; --line: #ecdcc6; --radius: 999px; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; --dw: 800; background: #fff8ee; color: #16130f; min-height: 100svh; }
+  .qp__top { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; width: min(100% - 2.5rem, 74rem); margin-inline: auto; padding-block: 1.1rem .2rem; }
+  .qp__top a { font-family: var(--display); font-weight: 800; font-size: 1.35rem; letter-spacing: -.03em; text-decoration: none; }
+  .qp__top span { color: var(--muted); font-weight: 600; }
+  .qp .live { padding-top: 1.25rem; }
+  .qp .live__head h2 { letter-spacing: -.04em; }
+</style>

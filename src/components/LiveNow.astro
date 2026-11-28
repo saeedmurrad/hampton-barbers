@@ -1,24 +1,26 @@
 ---
-// "Right now at Hampton Barbers": live wait, chairs and queue for this shop, the owner's
-// three shops side by side, and joining the queue online.
+// Live wait, chairs and queue for one shop, the owner's three shops side by side, and the
+// customer's own ticket: join, number, place in line, "I'm here", "Running late", leave.
 import { site, shops } from '../data/site';
-import { LIVE_DEMO, viewOf, agoText, chairsHtml, queueHtml, quickestKey } from '../lib/live';
-interface Props { design: 'heritage' | 'fresh' | 'street' | 'club'; title?: string; }
-const { design, title = 'Right now at Hampton Barbers' } = Astro.props;
-const s = LIVE_DEMO[design];
-const v = viewOf(s);
+import { boardView, exampleBoard } from '../lib/board';
+import { chairsHtml, queueHtml } from '../lib/live';
+interface Props { design: 'heritage' | 'fresh' | 'street' | 'club'; shop?: string; title?: string; }
+const { design, shop = 'hampton-vale', title = 'Right now at Hampton Barbers' } = Astro.props;
+const now = Date.now();
+const order = [shop, ...shops.map((s) => s.id).filter((id) => id !== shop)];
+const entries = order.map((id) => ({ shop: shops.find((s) => s.id === id)!, v: boardView(exampleBoard(id, now), now) }));
+const v = entries[0].v;
+const best = entries.reduce((a, b) => (b.v.minutes < a.v.minutes ? b : a)).shop;
 const steps = ['Quiet', 'Short wait', 'Busy', 'Very busy'];
-const keys = [design, 'shop-2', 'shop-3'];
-const entries = keys.map((key, i) => ({ key, shop: shops[i], v: viewOf(LIVE_DEMO[key]) }));
-const best = quickestKey(keys, (k) => LIVE_DEMO[k]);
-const etas: [number, string][] = [[0, 'Now'], [10, 'In 10 min'], [20, 'In 20 min'], [30, 'In 30 min']];
+const etas: [number, string][] = [[5, '5 min'], [10, '10 min'], [20, '20 min'], [30, '30 min']];
+const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.geo]));
 ---
-<section class:list={['live', `live--${design}`]} id="live" data-live-root={design} data-level={v.level} aria-labelledby="live-title">
+<section class:list={['live', `live--${design}`]} id="live" data-live-root={shop} data-geo={JSON.stringify(geo)} data-level={v.level} aria-labelledby="live-title">
   <div class="live__in">
     <header class="live__head">
       <p class="live__badge"><i aria-hidden="true"></i>Live</p>
       <h2 id="live-title">{title}</h2>
-      <p class="live__ago" data-live="ago">{agoText(s.updatedAt)}</p>
+      <p class="live__ago" data-live="ago">Example status for this demo</p>
     </header>
 
     <div class="live__ticket" data-ticket aria-live="polite" hidden></div>
@@ -44,7 +46,7 @@ const etas: [number, string][] = [[0, 'Now'], [10, 'In 10 min'], [20, 'In 20 min
           <ul class="live__chairs" data-live-chairs set:html={chairsHtml(v)} />
         </div>
         <div class="live__block">
-          <h3>Waiting <span class="live__key"><i class="k-shop"></i>In the shop <i class="k-online"></i>Joined online</span></h3>
+          <h3>Waiting <span class="live__key"><i class="k-shop"></i>In the shop <i class="k-online"></i>On the way</span></h3>
           <ul class="live__queue" data-live-queue set:html={queueHtml(v)} />
         </div>
         <dl class="live__stats">
@@ -58,15 +60,15 @@ const etas: [number, string][] = [[0, 'Now'], [10, 'In 10 min'], [20, 'In 20 min
     <div class="live__shops">
       <div class="live__shops-head">
         <h3>All three shops right now</h3>
-        <p data-shops-tip>{best === design ? 'This shop is the quickest right now.' : `${entries.find((e) => e.key === best)!.shop.name} is the quickest right now.`}</p>
+        <p data-shops-tip>{best.id === shop ? 'This shop is the quickest right now.' : `${best.name} is the quickest right now.`}</p>
       </div>
       <ul data-live-shops>
         {entries.map((e) => (
-          <li data-shop-key={e.key} data-name={e.shop.name} data-level={e.v.level} class:list={[{ best: e.key === best, here: e.key === design }]}>
+          <li data-shop-key={e.shop.id} data-name={e.shop.name} data-level={e.v.level} class:list={[{ best: e.shop.id === best.id, here: e.shop.id === shop }]}>
             <span class="live__shop-name"><b>{e.shop.name}</b><small>{e.shop.place}</small></span>
             <span class="live__shop-wait"><b data-sw="headline">{e.v.headline}</b><small data-sw="unit">{e.v.unit}</small></span>
             <span class="live__shop-label" data-sw="label">{e.v.label}</span>
-            <span class="live__shop-tags"><em class="t-best">Quickest</em>{e.key === design && <em class="t-here">This shop</em>}</span>
+            <span class="live__shop-tags"><em class="t-best">Quickest</em>{e.shop.id === shop && <em class="t-here">This shop</em>}</span>
             {e.shop.directionsUrl
               ? <a class="live__shop-go" href={e.shop.directionsUrl} rel="noopener">Directions →</a>
               : <span class="live__shop-go is-off">Directions coming soon</span>}
@@ -76,29 +78,30 @@ const etas: [number, string][] = [[0, 'Now'], [10, 'In 10 min'], [20, 'In 20 min
     </div>
 
     <footer class="live__foot">
-      <p>A rough guide set by the shop. Walk-ins and online joiners are seen in order.</p>
-      <div class="btns"><a class="btn btn--line" href={site.phoneHref}>Call {site.phone}</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Directions</a></div>
+      <p>Times are estimates from the shop’s own screen. Only people in the shop are called, in number order.</p>
+      {shop === 'hampton-vale' && <div class="btns"><a class="btn btn--line" href={site.phoneHref}>Call {site.phone}</a><a class="btn btn--line" href={site.directionsUrl} rel="noopener">Directions</a></div>}
     </footer>
   </div>
 
   <dialog class:list={['qdlg', `qdlg--${design}`]} id="join-dialog" aria-labelledby="qdlg-title">
     <form class="qdlg__form" data-join-form>
       <h2 id="qdlg-title">Join the queue</h2>
-      <p class="qdlg__lead">Save your place, then come in when it’s nearly your turn. No booking and no account.</p>
+      <p class="qdlg__lead qdlg__home">Take a ticket number now, then come in when it’s nearly your turn. No booking and no account.</p>
+      <p class="qdlg__lead qdlg__door">You’re at the shop, so you go straight into the line. Take a seat and watch the screen for your number.</p>
       <label class="qdlg__field">Your first name
         <input name="name" required maxlength="24" autocomplete="given-name" placeholder="e.g. Sam" />
       </label>
-      <fieldset class="qdlg__pick qdlg__pick--shops">
+      <fieldset class="qdlg__pick qdlg__pick--shops qdlg__home">
         <legend>Which shop?</legend>
         {entries.map((e, i) => (
-          <label><input type="radio" name="shop" value={e.key} checked={i === 0} /><span><b>{e.shop.name}</b><small data-qshop={e.key}>{e.v.headline} {e.v.unit}</small></span></label>
+          <label><input type="radio" name="shop" value={e.shop.id} checked={i === 0} /><span><b>{e.shop.name}</b><small data-qshop={e.shop.id}>{e.v.headline} {e.v.unit}</small></span></label>
         ))}
       </fieldset>
-      <fieldset class="qdlg__pick">
-        <legend>When will you get here?</legend>
-        {etas.map(([m, t], i) => <label><input type="radio" name="eta" value={m} checked={i === 1} /><span>{t}</span></label>)}
+      <fieldset class="qdlg__pick qdlg__home">
+        <legend>How far away are you?</legend>
+        {etas.map(([m, t]) => <label><input type="radio" name="eta" value={m} checked={m === 10} /><span>{t}</span></label>)}
       </fieldset>
-      <p class="qdlg__small">We keep only your first name, and only until your cut is done. You can leave the queue at any time.</p>
+      <p class="qdlg__small">We keep only your first name, and only until your cut is done. The shop screen shows your number, never your name. You can leave the queue at any time.</p>
       <p class="qdlg__err" data-join-error role="alert" hidden></p>
       <div class="qdlg__btns">
         <button type="button" class="btn btn--line" data-join-cancel>Cancel</button>
@@ -109,17 +112,15 @@ const etas: [number, string][] = [[0, 'Now'], [10, 'In 10 min'], [20, 'In 20 min
 </section>
 
 <script>
-  import {
-    LIVE_KEY, TICKET_KEY, TICKETS_KEY, LIVE_DEMO, LIVE_KEYS, parseLiveAll, fetchLiveStatus, paintLive,
-    newest, viewOf, waitForPosition, waitText, quickestKey, cleanStatus, type LiveAll,
-  } from '../lib/live';
+  import { arrive, boardView, clockText, join, leave, ord, placeOf, runLate, GRACE_MIN, QueueError, type Board } from '../lib/board';
+  import { TICKET_KEY, actLocal, esc, fetchBoards, metresBetween, newId, onDeviceChange, pickBoard, read, setLocalName, write, type Mine } from '../lib/store';
+  import { paintLive } from '../lib/live';
 
-  type Ticket = { id: string; shop: string; name: string; eta: number; createdAt: number; cloud: boolean };
-
-  const panel = [...document.querySelectorAll<HTMLElement>('section.live[data-live-root]')].find((el) => !el.closest('[data-live-preview]'));
+  const panel = document.querySelector<HTMLElement>('section.live[data-live-root]');
   if (panel) {
-    const design = panel.dataset.liveRoot!;
-    const keys = [design, 'shop-2', 'shop-3'];
+    const shop = panel.dataset.liveRoot!;
+    const geo = JSON.parse(panel.dataset.geo || '{}') as Record<string, [number, number]>;
+    const keys = [...panel.querySelectorAll<HTMLElement>('[data-shop-key]')].map((li) => li.dataset.shopKey!);
     const chips = [...document.querySelectorAll<HTMLElement>('.lchip[data-live-root]')];
     const ticketEl = panel.querySelector<HTMLElement>('[data-ticket]')!;
     const dialog = panel.querySelector<HTMLDialogElement>('#join-dialog')!;
@@ -127,18 +128,21 @@ const etas: [number, string][] = [[0, 'Now'], [10, 'In 10 min'], [20, 'In 20 min
     const errEl = dialog.querySelector<HTMLElement>('[data-join-error]')!;
     const submitBtn = dialog.querySelector<HTMLButtonElement>('[data-join-submit]')!;
     const shopName = (k: string) => panel.querySelector<HTMLElement>(`[data-shop-key="${k}"]`)?.dataset.name ?? 'the shop';
-    const esc = (x: unknown) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-    const ord = (n: number) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
-    const read = <T,>(k: string): T | null => { try { const x = localStorage.getItem(k); return x ? JSON.parse(x) as T : null; } catch { return null; } };
-    const write = (k: string, x: unknown) => { try { if (x === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(x)); } catch { /* storage blocked */ } };
+    // The code on the shop door opens this page with ?here: the visitor is standing in the shop.
+    const atDoor = new URLSearchParams(location.search).has('here');
+    const GEO_OK = 'hb-geo-ok';
+    const ARRIVE_M = 150;
 
-    let local: LiveAll | null = null;
-    try { local = parseLiveAll(localStorage.getItem(LIVE_KEY)); } catch { /* storage blocked */ }
-    let published: LiveAll | null = null;
-    let ticket = read<Ticket>(TICKET_KEY);
+    let cloud: Record<string, Board> = {};
+    let loaded = false;
+    let mine = read<Mine>(TICKET_KEY);
+    let api: typeof import('../lib/cloud') | null = null;
+    let stopFollow: (() => void) | null = null;
     let lastAhead = Infinity;
-    let announcedTurn = false;
-    const pick = (k: string) => newest(local?.[k], published?.[k], LIVE_DEMO[k]);
+    let toldTurn = false;
+    let toldLate = false;
+    let note = '';
+    const pick = (k: string) => pickBoard(k, cloud[k]);
 
     const notify = (title: string, body: string) => {
       try { navigator.vibrate?.([220, 120, 220]); } catch { /* not supported */ }
@@ -147,112 +151,208 @@ const etas: [number, string][] = [[0, 'Now'], [10, 'In 10 min'], [20, 'In 20 min
       const t = setInterval(() => { document.title = n++ % 2 ? old : `● ${title}`; if (n > 9) { clearInterval(t); document.title = old; } }, 900);
     };
 
-    type TicketState = { kind: 'waiting'; ahead: number; wait: number; checking: boolean } | { kind: 'turn' } | { kind: 'gone' };
-    const stateOf = (t: Ticket): TicketState => {
-      const s = pick(t.shop);
-      const i = s.line.indexOf(t.id);
-      if (i >= 0) return { kind: 'waiting', ahead: i, wait: waitForPosition(s, i), checking: false };
-      if (s.called.includes(t.id)) return { kind: 'turn' };
-      // Just joined and the shop's screen hasn't added you yet: show where you'll be.
-      if (Date.now() - t.createdAt < 3 * 60_000) return { kind: 'waiting', ahead: s.line.length, wait: waitForPosition(s, s.line.length), checking: true };
-      return { kind: 'gone' };
+    // Once this visitor holds a ticket, follow that shop's queue live instead of re-checking.
+    const follow = async () => {
+      if (!mine || mine.src !== 'cloud' || stopFollow) return;
+      const s = mine.shop;
+      try {
+        api ??= await import('../lib/cloud');
+        stopFollow = api.watchBoard(s, (b) => { if (b) { cloud = { ...cloud, [s]: b }; loaded = true; render(); } });
+      } catch { /* the regular refresh below still runs */ }
+    };
+    const setMine = (m: Mine | null) => {
+      mine = m;
+      write(TICKET_KEY, m);
+      if (!m) { stopFollow?.(); stopFollow = null; }
+    };
+    // A change to this visitor's own ticket.
+    const act = async (fn: (b: Board, id: string, now: number) => Board): Promise<boolean> => {
+      const m = mine;
+      if (!m) return false;
+      try {
+        if (m.src === 'cloud') {
+          api ??= await import('../lib/cloud');
+          const r = await api.actCustomer(m.shop, fn);
+          cloud = { ...cloud, [m.shop]: r.board };
+        } else actLocal(m.shop, (b, now) => fn(b, m.id, now));
+        return true;
+      } catch (e) {
+        note = e instanceof QueueError ? 'That could not be done. The shop may have moved your ticket on.' : 'Could not reach the shop. Check your connection and try again.';
+        return false;
+      } finally {
+        render();
+      }
     };
 
-    const paintShops = () => {
-      const best = quickestKey(keys, pick);
+    const paintShops = (now: number) => {
+      const views = Object.fromEntries(keys.map((k) => [k, boardView(pick(k).board, now)]));
+      const best = keys.reduce((a, k) => (views[k].minutes < views[a].minutes ? k : a), keys[0]);
       panel.querySelectorAll<HTMLElement>('[data-shop-key]').forEach((li) => {
         const k = li.dataset.shopKey!;
-        const v = viewOf(pick(k));
-        li.dataset.level = String(v.level);
+        li.dataset.level = String(views[k].level);
         li.classList.toggle('best', k === best);
-        li.querySelector('[data-sw="headline"]')!.textContent = v.headline;
-        li.querySelector('[data-sw="unit"]')!.textContent = v.unit;
-        li.querySelector('[data-sw="label"]')!.textContent = v.label;
+        li.querySelector('[data-sw="headline"]')!.textContent = views[k].headline;
+        li.querySelector('[data-sw="unit"]')!.textContent = views[k].unit;
+        li.querySelector('[data-sw="label"]')!.textContent = views[k].label;
       });
-      const tip = panel.querySelector<HTMLElement>('[data-shops-tip]')!;
-      const bv = viewOf(pick(best));
-      tip.textContent = best === design ? 'This shop is the quickest right now.' : `${shopName(best)} is the quickest right now: ${bv.headline === 'No wait' ? 'no wait' : `${bv.headline} ${bv.unit}`}.`;
-      dialog.querySelectorAll<HTMLElement>('[data-qshop]').forEach((el) => { const v = viewOf(pick(el.dataset.qshop!)); el.textContent = `${v.headline} ${v.unit}`.trim(); });
+      const bv = views[best];
+      panel.querySelector<HTMLElement>('[data-shops-tip]')!.textContent = best === shop
+        ? 'This shop is the quickest right now.'
+        : `${shopName(best)} is the quickest right now: ${bv.headline === 'No wait' ? 'no wait' : `${bv.headline} ${bv.unit}`}.`;
+      dialog.querySelectorAll<HTMLElement>('[data-qshop]').forEach((el) => { const x = views[el.dataset.qshop!]; el.textContent = `${x.headline} ${x.unit}`.trim(); });
     };
 
-    const paintTicket = () => {
-      chips.forEach((c) => c.querySelector('[data-mine]')?.remove());
-      if (!ticket) { ticketEl.hidden = true; ticketEl.innerHTML = ''; panel.classList.remove('has-ticket'); return; }
-      const st = stateOf(ticket);
-      const where = esc(shopName(ticket.shop));
-      ticketEl.hidden = false;
-      panel.classList.add('has-ticket');
-      let chipText = '';
-      if (st.kind === 'waiting') {
-        const pos = st.ahead + 1;
-        const w = waitText(st.wait);
-        const next = st.ahead === 0;
-        ticketEl.dataset.state = next ? 'next' : 'waiting';
-        ticketEl.innerHTML = `
-          <div class="tk">
-            <p class="tk__kicker">${st.checking ? 'Checking you in at' : 'You’re in the queue at'} ${where}, ${esc(ticket.name)}</p>
+    const paintTicket = (now: number) => {
+      const m = mine;
+      let html = '', state = '', chipText = '';
+      if (m) {
+        const { board, source } = pick(m.shop);
+        const where = esc(shopName(m.shop));
+        const k = board.t[m.id];
+        const place = placeOf(board, m.id, now);
+        const alertBtn = 'Notification' in window && Notification.permission === 'default' ? '<button type="button" class="btn btn--line" data-alert>Alert me when it’s my turn</button>' : '';
+        if (m.src === 'cloud' && source !== 'cloud' && !loaded) {
+          state = 'waiting';
+          html = `<div class="tk"><p class="tk__kicker">${where}</p><p class="tk__turn">Checking your place in the queue…</p></div>`;
+        } else if (k?.s === 'chair') {
+          const s = board.staff[k.b ?? ''];
+          state = 'turn';
+          html = `<div class="tk">
+            <p class="tk__kicker">${where}, number ${k.n}</p>
+            <p class="tk__turn">It’s your turn, ${esc(m.name)}! ${s ? `Chair ${s.chair}${s.name ? ` with ${esc(s.name)}` : ''}.` : 'Come and take a seat.'}</p>
+            <div class="tk__btns"><button type="button" class="btn" data-done>Done</button></div>
+          </div>`;
+          chipText = 'It’s your turn!';
+          if (!toldTurn) { toldTurn = true; notify('It’s your turn at Hampton Barbers', s ? `Number ${k.n}, chair ${s.chair}.` : 'Come and take a seat.'); }
+          if (m.seen !== 'chair') { mine = { ...m, seen: 'chair' }; write(TICKET_KEY, mine); }
+        } else if (place) {
+          const { ahead, mins, at } = place;
+          const tk = place.k;
+          const pos = ahead + 1, first = ahead === 0, here = tk.s === 'here';
+          // Past the time they gave: warn them before the place lapses.
+          const due = tk.at + tk.eta * 60_000, lapses = clockText(due + GRACE_MIN * 60_000);
+          const overdue = !here && now > due;
+          const warn = overdue ? `You said you’d be here by ${clockText(due)}. Your place lapses at ${lapses} unless you check in${tk.late ? '' : ' or tap “Running late”'}.` : '';
+          state = first && here ? 'next' : 'waiting';
+          const when = mins < 0 ? 'The shop is not cutting right now'
+            : mins <= 2 ? (here ? 'A barber should be free for you any moment' : 'A barber should be free when you arrive')
+            : `About ${Math.max(5, Math.round(mins / 5) * 5)} minutes, around ${clockText(at)}`;
+          html = `<div class="tk">
+            <p class="tk__kicker">${here ? 'Checked in at' : 'You’re in the queue at'} ${where}, ${esc(m.name)}</p>
             <div class="tk__main">
-              <p class="tk__big"><b>${pos}</b><small>${ord(pos).replace(String(pos), '')}<br />in line</small></p>
+              <p class="tk__big"><b>${tk.n}</b><small>your<br />number</small></p>
               <div class="tk__info">
-                <p class="tk__line">${next ? 'You’re next. Head in now.' : `${st.ahead} ${st.ahead === 1 ? 'person' : 'people'} ahead of you`}</p>
-                <p class="tk__wait">${st.wait === 0 ? 'A barber should be free for you' : `Estimated wait ${w.range}`}</p>
-                <p class="tk__sub">You said you’d arrive ${ticket.eta ? `in about ${ticket.eta} minutes` : 'now'}. We’ll keep your place, just come in when you’re near the front.</p>
+                <p class="tk__line">${first ? (here ? 'You’re next.' : 'You’re first in line.') : `${ord(pos)} in line, ${ahead} ${ahead === 1 ? 'person' : 'people'} ahead of you`}</p>
+                <p class="tk__wait">${when}</p>
+                <p class="tk__sub">${here
+                  ? `You’re checked in. Watch the shop screen for number ${tk.n}.`
+                  : `Only people in the shop are called. When you get here, tap “I’m here” or scan the code on the door. We’ll hold your place until ${clockText(tk.at + (tk.eta + GRACE_MIN) * 60_000)}.`}</p>
               </div>
             </div>
+            ${note || warn ? `<p class="tk__msg" role="status">${esc(note || warn)}</p>` : ''}
             <div class="tk__btns">
-              ${'Notification' in window && Notification.permission === 'default' ? '<button type="button" class="btn" data-alert>Alert me when I’m next</button>' : ''}
+              ${here ? '' : '<button type="button" class="btn" data-here>I’m here</button>'}
+              ${here || tk.late ? '' : '<button type="button" class="btn btn--line" data-late>Running late</button>'}
+              ${alertBtn}
               <button type="button" class="btn btn--line" data-leave>Leave the queue</button>
             </div>
           </div>`;
-        chipText = next ? 'You’re next!' : `You’re ${ord(pos)} in line`;
-        if (next && lastAhead !== Infinity && lastAhead > 0) notify('You’re next at Hampton Barbers', 'Head in now, a barber will be free in a moment.');
-        lastAhead = st.ahead;
-      } else if (st.kind === 'turn') {
-        ticketEl.dataset.state = 'turn';
-        ticketEl.innerHTML = `
-          <div class="tk">
-            <p class="tk__kicker">${where}</p>
-            <p class="tk__turn">It’s your turn, ${esc(ticket.name)}! Come and take a seat.</p>
-            <div class="tk__btns"><button type="button" class="btn" data-done>Done</button></div>
+          chipText = first ? (here ? 'You’re next!' : 'You’re first in line') : `You’re ${ord(pos)} in line`;
+          if (first && here && lastAhead !== Infinity && lastAhead > 0) notify('You’re next at Hampton Barbers', `Number ${tk.n}: a barber will call you in a moment.`);
+          if (overdue && !toldLate) { toldLate = true; notify('Are you nearly at Hampton Barbers?', `Your place lapses at ${lapses}.`); }
+          lastAhead = ahead;
+        } else if (m.seen === 'chair') {
+          state = 'gone';
+          html = `<div class="tk">
+            <p class="tk__turn">All done, ${esc(m.name)}. Thanks for coming in.</p>
+            <p class="tk__sub">See you next time at ${where}.</p>
+            <div class="tk__btns"><button type="button" class="btn btn--line" data-done>Close</button></div>
           </div>`;
-        chipText = 'It’s your turn!';
-        if (!announcedTurn) { announcedTurn = true; notify('It’s your turn at Hampton Barbers', 'Come and take a seat.'); }
-      } else {
-        ticketEl.dataset.state = 'gone';
-        ticketEl.innerHTML = `
-          <div class="tk">
+        } else {
+          state = 'gone';
+          html = `<div class="tk">
             <p class="tk__turn">You’re no longer in the queue at ${where}.</p>
-            <p class="tk__sub">If that’s a mistake, call the shop or join again.</p>
+            <p class="tk__sub">A place lapses if you have not arrived 10 minutes after the time you gave. If that’s a mistake, join again or call the shop.</p>
             <div class="tk__btns"><button type="button" class="btn" data-again>Join again</button><button type="button" class="btn btn--line" data-done>Close</button></div>
           </div>`;
+        }
       }
-      if (chipText) chips.forEach((c) => {
-        const meta = c.querySelector('.lchip__meta');
-        if (meta) meta.insertAdjacentHTML('beforeend', `<span class="lchip__mine" data-mine>${chipText}</span>`);
+      ticketEl.hidden = !m;
+      panel.classList.toggle('has-ticket', Boolean(m) && state !== 'gone');
+      if (state) ticketEl.dataset.state = state;
+      // Redraw only when something changed, so a tap never lands on a button being replaced.
+      if (ticketEl.dataset.html !== html) { ticketEl.innerHTML = html; ticketEl.dataset.html = html; }
+      chips.forEach((c) => {
+        const old = c.querySelector<HTMLElement>('[data-mine]');
+        if ((old?.textContent ?? '') === chipText) return;
+        old?.remove();
+        if (chipText) c.querySelector('.lchip__meta')?.insertAdjacentHTML('beforeend', `<span class="lchip__mine" data-mine>${chipText}</span>`);
       });
     };
 
     const render = () => {
-      const mine = ticket?.shop === design ? ticket.id : undefined;
-      paintLive(panel, pick(design), mine);
-      chips.forEach((c) => paintLive(c, pick(design)));
-      paintShops();
-      paintTicket();
+      const now = Date.now();
+      const cur = pick(shop);
+      const view = boardView(cur.board, now);
+      paintLive(panel, view, cur.board.updatedAt, mine?.shop === shop ? mine.id : undefined);
+      chips.forEach((c) => paintLive(c, view, cur.board.updatedAt));
+      paintShops(now);
+      paintTicket(now);
+    };
+
+    // ---- arriving ----
+    const manual = 'When you’re at the shop, scan the code on the door or tell your barber your number.';
+    const checkIn = (quiet = false) => {
+      const m = mine;
+      if (!m) return;
+      const tell = (t: string) => { if (!quiet) { note = t; render(); } };
+      const g = geo[m.shop];
+      if (!g || !navigator.geolocation) return tell(manual);
+      tell('Checking where you are…');
+      navigator.geolocation.getCurrentPosition(async (p) => {
+        const d = metresBetween(p.coords, g);
+        if (d - Math.min(p.coords.accuracy || 0, 100) <= ARRIVE_M) {
+          write(GEO_OK, 1);
+          note = '';
+          await act((b, id, now) => arrive(b, id, now));
+        } else {
+          tell(`You look about ${d < 950 ? `${Math.max(50, Math.round(d / 50) * 50)} metres` : `${(d / 1609).toFixed(d < 16_090 ? 1 : 0)} miles`} from the shop. ${manual}`);
+        }
+      }, () => tell(`We couldn’t check your location. ${manual}`), { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 });
+    };
+    // If the visitor already allowed location once, check quietly as they get close.
+    const autoCheckIn = async () => {
+      const m = mine;
+      if (!m || !read(GEO_OK) || document.visibilityState !== 'visible' || pick(m.shop).board.t[m.id]?.s !== 'way') return;
+      try { if ((await navigator.permissions.query({ name: 'geolocation' })).state === 'granted') checkIn(true); } catch { /* not supported */ }
     };
 
     // ---- joining and leaving ----
     const openJoin = () => {
       errEl.hidden = true;
-      if (ticket && stateOf(ticket).kind === 'waiting') { ticketEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      if (mine && (placeOf(pick(mine.shop).board, mine.id, Date.now()) || pick(mine.shop).board.t[mine.id])) { ticketEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      dialog.classList.toggle('is-door', atDoor);
       dialog.showModal();
       dialog.querySelector<HTMLInputElement>('input[name="name"]')!.focus();
     };
+    const leaveQueue = async () => {
+      const m = mine;
+      if (!m) return;
+      if (!(await act((b, id, now) => leave(b, id, now)))) return;
+      if (m.src === 'cloud') api?.dropName(m.shop, m.id).catch(() => { /* the shop tidies up */ });
+      else setLocalName(m.shop, m.id, null);
+      note = '';
+      setMine(null);
+      render();
+    };
     panel.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
-      if (t.closest('[data-join]') || t.closest('[data-again]')) { if (t.closest('[data-again]')) { ticket = null; write(TICKET_KEY, null); } openJoin(); }
+      if (t.closest('[data-join]') || t.closest('[data-again]')) { if (t.closest('[data-again]')) setMine(null); openJoin(); }
       else if (t.closest('[data-join-cancel]')) dialog.close();
-      else if (t.closest('[data-leave]')) leave();
-      else if (t.closest('[data-done]')) { ticket = null; write(TICKET_KEY, null); render(); }
+      else if (t.closest('[data-leave]')) leaveQueue();
+      else if (t.closest('[data-here]')) checkIn();
+      else if (t.closest('[data-late]')) act((b, id, now) => runLate(b, id, now)).then((ok) => { if (ok) { toldLate = false; note = 'Thanks for letting us know. Your place is held 10 minutes longer.'; render(); } });
+      else if (t.closest('[data-done]')) { setMine(null); note = ''; render(); }
       else if (t.closest('[data-alert]')) Notification.requestPermission().then(render);
     });
     dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
@@ -261,63 +361,67 @@ const etas: [number, string][] = [[0, 'Now'], [10, 'In 10 min'], [20, 'In 20 min
       e.preventDefault();
       const data = new FormData(form);
       const name = String(data.get('name') ?? '').trim().replace(/\s+/g, ' ').slice(0, 24);
-      const shop = String(data.get('shop') ?? design);
+      const s = atDoor ? shop : String(data.get('shop') ?? shop);
       const eta = Number(data.get('eta') ?? 10);
+      const src = atDoor ? 'qr' : 'web';
       if (!name) { errEl.textContent = 'Please add your first name.'; errEl.hidden = false; return; }
       submitBtn.disabled = true; submitBtn.textContent = 'Joining…';
-      let id = '', cloud = false;
       try {
-        const q = await import('../lib/queue');
-        id = await q.joinCloud({ shop, name, eta });
-        cloud = true;
-      } catch {
-        // Offline or not connected: keep the place on this device so the demo still works.
-        id = `local${Math.random().toString(36).slice(2, 12)}`;
+        const source = pick(s).source;
+        if (source === 'closed') throw new QueueError('closed');
+        let m: Mine;
+        if (source === 'cloud') {
+          api ??= await import('../lib/cloud');
+          const r = await api.actCustomer(s, (b, id, now) => (b.t[id] ? b : join(b, id, now, eta, src)));
+          cloud = { ...cloud, [s]: r.board };
+          api.setName(s, r.id, name).catch(() => { /* the number still works without a name */ });
+          m = { shop: s, id: r.id, name, src: 'cloud', at: Date.now() };
+        } else {
+          const id = newId('l');
+          actLocal(s, (b, now) => join(b, id, now, eta, src));
+          setLocalName(s, id, name);
+          m = { shop: s, id, name, src: 'local', at: Date.now() };
+        }
+        setMine(m);
+        lastAhead = Infinity; toldTurn = false; toldLate = false; note = '';
+        form.reset();
+        dialog.close();
+        follow();
+        render();
+        ticketEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (err) {
+        errEl.textContent = err instanceof QueueError
+          ? ({ closed: 'Online joining is not open at this shop right now. Walk in, or call the shop.', full: 'The queue is full right now. Please try again in a little while.' }[err.code] ?? 'Could not join. Please try again.')
+          : 'Could not join. Check your connection and try again.';
+        errEl.hidden = false;
+      } finally {
+        submitBtn.disabled = false; submitBtn.textContent = 'Join the queue';
       }
-      ticket = { id, shop, name, eta, createdAt: Date.now(), cloud };
-      write(TICKET_KEY, ticket);
-      const mineList = (read<Ticket[]>(TICKETS_KEY) ?? []).filter((x) => Date.now() - x.createdAt < 12 * 3_600_000);
-      write(TICKETS_KEY, [...mineList, ticket].slice(-30));
-      // Show yourself in the line straight away on this device.
-      const all: LiveAll = Object.fromEntries(LIVE_KEYS.map((k) => [k, pick(k)]));
-      all[shop] = cleanStatus({ ...all[shop], line: [...all[shop].line, id], updatedAt: Date.now() }, LIVE_DEMO[shop]);
-      local = all;
-      write(LIVE_KEY, all);
-      lastAhead = Infinity; announcedTurn = false;
-      submitBtn.disabled = false; submitBtn.textContent = 'Join the queue';
-      form.reset();
-      dialog.close();
-      render();
-      ticketEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
-
-    const leave = async () => {
-      if (!ticket) return;
-      const t = ticket;
-      ticket = null;
-      write(TICKET_KEY, null);
-      write(TICKETS_KEY, (read<Ticket[]>(TICKETS_KEY) ?? []).filter((x) => x.id !== t.id));
-      const s = pick(t.shop);
-      if (s.line.includes(t.id)) {
-        const all: LiveAll = Object.fromEntries(LIVE_KEYS.map((k) => [k, pick(k)]));
-        all[t.shop] = cleanStatus({ ...s, line: s.line.filter((x) => x !== t.id), updatedAt: Date.now() }, LIVE_DEMO[t.shop]);
-        local = all;
-        write(LIVE_KEY, all);
-      }
-      render();
-      if (t.cloud) { try { (await import('../lib/queue')).leaveCloud(t.id); } catch { /* the shop's screen tidies up old places */ } }
-    };
 
     // ---- keeping up to date ----
     render();
-    const refresh = async () => { const got = await fetchLiveStatus(); if (got) { published = got; } render(); };
-    refresh();
-    let tick = 0;
-    setInterval(() => { tick++; if (ticket || tick % 6 === 0) refresh(); else render(); }, 10_000);
-    // When the admin page (or another tab) changes things on this device, follow straight away.
-    addEventListener('storage', (e) => {
-      if (e.key === LIVE_KEY) { local = parseLiveAll(e.newValue); render(); }
-      if (e.key === TICKET_KEY) { ticket = read<Ticket>(TICKET_KEY); render(); }
+    const refresh = async () => {
+      const got = await fetchBoards();
+      if (got) for (const [k, b] of Object.entries(got)) if (!cloud[k] || b.updatedAt >= cloud[k].updatedAt) cloud = { ...cloud, [k]: b };
+      loaded = true;
+      render();
+    };
+    refresh().then(() => {
+      if (!atDoor) return;
+      // Scanned the code on the door: check in a ticket already held for this shop, or offer one.
+      if (mine?.shop === shop && pick(shop).board.t[mine.id]?.s === 'way') act((b, id, now) => arrive(b, id, now)).then((ok) => { if (ok) { note = ''; render(); } });
+      else if (!mine) openJoin();
     });
+    follow();
+    let tick = 0;
+    setInterval(() => {
+      tick++;
+      if (tick % 4 === 0 && document.visibilityState === 'visible') refresh(); else render();
+      if (tick % 3 === 0) autoCheckIn();
+    }, 15_000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+    // When the queue desk (or another tab) changes things on this device, follow straight away.
+    onDeviceChange(() => { mine = read<Mine>(TICKET_KEY); render(); });
   }
 </script>

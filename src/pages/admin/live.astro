@@ -1,407 +1,364 @@
 ---
+// The queue desk: the shop's own screen for running the queue. Add walk-ins, mark online
+// customers as arrived, call people to a chair, finish cuts, and manage barbers and settings.
 import Base from '../../layouts/Base.astro';
-import LiveNow from '../../components/LiveNow.astro';
-import { designs } from '../../data/site';
+import { shops } from '../../data/site';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<Base title="Hampton Barbers admin: live shop status" description="Tell customers how busy the shop is right now, and run the walk-in queue.">
-  <main id="main" class="la">
-    <header class="la__top">
+<Base noindex title="Hampton Barbers: queue desk" description="Run the walk-in queue: add walk-ins, call customers to a chair and keep the shop screen up to date.">
+  <main id="main" class="qd" data-base={base}>
+    <header class="qd__top">
       <div>
-        <a class="la__back" href={`${base}/admin/`}>← Prices and hours</a>
-        <h1>Live shop status</h1>
+        <a class="qd__back" href={`${base}/admin/`}>← Prices and hours</a>
+        <h1>Queue desk</h1>
       </div>
-      <p id="la-status" role="status" aria-live="polite">Loading…</p>
+      <p id="qd-status" role="status" aria-live="polite">Loading…</p>
     </header>
 
-    <section class="la__acct" id="la-account" aria-label="Your account"></section>
+    <section class="qd__acct" id="qd-account" aria-label="Your account"></section>
 
-    <nav class="la__tabs" aria-label="Which shop to update">
-      <span class="grp"><span>Hampton Vale, as shown in:</span>
-        {designs.map((d, i) => <button type="button" data-tab={d.id} aria-pressed={i === 0 ? 'true' : 'false'}>{d.name}</button>)}
-      </span>
-      <span class="grp"><span>Other shops:</span>
-        <button type="button" data-tab="shop-2" aria-pressed="false">Shop two</button>
-        <button type="button" data-tab="shop-3" aria-pressed="false">Shop three</button>
-      </span>
+    <nav class="qd__tabs" aria-label="Which shop">
+      {shops.map((s, i) => <button type="button" data-tab={s.id} aria-pressed={i === 0 ? 'true' : 'false'}><span>{s.name}</span></button>)}
     </nav>
+    <p class="qd__links" data-links></p>
+    <p class="qd__banner" data-banner hidden></p>
 
-    <div class="la__grid">
-      <div class="la__controls">
-        <div class="la__quick" aria-label="Quick updates">
-          <button type="button" data-quick="walkin">+ Someone walked in</button>
-          <button type="button" data-quick="seated">Next customer seated</button>
-          <button type="button" data-quick="done">A cut just finished</button>
-          <button type="button" data-quick="empty">Shop is empty</button>
-        </div>
+    <div class="qd__grid">
+      <section class="qd__card" aria-labelledby="qd-h-chairs">
+        <div class="qd__head"><h2 id="qd-h-chairs">Chairs</h2><p data-summary></p></div>
+        <ul class="qd__chairs" data-chairs></ul>
+      </section>
 
-        <div class="la__queue">
-          <div class="la__qhead"><b>Queue, in order</b><small>People who join online appear here by themselves.</small></div>
-          <ol data-queue></ol>
-        </div>
-
-        {[
-          ['barbers', 'Barbers cutting now', 'How many barbers are working right now'],
-          ['inChair', 'Customers in the chair', 'Being cut right now'],
-          ['waiting', 'Walk-ins waiting', 'Adds or removes a walk-in at the back of the queue'],
-          ['minutes', 'Minutes per customer', 'Average time for one cut'],
-        ].map(([k, label, hint]) => (
-          <div class="la__step" data-field={k}>
-            <div><b>{label}</b><small>{hint}</small></div>
-            <div class="la__ctl">
-              <button type="button" data-dec={k} aria-label={`Fewer: ${label}`}>−</button>
-              <output data-val={k}>0</output>
-              <button type="button" data-inc={k} aria-label={`More: ${label}`}>+</button>
-            </div>
-          </div>
-        ))}
-
-        <label class="la__field">How busy we look
-          <select id="la-mode">
-            <option value="auto">Work it out from the numbers (recommended)</option>
-            <option value="quiet">Quiet: walk straight in</option>
-            <option value="steady">Short wait</option>
-            <option value="busy">Busy</option>
-            <option value="very-busy">Very busy</option>
-            <option value="paused">Not cutting right now (break or closing)</option>
-          </select>
-        </label>
-        <label class="la__field">Short message for customers (optional)
-          <input id="la-note" maxlength="120" placeholder="e.g. Back from lunch at 2pm" />
-        </label>
-      </div>
-
-      <div class="la__preview" data-live-preview>
-        <p class="la__plabel">What customers see</p>
-        <LiveNow design="fresh" title="Right now at Hampton Barbers" />
-      </div>
+      <section class="qd__card" aria-labelledby="qd-h-line">
+        <div class="qd__head"><h2 id="qd-h-line">Waiting, in number order</h2><p>People who join on their phones appear here by themselves.</p></div>
+        <form class="qd__add" data-add>
+          <input name="name" maxlength="24" autocomplete="off" placeholder="First name (optional)" aria-label="Walk-in’s first name (optional)" />
+          <button type="submit" class="primary">+ Add walk-in</button>
+        </form>
+        <ol class="qd__line" data-queue></ol>
+      </section>
     </div>
+
+    <details class="qd__card qd__more">
+      <summary>Barbers and settings</summary>
+      <div class="qd__set">
+        <div>
+          <h3>Barbers at this shop</h3>
+          <p class="qd__hint">Each barber has their own profile and chair. Customers are assigned to a barber when they are called.</p>
+          <ul class="qd__staff" data-staff></ul>
+          <button type="button" data-add-barber>+ Add a barber</button>
+        </div>
+        <div class="qd__opts">
+          <h3>Queue settings</h3>
+          <div class="qd__step">
+            <div><b>Usual minutes per cut</b><small>Used for the wait estimates. Timed cuts fine-tune it through the day.</small></div>
+            <div class="qd__ctl"><button type="button" data-avg="-5" aria-label="Fewer minutes per cut">−</button><output data-avg-val>20</output><button type="button" data-avg="5" aria-label="More minutes per cut">+</button></div>
+          </div>
+          <label class="qd__field">Joining from a phone
+            <select id="qd-online">
+              <option value="on">On: customers can join from their phones</option>
+              <option value="off">Paused: walk-ins only</option>
+            </select>
+          </label>
+          <label class="qd__field">How busy we look
+            <select id="qd-mode">
+              <option value="auto">Work it out from the queue (recommended)</option>
+              <option value="quiet">Quiet: walk straight in</option>
+              <option value="steady">Short wait</option>
+              <option value="busy">Busy</option>
+              <option value="very-busy">Very busy</option>
+              <option value="paused">Not cutting right now (break or closing)</option>
+            </select>
+          </label>
+          <label class="qd__field">Short message for customers (optional)
+            <input id="qd-note" maxlength="120" placeholder="e.g. Back from lunch at 2pm" />
+          </label>
+          <div class="qd__row" data-demo-only>
+            <span>Fill the queue with an example:</span>
+            <button type="button" data-example="quiet">Quiet</button>
+            <button type="button" data-example="steady">Steady</button>
+            <button type="button" data-example="busy">Busy</button>
+          </div>
+          <div class="qd__row"><button type="button" data-clear>Clear the queue</button><small>Removes everyone waiting and in the chairs. Ticket numbers carry on.</small></div>
+        </div>
+      </div>
+    </details>
   </main>
 </Base>
 
 <script>
-  import { LIVE_KEY, TICKETS_KEY, LIVE_DEMO, LIVE_KEYS, WALK_IN, cleanStatus, parseLiveAll, fetchLiveStatus, paintLive, newest, type LiveAll, type LiveStatus } from '../../lib/live';
-  import { initializeApp } from 'firebase/app';
-  import { getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
-  import { getFirestore, connectFirestoreEmulator, doc, setDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore/lite';
+  import { addWalkIn, arrive, boardView, callNext, clearQueue, clockText, dropBarber, exampleBoard, finish, lapsed, minsText, removeTicket, setBarber, setOptions, uncall, type LiveMode } from '../../lib/board';
+  import { createDesk } from '../../lib/desk';
+  import { esc, newId } from '../../lib/store';
 
-  type Ticket = { id: string; shop: string; name: string; eta: number; createdAt: number; cloud?: boolean };
+  const root = document.querySelector<HTMLElement>('.qd')!;
+  const base = root.dataset.base ?? '';
+  const emu = new URLSearchParams(location.search).has('emulator');
+  const tabs = [...document.querySelectorAll<HTMLElement>('[data-tab]')];
+  const shops = tabs.map((b) => ({ id: b.dataset.tab!, name: b.textContent!.trim() }));
+  const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+  const statusEl = $('#qd-status'), account = $('#qd-account'), linksEl = $('[data-links]'), bannerEl = $('[data-banner]');
+  const chairsEl = $('[data-chairs]'), queueEl = $('[data-queue]'), staffEl = $('[data-staff]'), summaryEl = $('[data-summary]');
+  const modeEl = $<HTMLSelectElement>('#qd-mode'), onlineEl = $<HTMLSelectElement>('#qd-online'), noteEl = $<HTMLInputElement>('#qd-note');
+  const fill = (el: HTMLElement, html: string) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
+  const shopName = (id: string) => shops.find((s) => s.id === id)?.name ?? 'the shop';
 
-  const cfg = {
-    apiKey: import.meta.env.PUBLIC_FB_API_KEY, authDomain: import.meta.env.PUBLIC_FB_AUTH_DOMAIN,
-    projectId: import.meta.env.PUBLIC_FB_PROJECT_ID, appId: import.meta.env.PUBLIC_FB_APP_ID,
-  };
-  const connected = Boolean(cfg.apiKey && cfg.projectId);
-  const app = connected ? initializeApp(cfg) : null;
-  const auth = app ? getAuth(app) : null;
-  const db = app ? getFirestore(app) : null;
-  if (auth && db && /^(localhost|127\.0\.0\.1|.+\.test)$/.test(location.hostname) && new URLSearchParams(location.search).has('emulator')) {
-    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-    connectFirestoreEmulator(db, '127.0.0.1', 8080);
-  }
-
-  const statusEl = document.getElementById('la-status')!;
-  const account = document.getElementById('la-account')!;
-  const preview = document.querySelector<HTMLElement>('.la__preview .live')!;
-  const queueEl = document.querySelector<HTMLElement>('[data-queue]')!;
-  const modeEl = document.getElementById('la-mode') as HTMLSelectElement;
-  const noteEl = document.getElementById('la-note') as HTMLInputElement;
-  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-  const read = <T,>(k: string): T | null => { try { const x = localStorage.getItem(k); return x ? JSON.parse(x) as T : null; } catch { return null; } };
-  const write = (k: string, x: unknown) => { try { localStorage.setItem(k, JSON.stringify(x)); } catch { /* storage blocked */ } };
-  const clock = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const shopLabel = (k: string) => k === 'shop-2' ? 'Shop two' : k === 'shop-3' ? 'Shop three' : `Hampton Vale (${k[0].toUpperCase()}${k.slice(1)} demo)`;
-
-  let user: User | null = null;
-  let tab = 'heritage';
-  let all: LiveAll = Object.fromEntries(LIVE_KEYS.map((k) => [k, cleanStatus(LIVE_DEMO[k], LIVE_DEMO[k])]));
-  let tickets = new Map<string, Ticket>();
-  let cloudSeen = false;          // true when the last cloud check could see every online ticket
-  let seenLocal = new Set<string>(); // online places made on this device that we have already seen
-  let lastQueueHtml = '';
+  let tab = shops.find((s) => s.id === new URLSearchParams(location.search).get('shop'))?.id ?? shops[0].id;
+  let accountMsg = '';
+  let drawnFor: string | null | undefined;
+  const known: Record<string, Set<string>> = {}; // tickets already seen, so new online joiners can be announced
 
   const toast = (msg: string) => {
-    document.querySelector('.la__toast')?.remove();
-    const t = Object.assign(document.createElement('p'), { className: 'la__toast', textContent: msg });
+    document.querySelector('.qd__toast')?.remove();
+    const t = Object.assign(document.createElement('p'), { className: 'qd__toast', textContent: msg });
+    t.setAttribute('role', 'status');
     document.body.append(t);
-    setTimeout(() => t.remove(), 4000);
+    setTimeout(() => t.remove(), 4500);
   };
+
+  const desk = createDesk(shops.map((s) => s.id), () => draw());
 
   // ---------- drawing ----------
+  const drawAccount = () => {
+    const email = desk.email();
+    if (drawnFor === email && !accountMsg) return;
+    drawnFor = email;
+    const note = accountMsg ? `<p class="qd__msg" role="alert">${esc(accountMsg)}</p>` : '';
+    accountMsg = '';
+    if (!desk.connected) { account.innerHTML = '<p><strong>Not connected.</strong> Changes show on this device only.</p>'; return; }
+    account.innerHTML = email
+      ? `<p>Signed in as <strong>${esc(email)}</strong>. Every change goes live straight away on the website, the barbers’ phones and the shop TV. <button type="button" class="link" data-out>Sign out</button></p>${note}`
+      : `<form id="qd-signin" class="qd__signin"><b>Sign in to run the real queue</b>
+          <input type="email" name="email" autocomplete="username" placeholder="Email" required />
+          <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
+          <button type="submit" class="primary">Sign in</button></form>${note}
+        <p class="qd__hint">Until you sign in this is a demo that stays on this device: open the shop TV, a barber panel and a customer page in other tabs and they all follow along.</p>`;
+  };
+
   const draw = () => {
-    const s = all[tab];
-    document.querySelector('[data-val="barbers"]')!.textContent = String(s.barbers);
-    document.querySelector('[data-val="inChair"]')!.textContent = String(s.inChair);
-    document.querySelector('[data-val="waiting"]')!.textContent = String(s.line.filter((x) => x === WALK_IN).length);
-    document.querySelector('[data-val="minutes"]')!.textContent = String(s.minutes);
-    modeEl.value = s.mode;
-    if (document.activeElement !== noteEl) noteEl.value = s.note;
-    const look = tab === 'fresh' || tab === 'club' ? tab : 'fresh';
-    preview.className = preview.className.replace(/live--\w+/, `live--${look}`);
-    paintLive(preview, s);
-    const qHtml = s.line.length ? s.line.map((x, i) => {
-      if (x === WALK_IN) return `<li><span class="n">${i + 1}</span><span><b>Walk-in</b><small>Waiting in the shop</small></span><button type="button" data-seat="${i}">Seat</button><button type="button" data-remove="${i}">Left</button></li>`;
-      const t = tickets.get(x);
-      const who = t ? esc(t.name) : 'Online customer';
-      const when = t ? `Joined online ${clock.format(new Date(t.createdAt))} · ${t.eta ? `arriving in about ${t.eta} min` : 'on the way now'}` : 'Joined online';
-      return `<li class="online"><span class="n">${i + 1}</span><span><b>${who}</b><small>${when}</small></span><button type="button" data-seat="${i}">Seat</button><button type="button" data-remove="${i}">Remove</button></li>`;
-    }).join('') : '<li class="empty">Nobody waiting</li>';
-    // Only redraw when something changed, so a barber's tap never lands on a button being replaced.
-    if (qHtml !== lastQueueHtml) { queueEl.innerHTML = qHtml; lastQueueHtml = qHtml; }
-    document.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => {
-      b.setAttribute('aria-pressed', String(b.dataset.tab === tab));
-      const online = all[b.dataset.tab!].line.filter((x) => x !== WALK_IN).length;
-      const badge = b.querySelector('.badge');
-      if (String(online || '') !== (badge?.textContent ?? '')) {
-        badge?.remove();
-        if (online) b.insertAdjacentHTML('beforeend', `<b class="badge" title="Joined online">${online}</b>`);
-      }
+    const now = Date.now();
+    const b = desk.board(tab, now);
+    const v = boardView(b, now);
+    const signedIn = Boolean(desk.email());
+    statusEl.textContent = desk.offline(tab) ? 'No connection. Showing the last known queue.' : desk.status();
+    drawAccount();
+
+    // Announce people who joined on their phones since the last look.
+    for (const s of shops) {
+      const ids = Object.entries(desk.board(s.id, now).t);
+      if (known[s.id]) for (const [id, k] of ids) if (!known[s.id].has(id) && k.src !== 'desk' && now - k.at < 30_000) toast(`Number ${k.n} joined ${k.src === 'qr' ? 'at the door' : 'online'} for ${s.name}`);
+      known[s.id] = new Set(ids.map(([id]) => id));
+    }
+    tabs.forEach((btn) => {
+      const id = btn.dataset.tab!;
+      btn.setAttribute('aria-pressed', String(id === tab));
+      const n = boardView(desk.board(id, now), now).waiting;
+      const badge = btn.querySelector('.badge');
+      if (String(n || '') !== (badge?.textContent ?? '')) { badge?.remove(); if (n) btn.insertAdjacentHTML('beforeend', `<b class="badge" title="People waiting">${n}</b>`); }
     });
-  };
+    const q = emu ? '?emulator' : '';
+    fill(linksEl, `Open for ${esc(shopName(tab))}:
+      <a href="${base}/board/${tab}/${q}" target="_blank" rel="noopener">Shop TV</a>
+      <a href="${base}/barber/?shop=${tab}${emu ? '&emulator' : ''}" target="_blank" rel="noopener">Barber panel</a>
+      <a href="${base}/queue/${tab}/${q}" target="_blank" rel="noopener">Customer page</a>
+      <a href="${base}/queue/${tab}/?here=1${emu ? '&emulator' : ''}" target="_blank" rel="noopener">Door code link</a>
+      <a href="${base}/poster/${tab}/" target="_blank" rel="noopener">Door poster</a>`);
+    const closed = signedIn && !desk.opened(tab);
+    bannerEl.hidden = !closed;
+    if (closed) fill(bannerEl, `Today’s queue for ${esc(shopName(tab))} is not open yet, so customers cannot see or join it. <button type="button" class="primary" data-open>Open today’s queue</button>`);
+    summaryEl.textContent = `${v.inShop} in the shop · ${v.onWay} on the way · walk-in wait: ${v.headline === 'No wait' ? 'none' : `${v.headline} ${v.unit}`.trim()}`;
 
-  // ---------- saving ----------
-  let timer: number | undefined;
-  const commit = (keys: string[]) => {
-    const now = Date.now();
-    for (const k of keys) all[k] = cleanStatus({ ...all[k], updatedAt: now }, LIVE_DEMO[k]);
-    draw();
-    write(LIVE_KEY, all);
-    if (!user || !db) { statusEl.textContent = 'Shown on this device only. Sign in to update the website for everyone.'; return; }
-    statusEl.textContent = 'Updating the website…';
-    clearTimeout(timer);
-    timer = window.setTimeout(publish, 600);
-  };
-  const stamp = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const publish = async () => {
-    if (!user || !db) return;
-    const write2 = () => setDoc(doc(db, 'site', 'live'), { json: JSON.stringify(all), updatedAt: serverTimestamp() });
-    const denied = (err: unknown) => String((err as { code?: string }).code ?? '').includes('permission');
-    try {
-      try { await write2(); }
-      catch (err) {
-        if (!denied(err)) throw err;
-        await setDoc(doc(db, 'site', 'owner'), { uid: user.uid }); // first admin claims the site
-        await write2();
+    const next = v.line.find((x) => x.s === 'here');
+    fill(chairsEl, v.chairs.map((c) => {
+      const who = `Chair ${c.chair}${c.name ? ` · ${esc(c.name)}` : ''}`;
+      if (c.state === 'busy') {
+        const nm = desk.name(tab, c.tid!);
+        return `<li class="busy${c.calling ? ' calling' : ''}"><div><small>${who}</small><b>${c.n}</b><span>${nm ? `${esc(nm)} · ` : ''}${c.calling ? 'called just now' : `${c.mins} min so far`}</span></div>
+          <div class="qd__btns"><button type="button" class="primary" data-finish="${c.id}">Finish</button><button type="button" data-uncall="${c.tid}">Undo</button></div></li>`;
       }
-      statusEl.textContent = `Live for everyone ✓ ${stamp.format(new Date())}`;
-    } catch (err) {
-      statusEl.textContent = denied(err)
-        ? 'This account is not allowed to update the website. Sign in with the account that set it up.'
-        : 'Could not reach the website. Check the internet connection; it will retry on your next change.';
+      if (c.state === 'break') return `<li class="break"><div><small>${who}</small><b>Break</b><span>Not taking customers</span></div>
+        <div class="qd__btns"><button type="button" data-brk-off="${c.id}">Back from break</button></div></li>`;
+      return `<li class="free"><div><small>${who}</small><b>Free</b><span>${next ? `Next is number ${next.n}` : v.onWay ? 'Nobody in the shop yet' : 'Nobody waiting'}</span></div>
+        <div class="qd__btns"><button type="button" class="primary" data-call="${c.id}">Call next</button><button type="button" data-brk-on="${c.id}">Break</button></div></li>`;
+    }).join('') || '<li class="none">No barbers are on shift. Open “Barbers and settings” below to put someone on shift.</li>');
+
+    fill(queueEl, v.line.map((x) => {
+      const k = b.t[x.id];
+      const nm = desk.name(tab, x.id);
+      const title = nm ? esc(nm) : k.src === 'desk' ? 'Walk-in' : 'Online customer';
+      const sub = x.s === 'here' ? `In the shop${k.src === 'desk' ? '' : ' · joined on their phone'}` : `On the way · due ${clockText(x.due)}${k.late ? ' · running late' : ''}`;
+      return `<li class="${x.s}"><span class="n">${x.n}</span><span class="who"><b>${title}</b><small>${sub}</small></span><span class="eta">${minsText(x.mins)}</span>
+        <span class="qd__btns">${x.s === 'way' ? `<button type="button" data-arrived="${x.id}">Arrived</button>` : ''}<button type="button" class="primary" data-seat="${x.id}">Seat</button><button type="button" data-remove="${x.id}" aria-label="Remove number ${x.n} from the queue">Remove</button></span></li>`;
+    }).join('') || '<li class="empty">Nobody waiting</li>');
+
+    if (!staffEl.contains(document.activeElement)) {
+      fill(staffEl, Object.entries(b.staff).sort((x, y) => x[1].chair - y[1].chair).map(([id, s]) => `<li data-barber="${id}">
+        <label class="num">Chair<input type="number" min="1" max="30" value="${s.chair}" data-f="chair" /></label>
+        <label class="grow">Name<input maxlength="20" value="${esc(s.name)}" placeholder="First name" data-f="name" /></label>
+        <label class="chk"><input type="checkbox" ${s.on ? 'checked' : ''} data-f="on" />On shift</label>
+        <span class="done">${s.done} cut${s.done === 1 ? '' : 's'} today</span>
+        <button type="button" data-drop-barber="${id}" aria-label="Remove ${esc(s.name || `the barber on chair ${s.chair}`)}">Remove</button></li>`).join('') || '<li class="none">No barbers yet.</li>');
     }
+    $('[data-avg-val]').textContent = String(b.avg);
+    modeEl.value = b.mode;
+    onlineEl.value = b.online ? 'on' : 'off';
+    if (document.activeElement !== noteEl) noteEl.value = b.note;
+    $('[data-demo-only]').hidden = signedIn;
   };
 
-  // ---------- online tickets ----------
-  const dropTicket = (id: string) => {
-    const t = tickets.get(id);
-    tickets.delete(id);
-    write(TICKETS_KEY, (read<Ticket[]>(TICKETS_KEY) ?? []).filter((x) => x.id !== id));
-    if (t?.cloud !== false && user && db && !id.startsWith('local')) deleteDoc(doc(db, 'tickets', id)).catch(() => { /* tidied up later */ });
+  // ---------- actions ----------
+  const seat = (id: string) => {
+    const free = boardView(desk.board(tab), Date.now()).chairs.find((c) => c.state === 'free');
+    if (!free) { toast('No chair is free. Finish a cut first.'); return; }
+    desk.act(tab, (b, now) => callNext(b, free.id, now, id));
   };
-  const calledAdd = (s: LiveStatus, id: string) => [...s.called.filter((x) => x !== id), id].slice(-20);
-
-  const loadTickets = async () => {
-    const merged = new Map<string, Ticket>();
-    const localList = read<Ticket[]>(TICKETS_KEY) ?? [];
-    localList.forEach((t) => merged.set(t.id, t));
-    let cloudOk = false;
-    if (user && db) {
-      try {
-        const snap = await getDocs(query(collection(db, 'tickets'), where('status', '==', 'waiting')));
-        snap.forEach((d) => {
-          const x = d.data();
-          merged.set(d.id, { id: d.id, shop: x.shop, name: x.name, eta: x.eta, createdAt: x.createdAt?.toMillis?.() ?? Date.now(), cloud: true });
-        });
-        cloudOk = true;
-      } catch { /* not allowed or offline: use what this device knows */ }
-    }
-    cloudSeen = cloudOk;
-    const before = new Set(tickets.keys());
-    tickets = merged;
-    const changed = new Set<string>();
-    const now = Date.now();
-    for (const t of [...tickets.values()]) {
-      const s = all[t.shop];
-      if (!s) continue;
-      if (now - t.createdAt > 12 * 3_600_000) { dropTicket(t.id); if (s.line.includes(t.id)) { all[t.shop] = { ...s, line: s.line.filter((x) => x !== t.id) }; changed.add(t.shop); } continue; }
-      if (!s.line.includes(t.id) && !s.called.includes(t.id)) {
-        all[t.shop] = { ...all[t.shop], line: [...all[t.shop].line, t.id] };
-        changed.add(t.shop);
-        if (!before.has(t.id)) toast(`${t.name} joined the queue online for ${shopLabel(t.shop)}`);
-      }
-    }
-    // Remove online places whose ticket has gone (the customer left the queue).
-    const localIds = new Set(localList.map((t) => t.id));
-    for (const k of LIVE_KEYS) {
-      const s = all[k];
-      const keep = s.line.filter((x) => x === WALK_IN || tickets.has(x) || (!cloudSeen && !seenLocal.has(x)));
-      if (keep.length !== s.line.length) { all[k] = { ...s, line: keep }; changed.add(k); }
-    }
-    seenLocal = new Set([...seenLocal, ...localIds]);
-    if (changed.size) commit([...changed]); else draw();
-  };
-
-  // ---------- controls ----------
-  const bump = (k: 'barbers' | 'inChair' | 'waiting' | 'minutes', d: number) => {
-    const s = { ...all[tab], line: [...all[tab].line] };
-    if (k === 'waiting') {
-      if (d > 0) s.line.push(WALK_IN);
-      else { const i = s.line.lastIndexOf(WALK_IN); if (i >= 0) s.line.splice(i, 1); }
-    } else if (k === 'minutes') s.minutes += d * 5;
-    else if (k === 'barbers') { s.barbers += d; s.inChair = Math.min(s.inChair, Math.max(0, s.barbers)); }
-    else s.inChair += d;
-    all[tab] = s;
-    commit([tab]);
-  };
-  const seat = (i: number) => {
-    const s = { ...all[tab], line: [...all[tab].line] };
-    const [x] = s.line.splice(i, 1);
-    if (x === undefined) return;
-    s.inChair = Math.min(s.barbers, s.inChair + 1);
-    if (x !== WALK_IN) { s.called = calledAdd(s, x); dropTicket(x); }
-    all[tab] = s;
-    commit([tab]);
-  };
-  const removeAt = (i: number) => {
-    const s = { ...all[tab], line: [...all[tab].line] };
-    const [x] = s.line.splice(i, 1);
-    if (x === undefined) return;
-    if (x !== WALK_IN) dropTicket(x);
-    all[tab] = s;
-    commit([tab]);
-  };
-
   document.addEventListener('click', (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>('button');
-    if (!t || t.closest('[data-live-preview]')) return;
-    if (t.dataset.inc) bump(t.dataset.inc as never, 1);
-    else if (t.dataset.dec) bump(t.dataset.dec as never, -1);
-    else if (t.dataset.tab) { tab = t.dataset.tab; draw(); }
-    else if (t.dataset.seat) seat(Number(t.dataset.seat));
-    else if (t.dataset.remove) removeAt(Number(t.dataset.remove));
-    else if (t.dataset.quick) {
-      const s = { ...all[tab], line: [...all[tab].line] };
-      const q = t.dataset.quick;
-      if (q === 'walkin') {
-        if (s.inChair < s.barbers && s.line.length === 0) s.inChair++; else s.line.push(WALK_IN);
-      } else if (q === 'seated' || q === 'done') {
-        if (s.line.length && (q === 'done' || s.inChair < s.barbers)) {
-          const x = s.line.shift()!;
-          if (q === 'seated') s.inChair = Math.min(s.barbers, s.inChair + 1);
-          if (x !== WALK_IN) { s.called = calledAdd(s, x); dropTicket(x); toast(`${tickets.get(x)?.name ?? 'Online customer'} has been called to the chair`); }
-        } else if (q === 'done' && s.inChair > 0) s.inChair--;
-      } else if (q === 'empty') {
-        s.line.filter((x) => x !== WALK_IN).forEach(dropTicket);
-        s.line = []; s.inChair = 0;
-      }
-      all[tab] = { ...s, mode: s.mode === 'paused' ? 'auto' : s.mode };
-      commit([tab]);
-    }
+    if (!t) return;
+    const d = t.dataset;
+    if (d.tab) { tab = d.tab; draw(); }
+    else if (d.call) desk.act(tab, (b, now) => callNext(b, d.call!, now));
+    else if (d.finish) desk.act(tab, (b, now) => finish(b, d.finish!, now));
+    else if (d.uncall) desk.act(tab, (b, now) => uncall(b, d.uncall!, now));
+    else if (d.brkOn) desk.act(tab, (b, now) => setBarber(b, d.brkOn!, { brk: true }, now));
+    else if (d.brkOff) desk.act(tab, (b, now) => setBarber(b, d.brkOff!, { brk: false }, now));
+    else if (d.arrived) desk.act(tab, (b, now) => arrive(b, d.arrived!, now));
+    else if (d.seat) seat(d.seat);
+    else if (d.remove) desk.act(tab, (b, now) => removeTicket(b, d.remove!, now));
+    else if (d.avg) desk.act(tab, (b, now) => setOptions(b, { avg: b.avg + Number(d.avg) }, now));
+    else if ('open' in d) desk.act(tab, (b) => b);
+    else if ('addBarber' in d) desk.act(tab, (b, now) => setBarber(b, newId('b'), {}, now));
+    else if (d.dropBarber) { if (confirm('Remove this barber from the shop’s list?')) desk.act(tab, (b, now) => dropBarber(b, d.dropBarber!, now)); }
+    else if (d.example) { if (confirm(`Replace the demo queue for ${shopName(tab)} with a “${d.example}” example?`)) desk.act(tab, (b, now) => ({ ...exampleBoard(d.example!, now, b), updatedAt: Math.max(now, b.updatedAt + 1) })); }
+    else if ('clear' in d) { if (confirm(`Remove everyone from the queue for ${shopName(tab)}? This cannot be undone.`)) desk.act(tab, (b, now) => clearQueue(b, now)); }
+    else if ('out' in d) desk.signOut();
   });
-  modeEl.addEventListener('change', () => { all[tab] = { ...all[tab], mode: modeEl.value as LiveStatus['mode'] }; commit([tab]); });
+  $<HTMLFormElement>('[data-add]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = (e.target as HTMLFormElement).querySelector<HTMLInputElement>('input')!;
+    const name = input.value.trim().replace(/\s+/g, ' ').slice(0, 24);
+    const id = newId('w');
+    input.value = ''; // cleared at once, so the next name can be typed while this one saves
+    if (!(await desk.act(tab, (b, now) => addWalkIn(b, id, now)))) { input.value ||= name; return; }
+    if (name) desk.setName(tab, id, name);
+    toast(`Number ${desk.board(tab).t[id]?.n ?? ''}${name ? ` for ${name}` : ''}: added to the queue`);
+  });
+  staffEl.addEventListener('change', (e) => {
+    const el = e.target as HTMLInputElement;
+    const id = el.closest<HTMLElement>('[data-barber]')?.dataset.barber;
+    if (!id || !el.dataset.f) return;
+    const patch = el.dataset.f === 'on' ? { on: el.checked } : el.dataset.f === 'chair' ? { chair: Number(el.value) } : { name: el.value };
+    const shop = tab;
+    el.blur();
+    desk.act(shop, (b, now) => setBarber(b, id, patch, now));
+  });
+  // The chosen value is read before saving: the screen redraws while a save is in progress.
+  modeEl.addEventListener('change', () => { const mode = modeEl.value as LiveMode; desk.act(tab, (b, now) => setOptions(b, { mode }, now)); });
+  onlineEl.addEventListener('change', () => { const online = onlineEl.value === 'on'; desk.act(tab, (b, now) => setOptions(b, { online }, now)); });
   let noteTimer: number | undefined;
-  noteEl.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = window.setTimeout(() => { all[tab] = { ...all[tab], note: noteEl.value }; commit([tab]); }, 400); });
+  noteEl.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = window.setTimeout(() => { const note = noteEl.value; desk.act(tab, (b, now) => setOptions(b, { note }, now)); }, 500); });
 
-  // ---------- account (sign-in only; accounts are created on the main admin page) ----------
-  const drawAccount = (msg = '') => {
-    const note = msg ? `<p class="la__msg" role="alert">${esc(msg)}</p>` : '';
-    if (!connected) { account.innerHTML = '<p><strong>Not connected.</strong> Changes show on this device only.</p>'; return; }
-    if (!user) {
-      account.innerHTML = `<form id="la-signin" class="la__signin"><b>Sign in to update the website for everyone</b>
-        <input type="email" name="email" autocomplete="username" placeholder="Email" required />
-        <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
-        <button type="submit" class="primary">Sign in</button></form>${note}
-        <p class="la__hint">Until you sign in, changes and online joiners show only on this device, which is handy for a demo.</p>`;
-    } else {
-      account.innerHTML = `<p>Signed in as <strong>${esc(user.email)}</strong>. Every change goes live straight away, and online joiners appear here. <button type="button" class="link" data-out>Sign out</button></p>${note}`;
-    }
-  };
   account.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!auth) return;
     const f = new FormData(e.target as HTMLFormElement);
-    try { await signInWithEmailAndPassword(auth, String(f.get('email')).trim(), String(f.get('password'))); }
-    catch { drawAccount('The email or password is not right.'); }
+    try { await desk.signIn(String(f.get('email')).trim(), String(f.get('password'))); }
+    catch { accountMsg = 'The email or password is not right.'; draw(); }
   });
-  account.addEventListener('click', async (e) => { if ((e.target as HTMLElement).closest('[data-out]') && auth) await signOut(auth); });
-  if (auth) onAuthStateChanged(auth, (u) => {
-    user = u && !u.isAnonymous ? u : null;
-    drawAccount();
-    statusEl.textContent = user ? 'Signed in. Changes go live straight away.' : 'Shown on this device only. Sign in to update the website for everyone.';
-    loadTickets();
-  });
-  else drawAccount();
 
-  // ---------- start: newest of this device's copy and the published copy ----------
-  (async () => {
-    const local = parseLiveAll(localStorage.getItem(LIVE_KEY));
-    const published = await fetchLiveStatus();
-    all = Object.fromEntries(LIVE_KEYS.map((k) => [k, cleanStatus(newest(local?.[k], published?.[k], LIVE_DEMO[k]), LIVE_DEMO[k])]));
-    draw();
-    loadTickets();
-  })();
+  // ---------- start ----------
   draw();
-  setInterval(loadTickets, 8000);
-  addEventListener('storage', (e) => { if (e.key === TICKETS_KEY) loadTickets(); });
+  setInterval(() => {
+    const now = Date.now();
+    // Drop online places whose owner never arrived, then refresh the countdowns.
+    for (const s of shops) if (Object.values(desk.board(s.id, now).t).some((k) => lapsed(k, now))) desk.act(s.id, (b) => b);
+    draw();
+  }, 15_000);
 </script>
 
 <style is:global>
-  .la { --bg: #f4f2ee; --surface: #fff; --text: #15140f; --muted: #57534a; --accent: #15140f; --on-accent: #fff; --line: #d9d4c8; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; --dw: 700; background: #f4f2ee; color: #15140f; min-height: 100svh; padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 3rem) 5rem; }
-  .la > * { max-width: 76rem; margin-inline: auto; }
-  .la__top { display: flex; justify-content: space-between; align-items: end; gap: 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; background: #f4f2ee; padding-block: .75rem; border-bottom: 1px solid var(--line); }
-  .la__back { font-size: .9rem; color: var(--muted); }
-  .la h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.8rem); letter-spacing: -.04em; margin-top: .3rem; }
-  #la-status { font-weight: 700; font-size: .92rem; color: #2a7a4b; }
-  .la button, .la input, .la select { font: inherit; }
-  .la button { min-height: 2.9rem; padding: .5rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; font-weight: 650; cursor: pointer; }
-  .la button:hover { border-color: #15140f; }
-  .la .primary { background: #15140f; color: #fff; border-color: #15140f; }
-  .la .link { border: 0; background: none; text-decoration: underline; min-height: auto; padding: 0 .25rem; }
-  .la__acct { margin-top: 1rem; padding: 1rem 1.1rem; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
-  .la__signin { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-  .la__signin b { width: 100%; }
-  .la__signin input { flex: 1 1 12rem; min-height: 2.9rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 10px; }
-  .la__hint { font-size: .85rem; color: var(--muted); margin-top: .5rem; }
-  .la__msg { color: #8a4b00; font-weight: 600; margin-top: .5rem; }
-  .la__tabs { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-block: 1.25rem; }
-  .la__tabs span { font-size: .85rem; color: var(--muted); margin-right: .25rem; }
-  .la__tabs button[aria-pressed='true'] { background: #15140f; color: #fff; border-color: #15140f; }
-  .la__grid { display: grid; grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
-  .la__controls { display: grid; gap: .75rem; }
-  .la__quick { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
-  .la__quick button { min-height: 3.3rem; background: #15140f; color: #fff; border-color: #15140f; }
-  .la__quick button:nth-child(4) { background: #fff; color: #15140f; border-color: var(--line); }
-  .la__step { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 1rem; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
-  .la__step b { display: block; }
-  .la__step small { color: var(--muted); font-size: .82rem; }
-  .la__ctl { display: flex; align-items: center; gap: .5rem; flex: none; }
-  .la__ctl button { width: 3rem; height: 3rem; padding: 0; border-radius: 50%; font-size: 1.5rem; line-height: 1; }
-  .la__ctl output { min-width: 2.2rem; text-align: center; font-family: var(--display); font-size: 1.8rem; font-weight: 700; }
-  .la__field { display: grid; gap: .35rem; font-weight: 650; font-size: .9rem; }
-  .la__field select, .la__field input { min-height: 2.9rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-  .la__plabel { font-size: .75rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-  .la__preview .live { padding-block: .5rem 0; }
-  .la__preview .live__in { width: 100%; }
-  .la__preview .live__head h2 { font-size: 1.6rem; }
-  .la__preview .live__grid { grid-template-columns: 1fr; }
-  .la__preview .live__big b { font-size: clamp(3.5rem, 8vw, 5.5rem); }
-  .la__preview .live__foot { display: none; }
-  @media (max-width: 900px) { .la__grid { grid-template-columns: 1fr; } }
-  .la__tabs .grp { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-right: .75rem; }
-  .la__tabs b.badge { display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; margin-left: .35rem; padding-inline: .3rem; border-radius: 999px; background: #e4472b; color: #fff; font-size: .72rem; }
-  .la__queue { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: .9rem 1rem; }
-  .la__qhead { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; flex-wrap: wrap; margin-bottom: .6rem; }
-  .la__qhead small { color: var(--muted); font-size: .8rem; }
-  .la__queue ol { display: grid; gap: .45rem; }
-  .la__queue li { display: grid; grid-template-columns: 2rem 1fr auto auto; align-items: center; gap: .5rem; padding: .45rem .5rem; border-radius: 10px; background: #f7f4ee; }
-  .la__queue li.online { background: #fff1ec; box-shadow: 0 0 0 1.5px #e4472b inset; }
-  .la__queue li .n { font-family: var(--display); font-weight: 800; font-size: 1.2rem; text-align: center; }
-  .la__queue li b { display: block; }
-  .la__queue li small { color: var(--muted); font-size: .8rem; }
-  .la__queue li button { min-height: 2.4rem; padding: .3rem .7rem; font-size: .85rem; }
-  .la__queue li button[data-seat] { background: #15140f; color: #fff; border-color: #15140f; }
-  .la__queue .empty { color: var(--muted); padding: .4rem .2rem; }
-  .la__toast { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 80; padding: .8rem 1.1rem; border-radius: 12px; background: #15140f; color: #fff; font-weight: 700; box-shadow: 0 14px 40px rgb(0 0 0 / .3); animation: la-toast .35s cubic-bezier(.34,1.56,.64,1) both; }
-  @keyframes la-toast { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-  .la__preview .live__shops, .la__preview .live__ticket, .la__preview .live__join { display: none !important; }
+  .qd { --bg: #f4f2ee; --surface: #fff; --text: #15140f; --muted: #57534a; --accent: #15140f; --on-accent: #fff; --line: #d9d4c8; --ok: #1f8a4c; --warn: #b4690e; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; background: #f4f2ee; color: #15140f; min-height: 100svh; padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 3rem) 5rem; }
+  .qd > * { max-width: 76rem; margin-inline: auto; }
+  .qd__top { display: flex; justify-content: space-between; align-items: end; gap: .5rem 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; background: #f4f2ee; padding-block: .75rem; border-bottom: 1px solid var(--line); }
+  .qd__back { font-size: .9rem; color: var(--muted); }
+  .qd h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.8rem); letter-spacing: -.04em; margin-top: .3rem; }
+  .qd h2 { font-family: var(--display); font-weight: 750; font-size: 1.35rem; letter-spacing: -.02em; }
+  .qd h3 { font-family: inherit; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: .6rem; }
+  #qd-status { font-weight: 700; font-size: .92rem; color: var(--ok); }
+  .qd button, .qd input, .qd select { font: inherit; }
+  .qd button { min-height: 2.9rem; padding: .5rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; font-weight: 650; cursor: pointer; }
+  .qd button:hover { border-color: #15140f; }
+  .qd .primary { background: #15140f; color: #fff; border-color: #15140f; }
+  .qd .link { border: 0; background: none; text-decoration: underline; min-height: auto; padding: 0 .25rem; }
+  .qd input:not([type='checkbox']), .qd select { min-height: 2.9rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; min-width: 0; }
+  .qd__acct { margin-top: 1rem; padding: 1rem 1.1rem; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .qd__signin { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  .qd__signin b { width: 100%; }
+  .qd__signin input { flex: 1 1 12rem; }
+  .qd__hint { font-size: .85rem; color: var(--muted); margin-top: .5rem; }
+  .qd__msg { color: #8a4b00; font-weight: 600; margin-top: .5rem; }
+  .qd__tabs { display: flex; flex-wrap: wrap; gap: .4rem; margin-block: 1.25rem .6rem; }
+  .qd__tabs button[aria-pressed='true'] { background: #15140f; color: #fff; border-color: #15140f; }
+  .qd__tabs b.badge { display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; margin-left: .4rem; padding-inline: .3rem; border-radius: 999px; background: #e4472b; color: #fff; font-size: .72rem; }
+  .qd__links { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .9rem; font-size: .9rem; color: var(--muted); margin-bottom: 1rem; }
+  .qd__links a { font-weight: 650; color: #15140f; }
+  .qd__banner { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; padding: .8rem 1rem; margin-bottom: 1rem; border-radius: 14px; background: #fff3d6; border: 1px solid #e8c36a; font-weight: 600; }
+  .qd__banner[hidden] { display: none; }
+  .qd__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 1.25rem; align-items: start; }
+  .qd__card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 1.1rem 1.2rem 1.25rem; }
+  .qd__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .2rem 1rem; margin-bottom: .9rem; }
+  .qd__head p { font-size: .82rem; color: var(--muted); }
+  .qd__btns { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .qd__chairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr)); gap: .7rem; }
+  .qd__chairs li { display: grid; gap: .8rem; align-content: space-between; padding: .9rem 1rem 1rem; border-radius: 14px; background: #f7f4ee; border: 1.5px solid transparent; }
+  .qd__chairs li > div:first-child { display: grid; gap: .1rem; }
+  .qd__chairs small { font-size: .78rem; font-weight: 700; color: var(--muted); }
+  .qd__chairs b { font-family: var(--display); font-weight: 800; font-size: 2.6rem; line-height: 1; letter-spacing: -.03em; }
+  .qd__chairs span { font-size: .85rem; color: var(--muted); }
+  .qd__chairs li.free { background: #eaf7ef; border-color: #9fd7b5; }
+  .qd__chairs li.free b { color: var(--ok); font-size: 1.9rem; }
+  .qd__chairs li.break b { color: var(--muted); font-size: 1.9rem; }
+  .qd__chairs li.calling { border-color: #15140f; animation: qd-call 1.2s ease-in-out infinite alternate; }
+  @keyframes qd-call { from { box-shadow: 0 0 0 0 rgb(21 20 15 / .25); } to { box-shadow: 0 0 0 6px rgb(21 20 15 / 0); } }
+  .qd__chairs li.none, .qd__staff li.none { display: block; background: none; color: var(--muted); padding: .2rem 0; }
+  .qd__chairs .qd__btns button { flex: 1 1 auto; }
+  .qd__add { display: flex; gap: .5rem; margin-bottom: .8rem; }
+  .qd__add input { flex: 1 1 8rem; }
+  .qd__line { display: grid; gap: .45rem; }
+  .qd__line li { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; align-items: center; gap: .3rem .7rem; padding: .55rem .7rem; border-radius: 12px; background: #f7f4ee; }
+  .qd__line li.way { background: #fff7e8; box-shadow: 0 0 0 1.5px #ecc46f inset; }
+  .qd__line .n { font-family: var(--display); font-weight: 800; font-size: 1.7rem; line-height: 1; text-align: center; letter-spacing: -.03em; }
+  .qd__line .who { display: grid; min-width: 0; }
+  .qd__line .who small { color: var(--muted); font-size: .8rem; }
+  .qd__line li.way .who small { color: var(--warn); font-weight: 600; }
+  .qd__line .eta { font-weight: 750; font-size: .9rem; white-space: nowrap; }
+  .qd__line .qd__btns { grid-column: 2 / -1; }
+  .qd__line .qd__btns button { min-height: 2.5rem; padding: .3rem .8rem; font-size: .88rem; }
+  .qd__line .empty { display: block; background: none; color: var(--muted); padding: .4rem .2rem; }
+  .qd__more { margin-top: 1.25rem; }
+  .qd__more summary { cursor: pointer; font-family: var(--display); font-weight: 750; font-size: 1.2rem; }
+  .qd__set { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 2rem; margin-top: 1.2rem; }
+  .qd__staff { display: grid; gap: .5rem; margin-block: .8rem; }
+  .qd__staff li { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem .7rem; padding: .7rem .8rem; border-radius: 12px; background: #f7f4ee; }
+  .qd__staff label { display: grid; gap: .2rem; font-size: .78rem; font-weight: 700; color: var(--muted); }
+  .qd__staff label.num input { width: 4.2rem; }
+  .qd__staff label.grow { flex: 1 1 8rem; }
+  .qd__staff label.chk { display: flex; align-items: center; gap: .4rem; min-height: 2.9rem; font-size: .9rem; color: inherit; }
+  .qd__staff input[type='checkbox'] { width: 1.3rem; height: 1.3rem; accent-color: #15140f; }
+  .qd__staff .done { font-size: .82rem; color: var(--muted); align-self: center; }
+  .qd__staff button { min-height: 2.5rem; font-size: .85rem; }
+  .qd__opts { display: grid; gap: .8rem; align-content: start; }
+  .qd__step { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 1rem; background: #f7f4ee; border-radius: 14px; }
+  .qd__step b { display: block; }
+  .qd__step small, .qd__row small { color: var(--muted); font-size: .82rem; }
+  .qd__ctl { display: flex; align-items: center; gap: .5rem; flex: none; }
+  .qd__ctl button { width: 3rem; height: 3rem; padding: 0; border-radius: 50%; font-size: 1.5rem; line-height: 1; }
+  .qd__ctl output { min-width: 2.2rem; text-align: center; font-family: var(--display); font-size: 1.8rem; font-weight: 700; }
+  .qd__field { display: grid; gap: .35rem; font-weight: 650; font-size: .9rem; }
+  .qd__row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .7rem; font-size: .9rem; }
+  .qd__row[hidden] { display: none; }
+  .qd__toast { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 80; max-width: calc(100vw - 2rem); padding: .8rem 1.1rem; border-radius: 12px; background: #15140f; color: #fff; font-weight: 700; box-shadow: 0 14px 40px rgb(0 0 0 / .3); animation: qd-toast .35s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes qd-toast { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  @media (max-width: 900px) { .qd__grid, .qd__set { grid-template-columns: 1fr; } }
+  @media (max-width: 520px) { .qd__line li { grid-template-columns: 2.6rem minmax(0, 1fr) auto; } .qd__add { flex-wrap: wrap; } .qd__add button { flex: 1 1 100%; } }
+  @media (prefers-reduced-motion: reduce) { .qd__chairs li.calling, .qd__toast { animation: none; } }
 </style>

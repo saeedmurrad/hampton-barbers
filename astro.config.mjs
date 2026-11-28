@@ -8,5 +8,6 @@ export default defineConfig({
   site: process.env.SITE_URL ?? 'https://saeedmurrad.github.io',
   base: process.env.BASE_PATH ?? '/hampton-barbers',
   trailingSlash: 'always',
-  integrations: [sitemap()],
+  // Staff screens (queue desk, barber panel, shop TV, door poster) stay out of the sitemap.
+  integrations: [sitemap({ filter: (page) => !/\/(admin|barber|board|poster)\//.test(page) })],
 });

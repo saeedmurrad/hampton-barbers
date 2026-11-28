@@ -9,8 +9,8 @@ import '@fontsource/bebas-neue/index.css';
 import '../styles/global.css';
 import { site, designs } from '../data/site';
 
-interface Props { title: string; description?: string; design?: string; themeColor?: string; }
-const { title, description = site.description, design, themeColor = '#12100e' } = Astro.props;
+interface Props { title: string; description?: string; design?: string; themeColor?: string; noindex?: boolean; }
+const { title, description = site.description, design, themeColor = '#12100e', noindex = false } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const isDemo = import.meta.env.PUBLIC_DEMO !== 'false';
 const canonical = new URL(!isDemo && design ? `${base}/` : Astro.url.pathname, Astro.site).href;
@@ -43,7 +43,7 @@ const jsonLd = {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    {(isDemo || Astro.url.pathname.endsWith('/admin/') || Boolean(design && Astro.url.pathname !== `${base}/`)) && <meta name="robots" content="noindex" />}
+    {(isDemo || noindex || Astro.url.pathname.endsWith('/admin/') || Boolean(design && Astro.url.pathname !== `${base}/`)) && <meta name="robots" content="noindex" />}
     <meta name="theme-color" content={themeColor} />
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
     <meta property="og:type" content="website" />
@@ -76,7 +76,7 @@ const jsonLd = {
         <a href={`${base}/${next.id}/`} aria-label={`Next design: ${next.name}`}>›</a>
         <a href={`${base}/`}>All</a>
         <a class="designs__admin" href={`${base}/admin/`}>Edit prices</a>
-        <a class="designs__admin" href={`${base}/admin/live/`}>Set wait</a>
+        <a class="designs__admin" href={`${base}/admin/live/`}>Queue desk</a>
       </nav>
     )}
     <script>

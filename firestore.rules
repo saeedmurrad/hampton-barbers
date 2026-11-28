@@ -37,26 +37,90 @@ service cloud.firestore {
         && request.resource.data.json.size() < 20000;
     }
 
-    // Online queue tickets. A visitor (anonymous sign-in, no account) can add one ticket with
-    // only a first name and arrival time, and can see or delete only their own ticket.
-    // The shop can list, read and delete every ticket. Nobody can edit a ticket.
+    // Tickets from the first version of the online queue. Nothing new is written here any more
+    // (the queue now lives in /boards); what is already stored stays readable by its owner.
     match /tickets/{id} {
-      allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['shop', 'name', 'eta', 'uid', 'status', 'createdAt'])
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.shop in ['heritage', 'fresh', 'street', 'club', 'shop-2', 'shop-3']
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 24
-        && request.resource.data.eta is int
-        && request.resource.data.eta >= 0
-        && request.resource.data.eta <= 60
-        && request.resource.data.status == 'waiting'
-        && request.resource.data.createdAt == request.time;
+      allow create: if false;
       allow get: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAdmin();
       allow update: if false;
       allow delete: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    // The live queue: one board per shop. Everyone can read it, and it never holds a name:
+    // only ticket numbers, chairs, barbers' first names and times.
+    // Staff can change anything on it. A visitor (anonymous sign-in, no account) can do four
+    // things only, and only to the one ticket filed under their own sign-in:
+    // take the next number, mark it arrived, extend it once ("running late"), or remove it.
+    match /boards/{shop} {
+      function before() { return resource.data; }
+      function after() { return request.resource.data; }
+      function me() { return request.auth.uid; }
+      function onlyMyTicket() {
+        return after().t.diff(before().t).affectedKeys().hasOnly([me()]) && after().updatedAt is int;
+      }
+      function validBoard() {
+        return after().keys().hasOnly(['v', 'day', 'online', 'seq', 'staff', 't', 'avg', 'obs', 'done', 'mode', 'note', 'call', 'updatedAt'])
+          && after().day is string && after().seq is int && after().online is bool
+          && after().t is map && after().t.size() <= 80
+          && after().staff is map && after().staff.size() <= 12
+          && after().note is string && after().note.size() <= 120
+          && after().updatedAt is int;
+      }
+      function joins() {
+        return before().online == true
+          && after().diff(before()).affectedKeys().hasOnly(['seq', 't', 'updatedAt'])
+          && after().seq == before().seq + 1
+          && onlyMyTicket()
+          && !(me() in before().t)
+          && before().t.size() < 40
+          && after().t[me()].keys().hasOnly(['n', 's', 'at', 'eta', 'src'])
+          && after().t[me()].keys().hasAll(['n', 's', 'at', 'eta', 'src'])
+          && after().t[me()].n == after().seq
+          && after().t[me()].s in ['way', 'here']
+          && after().t[me()].at is int
+          && after().t[me()].eta is int && after().t[me()].eta >= 0 && after().t[me()].eta <= 60
+          && after().t[me()].src in ['web', 'qr'];
+      }
+      function changesOwn() {
+        return after().diff(before()).affectedKeys().hasOnly(['t', 'updatedAt'])
+          && onlyMyTicket()
+          && me() in before().t && me() in after().t
+          && before().t[me()].s == 'way'
+          && after().t[me()].diff(before().t[me()]).affectedKeys().hasOnly(['s', 'arr', 'eta', 'late'])
+          && after().t[me()].s in ['way', 'here']
+          && after().t[me()].get('arr', 0) is int
+          && after().t[me()].eta is int
+          && ((after().t[me()].eta == before().t[me()].eta
+                && after().t[me()].get('late', 0) == before().t[me()].get('late', 0))
+              || (before().t[me()].get('late', 0) == 0 && after().t[me()].get('late', 0) == 1
+                && after().t[me()].eta > before().t[me()].eta && after().t[me()].eta <= 120));
+      }
+      function leaves() {
+        return after().diff(before()).affectedKeys().hasOnly(['t', 'updatedAt'])
+          && onlyMyTicket()
+          && me() in before().t && !(me() in after().t)
+          && before().t[me()].s in ['way', 'here'];
+      }
+      allow read: if true;
+      allow create: if isAdmin() && shop in ['hampton-vale', 'shop-2', 'shop-3'] && validBoard();
+      allow update: if (isAdmin() && validBoard())
+        || (request.auth != null && (joins() || changesOwn() || leaves()));
+      allow delete: if false;
+
+      // First names, kept apart from the public board. A visitor can see and remove only
+      // their own; staff can see them all. Removed when the cut is done.
+      match /names/{id} {
+        allow get: if request.auth != null && (request.auth.uid == id || isAdmin());
+        allow list: if isAdmin();
+        allow create, update: if request.auth != null && (request.auth.uid == id || isAdmin())
+          && request.resource.data.keys().hasOnly(['name', 'at'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() >= 1
+          && request.resource.data.name.size() <= 24
+          && request.resource.data.at is int;
+        allow delete: if request.auth != null && (request.auth.uid == id || isAdmin());
+      }
     }
 
     // Who owns the price list. The first signed-in person to publish creates this record

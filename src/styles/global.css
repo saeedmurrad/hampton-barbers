@@ -404,3 +404,11 @@ main { overflow-x: clip; }
   padding: .65rem .85rem;
   margin-block: .35rem;
 }
+
+/* Queue with ticket numbers: numbers in the waiting line, messages on the ticket, door-code joining */
+.live__queue li b { font: 800 .82rem/1 system-ui, sans-serif; letter-spacing: -.01em; }
+.tk__msg { margin-top: .9rem; padding: .6rem .8rem; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); font-weight: 600; font-size: .92rem; max-width: 40rem; }
+.tk__big small { text-transform: uppercase; letter-spacing: .08em; font-size: .7rem; }
+.qdlg__door { display: none; }
+.qdlg.is-door .qdlg__door { display: block; }
+.qdlg.is-door .qdlg__home { display: none; }

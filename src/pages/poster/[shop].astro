@@ -1,0 +1,52 @@
+---
+// A poster to print and put on the shop door or by the till. Scanning the code gives a
+// walk-in a ticket number, or checks in a customer who joined the queue from home.
+import QRCode from 'qrcode';
+import Base from '../../layouts/Base.astro';
+import { shops, type Shop } from '../../data/site';
+export function getStaticPaths() { return shops.map((shop) => ({ params: { shop: shop.id }, props: { shop } })); }
+interface Props { shop: Shop; }
+const { shop } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const joinUrl = new URL(`${base}/queue/${shop.id}/?here=1`, Astro.site).href;
+const qr = await QRCode.toString(joinUrl, { type: 'svg', margin: 0, errorCorrectionLevel: 'Q' });
+---
+<Base noindex title={`Hampton Barbers ${shop.name}: door poster`} description="A poster with the code customers scan to join the queue or check in." themeColor="#ffffff">
+  <main id="main" class="pst">
+    <p class="pst__tools"><button type="button" onclick="window.print()">Print this poster</button><span>A4, portrait. Put it on the door and by the till.</span></p>
+    <article class="pst__sheet">
+      <p class="pst__shop">Hampton Barbers · {shop.name}</p>
+      <h1>Join the queue</h1>
+      <p class="pst__lead">Scan with your phone camera to take a ticket number, or to check in if you joined from home.</p>
+      <div class="pst__qr" set:html={qr} role="img" aria-label="Code to scan to join the queue" />
+      <ol class="pst__steps">
+        <li><b>1</b><span>Scan the code</span></li>
+        <li><b>2</b><span>Get your number</span></li>
+        <li><b>3</b><span>Watch the screen</span></li>
+      </ol>
+      <p class="pst__foot">No phone? Tell your barber and they will give you a number.</p>
+    </article>
+  </main>
+</Base>
+
+<style is:global>
+  .pst { background: #e9e6df; color: #15140f; min-height: 100svh; padding: 1.5rem 1rem 3rem; display: grid; gap: 1rem; justify-items: center; align-content: start; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif; }
+  .pst__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .5rem 1rem; font-size: .9rem; color: #57534a; }
+  .pst__tools button { font: inherit; font-weight: 700; min-height: 2.9rem; padding: .5rem 1.2rem; border-radius: 10px; border: 0; background: #15140f; color: #fff; cursor: pointer; }
+  .pst__sheet { width: min(100%, 210mm); aspect-ratio: 210 / 297; background: #fff; border-radius: 6px; box-shadow: 0 20px 50px rgb(0 0 0 / .18); padding: 7% 8%; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto auto; justify-items: center; text-align: center; gap: 2.2%; container-type: inline-size; }
+  .pst__shop { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 2.2cqw; color: #57534a; }
+  .pst h1 { font-family: var(--display); font-weight: 800; font-size: 13cqw; letter-spacing: -.045em; line-height: .95; }
+  .pst__lead { font-size: 3.1cqw; max-width: 30em; line-height: 1.35; }
+  .pst__qr { width: 62%; align-self: center; aspect-ratio: 1; }
+  .pst__qr svg { display: block; width: 100%; height: 100%; }
+  .pst__steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3%; width: 100%; }
+  .pst__steps li { display: grid; justify-items: center; gap: .3em; font-weight: 700; font-size: 2.8cqw; }
+  .pst__steps b { display: grid; place-items: center; width: 2em; height: 2em; border-radius: 50%; background: #15140f; color: #fff; font-family: var(--display); font-size: 3.4cqw; }
+  .pst__foot { font-size: 2.5cqw; color: #57534a; }
+  @page { size: A4 portrait; margin: 0; }
+  @media print {
+    .pst { background: #fff; padding: 0; display: block; min-height: 0; }
+    .pst__tools, .skip { display: none !important; }
+    .pst__sheet { width: 210mm; height: 297mm; border-radius: 0; box-shadow: none; }
+  }
+</style>

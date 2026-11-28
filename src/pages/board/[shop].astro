@@ -1,0 +1,246 @@
+---
+// The shop TV: open this page on the TV in the shop and leave it. It shows ticket numbers
+// only (never names): who is in each chair, who is next, and the wait for each number.
+// It updates by itself, chimes when a number is called, and keeps the screen awake.
+import QRCode from 'qrcode';
+import Base from '../../layouts/Base.astro';
+import { shops, type Shop } from '../../data/site';
+export function getStaticPaths() { return shops.map((shop) => ({ params: { shop: shop.id }, props: { shop } })); }
+interface Props { shop: Shop; }
+const { shop } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const joinUrl = new URL(`${base}/queue/${shop.id}/?here=1`, Astro.site).href;
+const qr = await QRCode.toString(joinUrl, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+---
+<Base noindex title={`Hampton Barbers ${shop.name}: now serving`} description="The shop screen: ticket numbers in the chairs, who is next and how long the wait is." themeColor="#0c0e0d">
+  <main id="main" class="tv" data-shop={shop.id} data-level="1">
+    <header class="tv__top">
+      <p class="tv__name"><b>Hampton Barbers</b><span>{shop.name}</span></p>
+      <p class="tv__wait" data-wait></p>
+      <p class="tv__clock" data-clock></p>
+    </header>
+
+    <div class="tv__body">
+      <section class="tv__col" aria-labelledby="tv-chairs">
+        <h2 id="tv-chairs">Now in the chair</h2>
+        <ul class="tv__chairs" data-chairs></ul>
+      </section>
+      <section class="tv__col" aria-labelledby="tv-next">
+        <h2 id="tv-next">Next up <span data-count></span></h2>
+        <ol class="tv__line" data-line></ol>
+      </section>
+    </div>
+
+    <footer class="tv__foot">
+      <div class="tv__qr" set:html={qr} role="img" aria-label="Code to scan to join the queue" />
+      <p class="tv__how"><b>Scan to join the queue</b><span>Or follow your number on your phone. Only people in the shop are called, in number order.</span></p>
+      <p class="tv__note" data-note hidden></p>
+      <div class="tv__state"><span data-conn>Starting…</span><button type="button" data-sound>Sound: off</button></div>
+    </footer>
+
+    <div class="tv__call" data-call hidden aria-live="assertive"><p>Number</p><b data-call-n></b><span data-call-chair></span></div>
+  </main>
+</Base>
+
+<script>
+  import { boardView, clockText, minsText, type Board } from '../../lib/board';
+  import { esc, fetchBoards, onDeviceChange, pickBoard, read, write } from '../../lib/store';
+
+  const root = document.querySelector<HTMLElement>('.tv')!;
+  const shop = root.dataset.shop!;
+  const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+  const fill = (el: HTMLElement, html: string) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
+  const SOUND_KEY = 'hb-tv-sound';
+  const ROWS = 7;
+
+  let cloudBoard: Board | null = null;
+  let live = false;
+  let lastCall = 0;
+  let drawn = false;
+
+  // ---------- sound: a chime, and optionally the number spoken aloud ----------
+  let sound = Number(read<number>(SOUND_KEY) ?? 0); // 0 off, 1 chime, 2 chime and voice
+  let audio: AudioContext | null = null;
+  const soundBtn = $<HTMLButtonElement>('[data-sound]');
+  const paintSound = () => { soundBtn.textContent = ['Sound: off', 'Sound: chime', 'Sound: chime and voice'][sound] + (sound && audio?.state !== 'running' ? ' (press to start)' : ''); };
+  const wake = async () => { try { audio ??= new AudioContext(); if (audio.state !== 'running') await audio.resume(); } catch { /* no sound on this device */ } paintSound(); };
+  const chime = () => {
+    if (!sound || !audio || audio.state !== 'running') return;
+    const t = audio.currentTime;
+    [[880, 0], [1174.66, .2], [1318.51, .4]].forEach(([freq, delay]) => {
+      const o = audio!.createOscillator(), g = audio!.createGain();
+      o.type = 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t + delay);
+      g.gain.exponentialRampToValueAtTime(0.4, t + delay + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + delay + 0.8);
+      o.connect(g).connect(audio!.destination);
+      o.start(t + delay); o.stop(t + delay + 0.85);
+    });
+  };
+  const speak = (n: number, chair: number) => {
+    if (sound < 2) return;
+    try { const u = new SpeechSynthesisUtterance(`Number ${n}. Chair ${chair}.`); u.lang = 'en-GB'; u.rate = 0.92; speechSynthesis.cancel(); setTimeout(() => speechSynthesis.speak(u), 1100); } catch { /* no voice on this device */ }
+  };
+  soundBtn.addEventListener('click', async () => {
+    // A browser only allows sound after a press, so the first press on a new day just starts it.
+    if (sound && audio?.state !== 'running') { await wake(); chime(); return; }
+    sound = (sound + 1) % 3;
+    write(SOUND_KEY, sound);
+    if (sound) { await wake(); chime(); if (sound === 2) speak(1, 1); }
+    paintSound();
+  });
+  if (sound) wake();
+
+  // ---------- the big "Number 27, chair 2" announcement ----------
+  const callEl = $('[data-call]');
+  let callTimer: number | undefined;
+  const announce = (n: number, chair: number, name: string) => {
+    $('[data-call-n]').textContent = String(n);
+    $('[data-call-chair]').textContent = `Chair ${chair}${name ? ` with ${name}` : ''}`;
+    callEl.hidden = false;
+    chime();
+    speak(n, chair);
+    clearTimeout(callTimer);
+    callTimer = window.setTimeout(() => { callEl.hidden = true; }, 8000);
+  };
+
+  // ---------- drawing ----------
+  const draw = () => {
+    const now = Date.now();
+    const { board, source } = pickBoard(shop, cloudBoard, now);
+    const v = boardView(board, now);
+    root.dataset.level = String(v.level);
+    $('[data-clock]').textContent = clockText(now);
+    $('[data-wait]').textContent = v.level === 0 ? 'Not cutting right now' : v.minutes === 0 ? 'Walk in now: no wait' : `Walk in now: about ${v.minutes} min`;
+
+    fill($('[data-chairs]'), v.chairs.map((c) => {
+      const big = c.state === 'busy' ? String(c.n) : c.state === 'free' ? 'Free' : 'Break';
+      const sub = c.state === 'busy' ? (c.calling ? 'Calling now' : (c.left ?? 0) > 2 ? `${Math.max(5, Math.round((c.left ?? 0) / 5) * 5)} min left` : 'Nearly done')
+        : c.state === 'free' ? 'Ready' : 'Back soon';
+      return `<li class="${c.state}${c.calling ? ' calling' : ''}"><div><small>Chair ${c.chair}${c.name ? ` · ${esc(c.name)}` : ''}</small><b${big.length > 2 && c.state === 'busy' ? ' class="long"' : ''}>${big}</b><span>${sub}</span></div></li>`;
+    }).join('') || '<li class="none"><div><b>No barbers cutting right now</b></div></li>');
+    root.dataset.chairs = String(Math.min(6, Math.max(1, v.chairs.length)));
+
+    $('[data-count]').textContent = v.waiting ? `${v.waiting} waiting` : '';
+    fill($('[data-line]'), v.turns.slice(0, ROWS).map((x, i) =>
+      `<li class="${x.s}"><i>${i + 1}</i><b>${x.n}</b><em>${x.s === 'here' ? 'In the shop' : 'On the way'}</em><span>${minsText(x.mins) || '—'}</span></li>`).join('')
+      + (v.line.length > ROWS ? `<li class="more">and ${v.line.length - ROWS} more waiting</li>` : '')
+      || `<li class="empty"><b>Nobody waiting</b><span>${v.level === 0 ? 'The queue is not running right now.' : v.freeChairs ? 'Walk straight in.' : 'You would be next.'}</span></li>`);
+
+    const note = $('[data-note]');
+    note.textContent = v.note;
+    note.hidden = !v.note;
+    const conn = $('[data-conn]');
+    conn.textContent = source === 'cloud' ? (live && navigator.onLine ? 'Live' : 'Reconnecting…') : source === 'closed' ? 'The queue opens when the shop opens' : 'Demo on this screen';
+    conn.dataset.ok = String(source !== 'cloud' || (live && navigator.onLine));
+
+    // Announce a newly called number (but not an old call that was already made before this page opened).
+    const c = board.call;
+    if (c && c.at > lastCall) {
+      const fresh = drawn && now - c.at < 25_000;
+      lastCall = c.at;
+      if (fresh) announce(c.n, c.chair, Object.values(board.staff).find((s) => s.chair === c.chair)?.name ?? '');
+    }
+    drawn = true;
+  };
+
+  // ---------- keeping up to date ----------
+  draw();
+  const poll = async () => { const got = await fetchBoards(); if (got?.[shop]) { cloudBoard = got[shop]; live = true; } else if (got === null) live = false; draw(); };
+  import('../../lib/cloud')
+    .then((c) => c.watchBoard(shop, (b, isLive) => { cloudBoard = b; live = isLive; draw(); }, () => { live = false; draw(); }))
+    .catch(() => { poll(); setInterval(poll, 15_000); }); // no live connection on this device: check every 15 seconds instead
+  onDeviceChange(draw);
+  addEventListener('online', draw);
+  addEventListener('offline', draw);
+  setInterval(draw, 10_000);
+
+  // Keep the screen awake, and reload overnight so the TV always runs the newest version.
+  const stayAwake = async () => { try { await (navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<unknown> } }).wakeLock?.request('screen'); } catch { /* not supported */ } };
+  stayAwake();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { stayAwake(); draw(); } });
+  const four = new Date(); four.setHours(28, 0, 0, 0);
+  setTimeout(() => location.reload(), four.getTime() - Date.now());
+</script>
+
+<style is:global>
+  /* Everything is sized in em from one viewport-based font size, so the board fills any TV. */
+  .tv { --ok: #35d07f; --way: #f5b942; --dim: #9aa69f; --rule: rgb(255 255 255 / .13); --card: #171b19; --display: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+    position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 1.4em; height: 100svh; padding: 1.6em 2.2em 1.4em; overflow: hidden;
+    background: #0c0e0d; color: #f5f2ea; font-size: clamp(9px, min(1.42vw, 2.5vh), 44px); line-height: 1.25; }
+  .tv h2 { font-family: inherit; font-size: 1.15em; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); margin-bottom: .8em; display: flex; justify-content: space-between; gap: 1em; }
+  .tv h2 span { letter-spacing: .04em; text-transform: none; font-weight: 600; }
+  .tv__top { display: flex; align-items: center; justify-content: space-between; gap: 1.5em; padding-bottom: 1.1em; border-bottom: 1px solid var(--rule); }
+  .tv__name { display: flex; align-items: baseline; gap: .7em; }
+  .tv__name b { font-family: var(--display); font-weight: 800; font-size: 2.3em; letter-spacing: -.03em; }
+  .tv__name span { font-size: 1.4em; color: var(--dim); }
+  .tv__wait { font-size: 1.5em; font-weight: 700; padding: .35em 1em; border-radius: 999px; background: color-mix(in srgb, var(--lc, var(--ok)) 20%, transparent); color: var(--lc, var(--ok)); }
+  .tv[data-level='0'] { --lc: var(--dim); } .tv[data-level='2'] { --lc: #e8c540; } .tv[data-level='3'] { --lc: #f59342; } .tv[data-level='4'] { --lc: #f0605f; }
+  .tv__clock { font-family: var(--display); font-weight: 700; font-size: 2.3em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tv__body { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 2.4em; min-height: 0; }
+  .tv__col { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+  .tv__chairs { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 1em; min-height: 0; }
+  .tv[data-chairs='1'] { --cols: 1; } .tv[data-chairs='3'], .tv[data-chairs='5'], .tv[data-chairs='6'] { --cols: 3; }
+  /* Each chair card sizes its own text from its own height and width, so any number of chairs fits. */
+  .tv__chairs li { container-type: size; display: grid; place-items: center; border-radius: 1.2em; background: var(--card); border: .16em solid transparent; min-height: 0; overflow: hidden; }
+  .tv__chairs li > div { display: grid; justify-items: center; gap: .3em; gap: 2.5cqh; padding: .6em; text-align: center; }
+  .tv__chairs small { font-size: 1.2em; font-size: clamp(.8em, 9cqh, 1.5em); font-weight: 700; color: var(--dim); }
+  .tv__chairs b { font-family: var(--display); font-weight: 800; font-size: 5em; font-size: min(46cqh, 60cqw); line-height: .9; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+  .tv__chairs span { font-size: 1.1em; font-size: clamp(.75em, 7.5cqh, 1.3em); color: var(--dim); }
+  .tv__chairs b.long { font-size: 4em; font-size: min(40cqh, 42cqw); }
+  .tv__chairs li.free b, .tv__chairs li.break b { font-size: 3em; font-size: min(30cqh, 34cqw); line-height: 1.05; }
+  .tv__chairs li.free { border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
+  .tv__chairs li.free b { color: var(--ok); }
+  .tv__chairs li.break b { color: var(--dim); }
+  .tv__chairs li.calling { background: var(--ok); color: #06140c; animation: tv-pulse 1.1s ease-in-out infinite alternate; }
+  .tv__chairs li.calling small, .tv__chairs li.calling span { color: #0b2a18; font-weight: 800; }
+  .tv__chairs li.none { grid-column: 1 / -1; }
+  .tv__chairs li.none b { font-size: 2.4em; line-height: 1.2; color: var(--dim); letter-spacing: -.02em; }
+  @keyframes tv-pulse { from { transform: scale(1); } to { transform: scale(1.025); } }
+  .tv__line { display: grid; grid-auto-rows: minmax(0, 1fr); gap: .55em; min-height: 0; align-content: start; }
+  .tv__line li { display: grid; grid-template-columns: 1.6em minmax(3.4em, auto) minmax(0, 1fr) auto; align-items: center; gap: 1em; padding: .5em 1.1em; border-radius: 1em; background: var(--card); min-height: 0; max-height: 5.2em; animation: tv-in .5s cubic-bezier(.2,.8,.2,1) both; }
+  .tv__line i { font-style: normal; font-size: 1.2em; font-weight: 700; color: var(--dim); }
+  .tv__line b { font-family: var(--display); font-weight: 800; font-size: 3.3em; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .tv__line em { font-style: normal; justify-self: start; font-size: 1.15em; font-weight: 700; padding: .28em .8em; border-radius: 999px; background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); white-space: nowrap; }
+  .tv__line li.way em { background: color-mix(in srgb, var(--way) 18%, transparent); color: var(--way); }
+  .tv__line li.way b { color: color-mix(in srgb, #f5f2ea 62%, transparent); }
+  .tv__line span { font-size: 1.7em; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tv__line li.more { display: block; background: none; color: var(--dim); font-size: 1.25em; font-weight: 600; padding: .2em 1em; animation: none; }
+  .tv__line li.empty { display: grid; grid-template-columns: 1fr; justify-items: start; gap: .2em; max-height: none; padding: 1.2em 1.4em; }
+  .tv__line li.empty b { font-size: 2.4em; }
+  .tv__line li.empty span { font-size: 1.4em; font-weight: 500; color: var(--dim); white-space: normal; }
+  @keyframes tv-in { from { opacity: 0; transform: translateY(.6em); } to { opacity: 1; transform: none; } }
+  .tv__foot { display: flex; align-items: center; gap: 1.4em; padding-top: 1.1em; border-top: 1px solid var(--rule); }
+  .tv__qr { flex: none; width: 7.2em; height: 7.2em; padding: .35em; border-radius: .6em; background: #fff; }
+  .tv__qr svg { display: block; width: 100%; height: 100%; }
+  .tv__how { display: grid; gap: .15em; max-width: 34em; }
+  .tv__how b { font-family: var(--display); font-weight: 800; font-size: 1.9em; letter-spacing: -.02em; }
+  .tv__how span { font-size: 1.15em; color: var(--dim); }
+  .tv__note { flex: 1 1 0; font-size: 1.4em; font-weight: 700; padding: .5em .9em; border-left: .25em solid var(--way); background: color-mix(in srgb, var(--way) 14%, transparent); }
+  .tv__note[hidden] { display: none; }
+  .tv__state { margin-left: auto; display: grid; justify-items: end; gap: .5em; font-size: 1.05em; color: var(--dim); white-space: nowrap; }
+  .tv__state span::before { content: ''; display: inline-block; width: .65em; height: .65em; margin-right: .5em; border-radius: 50%; background: var(--ok); }
+  .tv__state span[data-ok='false']::before { background: #f0605f; }
+  .tv__state button { font: inherit; color: inherit; background: none; border: 1px solid var(--rule); border-radius: 999px; padding: .35em .9em; cursor: pointer; }
+  .tv__state button:hover, .tv__state button:focus-visible { color: #f5f2ea; border-color: #f5f2ea; }
+  .tv__call { position: absolute; inset: 0; z-index: 10; display: grid; place-content: center; justify-items: center; text-align: center; background: var(--ok); color: #06140c; animation: tv-call .45s cubic-bezier(.2,.8,.2,1) both; }
+  .tv__call[hidden] { display: none; }
+  .tv__call p { font-size: 4em; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+  .tv__call b { font-family: var(--display); font-weight: 800; font-size: min(34vw, 52vh); line-height: .9; letter-spacing: -.05em; }
+  .tv__call span { font-family: var(--display); font-weight: 750; font-size: 6em; letter-spacing: -.02em; }
+  @keyframes tv-call { from { opacity: 0; transform: scale(1.08); } to { opacity: 1; transform: none; } }
+  /* A phone or a tall screen: one column that scrolls. */
+  @media (max-aspect-ratio: 1/1), (max-width: 760px) {
+    .tv { height: auto; min-height: 100svh; overflow: visible; font-size: clamp(9px, 2.5vw, 20px); padding: 1.4em 1.4em 2em; grid-template-rows: auto auto auto; align-content: start; }
+    .tv__col { display: block; }
+    .tv__top { flex-wrap: wrap; gap: .6em 1.2em; }
+    .tv__body { grid-template-columns: 1fr; }
+    .tv { --cols: 2; }
+    .tv__chairs { grid-auto-rows: 13em; }
+    .tv__line { grid-auto-rows: auto; }
+    .tv__foot { flex-wrap: wrap; }
+    .tv__state { margin-left: 0; justify-items: start; }
+    .tv__call { position: fixed; }
+  }
+  @media (prefers-reduced-motion: reduce) { .tv__chairs li.calling, .tv__line li, .tv__call { animation: none; } }
+</style>
