@@ -1,0 +1,86 @@
+---
+// Design preview only: the barber's phone in the new dark look, in two moments of the day.
+import '../../styles/ui.css';
+import Base from '../../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const next = [
+  { n: 26, name: 'Tom H.', tag: 'In the shop', kind: 'ok', eta: 'Next' },
+  { n: 28, name: 'Walk-in', tag: 'In the shop', kind: 'ok', eta: '5 min' },
+  { n: 27, name: 'Sam K.', tag: 'On the way', kind: 'wait', eta: '15 min' },
+];
+---
+<Base noindex title="Design preview: barber panel" description="Design preview of the barber panel." themeColor="#0a0c0b">
+  <main id="main" class="ui">
+    <header class="u-top">
+      <a class="u-brand" href={`${base}/preview/`}><i>HB</i><span><b>Design preview</b><small>Barber’s phone</small></span></a>
+    </header>
+    <div class="u-frames">
+      <section>
+        <span class="u-label">With a customer in the chair</span>
+        <div class="u-phone">
+          <header class="u-me">
+            <span class="u-avatar u-avatar--lg">A</span>
+            <span><b>Ali</b><small>Chair 1 · Hampton Vale</small></span>
+            <button type="button" class="u-pill"><i></i>On shift</button>
+          </header>
+          <section class="u-hero">
+            <span class="u-label">In your chair</span>
+            <div class="u-ring" style="--p:.7"><b class="u-num">24</b></div>
+            <p class="u-hero__who">Tom H.</p>
+            <p class="u-hero__time">14 min so far · usual 20</p>
+          </section>
+          <section class="u-today" aria-label="Your day so far">
+            <div><small>Cuts</small><b>9</b></div>
+            <div><small>Taken</small><b>£168</b></div>
+            <div><small>Cash</small><b>£60</b></div>
+            <div><small>Online</small><b>£108</b></div>
+          </section>
+          <section class="u-panel">
+            <div class="u-h"><h2>Next up <em>3</em></h2><span>2 in the shop</span></div>
+            <ol class="u-line">
+              {next.map((r, i) => (
+                <li class:list={['u-row', { 'is-way': r.kind === 'wait' }]}>
+                  <b class="u-num u-row__n">{r.n}</b>
+                  <span class="u-row__who"><b>{r.name}</b></span>
+                  <span class="u-row__tags"><span class:list={['u-chip', `u-chip--${r.kind}`]}>{r.tag}</span></span>
+                  <span class="u-row__eta">{r.eta}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+          <footer class="u-dock">
+            <button type="button" class="u-btn u-btn--primary u-btn--lg u-btn--block">Finish and take payment</button>
+            <div><button type="button" class="u-btn u-btn--quiet">Didn’t come</button><button type="button" class="u-btn u-btn--quiet">Undo call</button><button type="button" class="u-btn u-btn--quiet">Add walk-in</button></div>
+          </footer>
+        </div>
+      </section>
+
+      <section>
+        <span class="u-label">With the chair free</span>
+        <div class="u-phone">
+          <header class="u-me">
+            <span class="u-avatar u-avatar--lg">A</span>
+            <span><b>Ali</b><small>Chair 1 · Hampton Vale</small></span>
+            <button type="button" class="u-pill"><i></i>On shift</button>
+          </header>
+          <section class="u-hero">
+            <span class="u-label">Next for you</span>
+            <div class="u-ring" style="--p:0"><b class="u-num">26</b></div>
+            <p class="u-hero__who">Tom H.</p>
+            <p class="u-hero__time"><span class="u-chip u-chip--ok">In the shop</span></p>
+          </section>
+          <section class="u-today" aria-label="Your day so far">
+            <div><small>Cuts</small><b>10</b></div>
+            <div><small>Taken</small><b>£188</b></div>
+            <div><small>Cash</small><b>£80</b></div>
+            <div><small>Online</small><b>£108</b></div>
+          </section>
+          <footer class="u-dock">
+            <button type="button" class="u-btn u-btn--go u-btn--lg u-btn--block">Call number 26</button>
+            <div><button type="button" class="u-btn u-btn--quiet">Take a break</button><button type="button" class="u-btn u-btn--quiet">End my shift</button><button type="button" class="u-btn u-btn--quiet">Add walk-in</button></div>
+          </footer>
+        </div>
+      </section>
+    </div>
+  </main>
+</Base>

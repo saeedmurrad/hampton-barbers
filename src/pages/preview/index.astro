@@ -1,0 +1,23 @@
+---
+// Design preview hub: three key screens in the new look, for approval before it is rolled out.
+import '../../styles/ui.css';
+import Base from '../../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base noindex title="Design preview: the new look" description="Design preview of the queue system's new look." themeColor="#0a0c0b">
+  <main id="main" class="ui">
+    <header class="u-top">
+      <a class="u-brand" href={`${base}/`}><i>HB</i><span><b>Hampton Barbers</b><small>Design preview</small></span></a>
+    </header>
+    <div class="u-intro">
+      <h1>The new look, on three key screens</h1>
+      <p>Dark and premium, in the same family as the shop TV, and designed for a phone first. These are design previews with sample data: the buttons do not do anything yet.</p>
+      <span class="u-sample">Sample names and numbers</span>
+    </div>
+    <nav class="u-hub" aria-label="Previews">
+      <a href={`${base}/preview/desk/`}><b>Queue desk</b><span>The shop’s screen: chairs, the waiting line and adding walk-ins. Open it on a laptop and on a phone.</span></a>
+      <a href={`${base}/preview/barber/`}><b>Barber’s phone</b><span>One barber’s own screen, with a customer in the chair and with the chair free.</span></a>
+      <a href={`${base}/preview/ticket/`}><b>Customer’s ticket</b><span>What a customer sees while waiting, and the moment it is their turn.</span></a>
+    </nav>
+  </main>
+</Base>

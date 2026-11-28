@@ -1,0 +1,82 @@
+---
+// Design preview only: the customer's ticket in the new look, while waiting and when called.
+import '../../styles/ui.css';
+import Base from '../../layouts/Base.astro';
+import { site } from '../../data/site';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base noindex title="Design preview: customer ticket" description="Design preview of the customer's ticket." themeColor="#0a0c0b">
+  <main id="main" class="ui">
+    <header class="u-top">
+      <a class="u-brand" href={`${base}/preview/`}><i>HB</i><span><b>Design preview</b><small>Customer’s phone</small></span></a>
+    </header>
+    <div class="u-frames">
+      <section>
+        <span class="u-label">While waiting</span>
+        <div class="u-phone">
+          <header class="u-shopbar"><span class="u-brand"><i>HB</i><span><b>Hampton Barbers</b><small>Hampton Vale</small></span></span><span>Hi, Sam</span></header>
+          <article class="u-pass" aria-label="Your ticket">
+            <header class="u-pass__top"><span>Your ticket</span><span class="u-live"><i></i>Live</span></header>
+            <span class="u-label">Your number</span>
+            <p class="u-num u-pass__n">28</p>
+            <p class="u-pass__place">2nd in line</p>
+            <p class="u-pass__time">About 10 minutes, around <b>2:52 pm</b></p>
+            <ol class="u-steps" aria-label="Where you are">
+              <li class="is-done">Joined</li>
+              <li class="is-now">On the way</li>
+              <li>In the shop</li>
+              <li>Your turn</li>
+            </ol>
+            <div class="u-perf" aria-hidden="true"></div>
+            <div class="u-pass__acts">
+              <button type="button" class="u-btn u-btn--primary u-btn--lg u-btn--block">I’m here</button>
+              <div><button type="button" class="u-btn u-btn--quiet">Running late</button><button type="button" class="u-btn u-btn--quiet">Leave the queue</button></div>
+            </div>
+          </article>
+          <section class="u-panel u-ahead">
+            <div class="u-h"><h2>The line</h2><span>1 person ahead of you</span></div>
+            <ol aria-label="Ticket numbers in the order they will be called">
+              <li class="is-chair">24</li>
+              <li class="is-chair">25</li>
+              <li>26</li>
+              <li class="is-me">28</li>
+              <li>29</li>
+              <li class="is-way">27</li>
+            </ol>
+            <p class="u-key"><span><i class="c"></i>In a chair</span><span><i></i>In the shop</span><span><i class="w"></i>On the way</span><span><i class="m"></i>You</span></p>
+            <p class="u-note">Only people in the shop are called. We hold your place until 3:02 pm.</p>
+          </section>
+          <section class="u-panel u-shopcard">
+            <p><b>Hampton Barbers</b>{site.address.street}, {site.address.locality}, {site.address.postcode}</p>
+            <div><a class="u-btn" href={site.directionsUrl} rel="noopener">Directions</a><a class="u-btn" href={site.phoneHref}>Call the shop</a></div>
+          </section>
+        </div>
+      </section>
+
+      <section>
+        <span class="u-label">When it’s their turn</span>
+        <div class="u-phone">
+          <header class="u-shopbar"><span class="u-brand"><i>HB</i><span><b>Hampton Barbers</b><small>Hampton Vale</small></span></span><span>Hi, Sam</span></header>
+          <article class="u-pass is-turn" aria-label="Your ticket">
+            <header class="u-pass__top"><span>It’s your turn</span><span class="u-live"><i></i>Live</span></header>
+            <span class="u-label">Number</span>
+            <p class="u-num u-pass__n">28</p>
+            <p class="u-pass__place">Come and take a seat</p>
+            <p class="u-pass__time">Your barber is ready for you now.</p>
+            <ol class="u-steps" aria-label="Where you are">
+              <li class="is-done">Joined</li>
+              <li class="is-done">On the way</li>
+              <li class="is-done">In the shop</li>
+              <li class="is-now">Your turn</li>
+            </ol>
+            <div class="u-perf" aria-hidden="true"></div>
+            <div class="u-chairline"><span class="u-avatar">S</span><span><b>Chair 2 with Sam</b><small>Second chair on the left</small></span></div>
+          </article>
+          <section class="u-panel u-shopcard">
+            <p><b>Thanks for waiting</b>Your ticket closes by itself when your cut is finished.</p>
+          </section>
+        </div>
+      </section>
+    </div>
+  </main>
+</Base>

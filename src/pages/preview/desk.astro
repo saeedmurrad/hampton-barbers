@@ -1,0 +1,100 @@
+---
+// Design preview only: the queue desk in the new dark look, with sample data and no live queue.
+import '../../styles/ui.css';
+import Base from '../../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const chairs = [
+  { chair: 1, name: 'Ali', n: 24, who: 'Tom', mins: 14, pct: 70, state: 'busy' },
+  { chair: 2, name: 'Sam', n: 25, who: 'Walk-in', mins: 23, pct: 100, state: 'late' },
+  { chair: 3, name: 'Omar', n: 0, who: '', mins: 0, pct: 0, state: 'free' },
+  { chair: 4, name: 'Bilal', n: 0, who: '', mins: 0, pct: 0, state: 'break' },
+];
+const line = [
+  { n: 26, name: 'Tom H.', sub: 'Walk-in · waiting 11 min', tag: 'In the shop', kind: 'ok', eta: 'Next', way: false },
+  { n: 28, name: 'Walk-in', sub: 'Waiting 6 min', tag: 'In the shop', kind: 'ok', eta: '5 min', way: false },
+  { n: 29, name: 'Daniyal', sub: 'Joined on his phone', tag: 'In the shop', kind: 'ok', eta: '10 min', way: false },
+  { n: 27, name: 'Sam K.', sub: 'Due 2:50 pm · 07700 900123', tag: 'On the way', kind: 'wait', eta: '15 min', way: true },
+  { n: 30, name: 'Yusuf', sub: 'Due 3:05 pm · running late', tag: 'On the way', kind: 'wait', eta: '25 min', way: true },
+];
+---
+<Base noindex title="Design preview: queue desk" description="Design preview of the queue desk." themeColor="#0a0c0b">
+  <main id="main" class="ui">
+    <header class="u-top">
+      <a class="u-brand" href={`${base}/preview/`}><i>HB</i><span><b>Hampton Barbers</b><small>Queue desk</small></span></a>
+      <nav class="u-seg" aria-label="Shop">
+        <button type="button" aria-pressed="true">Hampton Vale <em>5</em></button>
+        <button type="button" aria-pressed="false">Orton <em>4</em></button>
+        <button type="button" aria-pressed="false">Rivergate</button>
+      </nav>
+      <div class="u-top__right">
+        <nav class="u-nav" aria-label="Sections"><a href="#" aria-current="page">Queue</a><a href="#">Barbers</a><a href="#">Reports</a><a href="#">Settings</a></nav>
+        <span class="u-live"><i></i>Live</span>
+        <time>2:41 pm</time>
+        <span class="u-avatar u-avatar--sm" aria-label="Signed in as Saeed">S</span>
+      </div>
+    </header>
+
+    <div class="u-desk__body">
+      <section class="u-stats" aria-label="Right now">
+        <div class="u-stat"><span class="u-label">In the shop</span><b>3</b></div>
+        <div class="u-stat"><span class="u-label">On the way</span><b>2</b></div>
+        <div class="u-stat u-stat--wait"><span class="u-label">Walk-in wait</span><b>~20<small>min</small></b></div>
+        <div class="u-stat"><span class="u-label">Cuts today</span><b>18</b></div>
+      </section>
+
+      <div class="u-main">
+        <section class="u-panel" aria-labelledby="pv-chairs">
+          <div class="u-h"><h2 id="pv-chairs">Chairs</h2><span>3 cutting · 1 on a break</span></div>
+          <div class="u-chairs">
+            {chairs.map((c) => (
+              <article class:list={['u-chair', { 'is-free': c.state === 'free', 'is-break': c.state === 'break', 'is-late': c.state === 'late' }]}>
+                <p class="u-num u-chair__num">{c.state === 'free' ? 'Free' : c.state === 'break' ? 'Break' : c.n}</p>
+                <div class="u-chair__who">
+                  <span class="u-avatar u-avatar--sm">{c.name[0]}</span>
+                  <b>{c.name}</b>
+                  <small>Chair {c.chair} · {c.state === 'free' ? 'next is 26' : c.state === 'break' ? 'back at 3:00 pm' : c.who}</small>
+                </div>
+                <div class="u-bar"><i style={`width:${c.pct}%`}></i></div>
+                {(c.state === 'busy' || c.state === 'late') && <p class="u-chair__meta"><span>{c.mins} min so far</span><span>{c.state === 'late' ? `${c.mins - 20} min over` : `${20 - c.mins} min left`}</span></p>}
+                <div class="u-chair__act">
+                  {c.state === 'free' && <button type="button" class="u-btn u-btn--go">Call 26</button>}
+                  {c.state === 'break' && <button type="button" class="u-btn">End break</button>}
+                  {(c.state === 'busy' || c.state === 'late') && <button type="button" class="u-btn u-btn--primary">Finish</button>}
+                  <button type="button" class="u-btn u-btn--icon" aria-label={`More for chair ${c.chair}`}>⋯</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section class="u-panel" aria-labelledby="pv-line">
+          <div class="u-h">
+            <h2 id="pv-line">Waiting <em>5</em></h2>
+            <form class="u-add" onsubmit="return false"><input placeholder="Walk-in’s first name (optional)" aria-label="Walk-in’s first name (optional)" /><button type="submit" class="u-btn u-btn--primary">Add walk-in</button></form>
+          </div>
+          <ol class="u-line">
+            {line.map((r, i) => (
+              <li class:list={['u-row', { 'is-next': i === 0, 'is-way': r.way }]}>
+                <b class="u-num u-row__n">{r.n}</b>
+                <span class="u-row__who"><b>{r.name}</b><small>{r.sub}</small></span>
+                <span class="u-row__tags"><span class:list={['u-chip', `u-chip--${r.kind}`]}>{r.tag}</span></span>
+                <span class="u-row__eta">{r.eta}</span>
+                <span class="u-row__act">
+                  <button type="button" class:list={['u-btn', 'u-btn--sm', { 'u-btn--primary': i === 0 }]}>{r.way ? 'Arrived' : 'Seat'}</button>
+                  <button type="button" class="u-btn u-btn--icon u-btn--sm" aria-label={`More for number ${r.n}`}>⋯</button>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    </div>
+
+    <nav class="u-tabbar" aria-label="Sections">
+      <a href="#" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg>Queue</a>
+      <a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>Barbers</a>
+      <a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7" /></svg>Reports</a>
+      <a href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>Settings</a>
+    </nav>
+  </main>
+</Base>
