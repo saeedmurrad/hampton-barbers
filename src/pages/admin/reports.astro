@@ -78,6 +78,7 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   import { barberLabel, londonDay, type Board } from '../../lib/board';
   import { dayLabel, exampleSales, money, pctFor, period, setPct, shiftPeriod, summarize, toCsv, type PayRules, type PeriodKind, type Sale } from '../../lib/sales';
   import { CONNECTED, esc, fetchBoards, localPay, localSales, onDeviceChange, pickBoard, saveLocalPay, saveLocalSale } from '../../lib/store';
+  import { signInHtml, wireSignIn } from '../../lib/signin';
   import * as cloud from '../../lib/cloud';
 
   const root = document.querySelector<HTMLElement>('.rp')!;
@@ -142,10 +143,7 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     accountMsg = '';
     let html: string;
     if (!CONNECTED) html = '<p><strong>Not connected.</strong> Showing example figures.</p>';
-    else if (!email) html = `<form id="rp-signin" class="rp__signin"><b>Sign in as the owner to see the real takings</b>
-        <input type="email" name="email" autocomplete="username" placeholder="Email" required />
-        <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
-        <button type="submit" class="primary">Sign in</button></form>${note}
+    else if (!email) html = `<b class="rp__signin-title">Sign in as the owner to see the real takings</b>${signInHtml({ formId: 'rp-signin' })}${note}
         <p class="rp__hint">Until then, this page shows example figures so you can see how the reports work.</p>`;
     else if (owner === false) html = `<p><strong>These reports are for the owner only.</strong> You are signed in as ${esc(email)}, which can run the queue and record sales but cannot see the takings. On a new site, the first login to save a change on the queue desk becomes the owner. <button type="button" class="link" data-out>Sign out</button></p>${note}`;
     else html = `<p>Signed in as <strong>${esc(email)}</strong>, the owner. <button type="button" class="link" data-out>Sign out</button></p>${note}`;
@@ -266,12 +264,7 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     else if ('out' in d) cloud.staffSignOut();
   });
   $<HTMLSelectElement>('#rp-shop').addEventListener('change', (e) => { shop = (e.target as HTMLSelectElement).value; load(); });
-  account.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target as HTMLFormElement);
-    try { await cloud.staffSignIn(String(f.get('email')).trim(), String(f.get('password'))); }
-    catch { accountMsg = 'The email or password is not right.'; draw(); }
-  });
+  wireSignIn(account, { formId: 'rp-signin' });
 
   // ---------- start ----------
   draw();
@@ -299,7 +292,9 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   .rp button { min-height: 2.75rem; padding: 0 1rem; border: 1px solid var(--line2); border-radius: 12px; background: var(--s2); color: var(--text); font-weight: 650; cursor: pointer; }
   .rp button:hover:not(:disabled) { background: var(--s3); }
   .rp button:disabled { opacity: .35; cursor: default; }
-  .rp .primary { background: var(--text); color: #0a0c0b; border-color: transparent; }
+  .rp .primary, .rp .u-btn--primary { background: var(--text); color: #0a0c0b; border-color: transparent; }
+  .rp .u-link { border: 0; background: none; min-height: 0; padding: 0; }
+  .rp__signin-title { display: block; margin-bottom: .8rem; color: var(--text); font: 750 1.1rem/1.2 var(--display); letter-spacing: -.02em; }
   .rp .link { border: 0; background: none; min-height: auto; padding: 0 .2rem; text-decoration: underline; text-underline-offset: 3px; }
   .rp input, .rp select { min-height: 2.75rem; padding: 0 .8rem; border: 1px solid var(--line2); border-radius: 12px; background: var(--bg); color: var(--text); min-width: 0; }
   .rp__signin { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }

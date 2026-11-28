@@ -1,7 +1,7 @@
 // The Firebase side of the queue: sign-in, live updates and safe saves. Loaded only where it
 // is needed: staff pages, the shop TV, and a customer's page once they hold a ticket.
 import { initializeApp, getApps, deleteApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, initializeAuth, inMemoryPersistence, updatePassword } from 'firebase/auth';
+import { getAuth, connectAuthEmulator, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, initializeAuth, inMemoryPersistence, updatePassword, GoogleAuthProvider, signInWithPopup, signInWithCredential, sendPasswordResetEmail, deleteUser } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, doc, collection, onSnapshot, runTransaction, setDoc, deleteDoc, deleteField, getDoc, getDocs, query, where, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { cleanBoard, londonDay, openToday, QueueError, type Board } from './board';
 import { cleanRules, cleanSale, type PayRules, type Sale } from './sales';
@@ -21,6 +21,9 @@ function fb() {
   if (useEmulator()) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
+    // Local testing only (the emulator, never the real site): stands in for Google's own sign-in window.
+    (window as unknown as Record<string, unknown>).__hbGoogle = (email: string, name = '') =>
+      signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({ sub: `g-${email}`, email, email_verified: true, name })));
   }
   ready = { auth, db };
   return ready;
@@ -72,12 +75,12 @@ export async function actStaff(shop: string, fn: (b: Board, now: number) => Boar
   }
 }
 
-// A customer change. No account: the visitor gets an anonymous sign-in, and the database
-// rules let that sign-in touch only its own ticket. Only the changed fields are sent.
+// A customer change. The customer is signed in to their own account, and the database rules
+// let that account touch only the one ticket filed under it. Only the changed fields are sent.
 export async function actCustomer(shop: string, fn: (b: Board, id: string, now: number) => Board): Promise<{ board: Board; id: string }> {
   const { auth, db } = fb();
   await auth.authStateReady();
-  if (!auth.currentUser) await signInAnonymously(auth);
+  if (!auth.currentUser) throw Object.assign(new Error('sign in first'), { code: 'signin' });
   const id = auth.currentUser!.uid;
   const ref = doc(db, 'boards', shop);
   const once = () => runTransaction(db, async (tx) => {
@@ -214,4 +217,86 @@ export async function loadBarberDay(shop: string, b: string, day: string): Promi
   const out: Sale[] = [];
   snap.forEach((d) => { const s = cleanSale(d.data(), d.id); if (s) out.push(s); });
   return out;
+}
+
+
+// ---------- accounts: one sign-in for everyone (owner, staff and customers) ----------
+export type Account = { uid: string; email: string; name: string };
+export function onAccount(cb: (a: Account | null) => void) {
+  return onAuthStateChanged(fb().auth, (u) => cb(u && !u.isAnonymous ? { uid: u.uid, email: u.email ?? '', name: u.displayName ?? '' } : null));
+}
+export async function googleSignIn() {
+  const p = new GoogleAuthProvider();
+  p.setCustomParameters({ prompt: 'select_account' });
+  await signInWithPopup(fb().auth, p);
+}
+export const emailSignIn = (email: string, password: string) => signInWithEmailAndPassword(fb().auth, email, password);
+export const emailSignUp = (email: string, password: string) => createUserWithEmailAndPassword(fb().auth, email, password);
+export const resetPassword = (email: string) => sendPasswordResetEmail(fb().auth, email);
+export const accountSignOut = () => signOut(fb().auth);
+// What to tell someone when signing in did not work.
+export function authMessage(e: unknown): string {
+  const code = String((e as { code?: string }).code ?? '');
+  if (/invalid-credential|wrong-password|user-not-found/.test(code)) return 'The email or password is not right.';
+  if (code.includes('email-already-in-use')) return 'That email already has an account. Sign in instead, or use Forgot password.';
+  if (code.includes('weak-password')) return 'Choose a password with at least 8 characters.';
+  if (code.includes('invalid-email') || code.includes('missing-email')) return 'That does not look like an email address.';
+  if (code.includes('too-many-requests')) return 'Too many tries. Wait a few minutes and try again.';
+  if (code.includes('popup-blocked')) return 'Your browser blocked the Google window. Allow pop-ups for this site and try again.';
+  if (code.includes('popup-closed') || code.includes('cancelled-popup')) return 'The Google window was closed before signing in.';
+  if (code.includes('operation-not-allowed') || code.includes('unauthorized-domain')) return 'This way of signing in is not switched on yet. Use email and password for now.';
+  if (code.includes('account-exists-with-different-credential')) return 'That email already has an account. Sign in with its email and password.';
+  return 'That did not work. Check your internet connection and try again.';
+}
+
+// ---------- a customer's own details ----------
+// Only what the queue needs: first name, email and mobile. Never a date of birth or an address.
+export type Profile = { name: string; email: string; mobile: string; at: number; seen: number };
+export const cleanMobile = (x: string) => x.replace(/[\s().-]/g, '');
+export const validMobile = (x: string) => /^\+?\d{9,15}$/.test(cleanMobile(x));
+const profileOf = (d: Record<string, unknown>): Profile => ({ name: String(d.name ?? ''), email: String(d.email ?? ''), mobile: String(d.mobile ?? ''), at: Number(d.at ?? 0), seen: Number(d.seen ?? 0) });
+export async function loadProfile(): Promise<Profile | null> {
+  const { auth, db } = fb();
+  const s = await getDoc(doc(db, 'customers', auth.currentUser!.uid));
+  return s.exists() ? profileOf(s.data()) : null;
+}
+export async function saveProfile(input: { name: string; mobile: string }, old: Profile | null): Promise<Profile> {
+  const { auth, db } = fb();
+  const u = auth.currentUser!;
+  const now = Date.now();
+  const p: Profile = { name: input.name.trim().replace(/\s+/g, ' ').slice(0, 24), email: u.email ?? '', mobile: cleanMobile(input.mobile), at: old?.at || now, seen: now };
+  await setDoc(doc(db, 'customers', u.uid), p);
+  return p;
+}
+// The shop can ring a customer who is in the queue. Staff logins only, one customer at a time.
+export async function customerContact(uid: string): Promise<{ name: string; mobile: string } | null> {
+  const s = await getDoc(doc(fb().db, 'customers', uid));
+  return s.exists() ? { name: String(s.data().name ?? ''), mobile: String(s.data().mobile ?? '') } : null;
+}
+// Everything held about the signed-in customer, for "Download my details".
+export async function exportMine(shops: string[]): Promise<Record<string, unknown>> {
+  const { auth, db } = fb();
+  const u = auth.currentUser!;
+  const tickets: Record<string, unknown> = {};
+  for (const shop of shops) {
+    const b = await getDoc(doc(db, 'boards', shop));
+    const t = b.exists() ? cleanBoard(b.data()).t[u.uid] : undefined;
+    if (t) tickets[shop] = t;
+  }
+  return { exportedAt: new Date().toISOString(), account: { email: u.email, signInMethods: u.providerData.map((x) => x.providerId), created: u.metadata.creationTime, lastSignIn: u.metadata.lastSignInTime }, details: await loadProfile(), ticketsToday: tickets };
+}
+// "Delete my account": gives up any place in a queue, removes the customer's details and then
+// the sign-in itself. Firebase asks for a recent sign-in before it will remove the sign-in.
+export async function deleteMine(shops: string[]): Promise<void> {
+  const { auth, db } = fb();
+  const u = auth.currentUser!;
+  for (const shop of shops) {
+    const ref = doc(db, 'boards', shop);
+    const b = await getDoc(ref);
+    const t = b.exists() ? cleanBoard(b.data()).t[u.uid] : undefined;
+    if (t && t.s !== 'chair') await updateDoc(ref, { [`t.${u.uid}`]: deleteField(), updatedAt: Date.now() }).catch(() => { /* the shop clears it at the end of the day */ });
+    await deleteDoc(doc(db, 'boards', shop, 'names', u.uid)).catch(() => { /* nothing stored */ });
+  }
+  await deleteDoc(doc(db, 'customers', u.uid));
+  await deleteUser(u);
 }

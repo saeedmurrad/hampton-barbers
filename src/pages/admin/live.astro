@@ -147,6 +147,8 @@ const icons = {
   import { addWalkIn, arrive, barberLabel, boardView, callNext, clearQueue, clockText, cutMinutes, dropBarber, exampleBoard, lapsed, minsText, removeTicket, setBarber, setOptions, uncall, type LiveMode } from '../../lib/board';
   import { createDesk } from '../../lib/desk';
   import { finishAndPay, loadServices, type Service } from '../../lib/paysheet';
+  import { signInHtml, wireSignIn } from '../../lib/signin';
+  import { customerContact } from '../../lib/cloud';
   import { esc, newId } from '../../lib/store';
   import * as cloud from '../../lib/cloud';
 
@@ -214,10 +216,7 @@ const icons = {
     account.innerHTML = email
       ? `<p>Signed in as <strong>${esc(email)}</strong>. Every change goes live straight away on the website, the barbers’ phones and the shop TV. <button type="button" class="u-link" data-out>Sign out</button></p>${note}`
       : `<details${note ? ' open' : ''}><summary>Sign in to run the real queue</summary>
-          <form id="qd-signin" class="u-signin">
-          <input class="u-input" type="email" name="email" autocomplete="username" placeholder="Email" required />
-          <input class="u-input" type="password" name="password" autocomplete="current-password" placeholder="Password" required />
-          <button type="submit" class="u-btn u-btn--primary">Sign in</button></form>${note}
+          ${signInHtml({ formId: 'qd-signin' })}${note}
         <p class="u-hint" style="margin-top:.7rem">Until you sign in this is a demo that stays on this device: open the shop TV, a barber panel and a customer page in other tabs and they all follow along.</p></details>`;
   };
 
@@ -376,6 +375,7 @@ const icons = {
       if (!k) return;
       openSheet(`Number ${k.n}${desk.name(tab, id) ? ` · ${desk.name(tab, id)}` : ''}`, [
         ...(k.s === 'way' ? [{ label: 'Seat now (they are here)', attr: `data-seat="${id}"` }] : []),
+        ...(desk.email() && k.src !== 'desk' ? [{ label: 'Show their mobile number', attr: `data-contact="${id}"` }] : []),
         { label: 'Remove from the queue', attr: `data-remove="${id}"`, danger: true },
       ]);
     }
@@ -393,6 +393,8 @@ const icons = {
     else if (d.call) desk.act(tab, (b, now) => callNext(b, d.call!, now));
     else if (d.finish) finishAndPay(desk, tab, d.finish, services, toast);
     else if (d.uncall) desk.act(tab, (b, now) => uncall(b, d.uncall!, now));
+    // To ring a customer who is in the queue. Looked up one at a time, only when asked for.
+    else if (d.contact) customerContact(d.contact).then((c) => (c?.mobile ? toast(`${c.name}: ${c.mobile}`, { label: 'Call', run: () => { location.href = `tel:${c.mobile}`; } }) : toast('No mobile number is held for this customer.')), () => toast('Could not get the number. Check the connection and try again.'));
     else if (d.brkOn) desk.act(tab, (b, now) => setBarber(b, d.brkOn!, { brk: true }, now));
     else if (d.brkOff) desk.act(tab, (b, now) => setBarber(b, d.brkOff!, { brk: false }, now));
     else if (d.off) desk.act(tab, (b, now) => setBarber(b, d.off!, { on: false }, now));
@@ -457,12 +459,7 @@ const icons = {
   noteEl.addEventListener('input', () => { const note = noteEl.value, shop = tab; clearTimeout(noteTimer); noteTimer = window.setTimeout(() => desk.act(shop, (b, now) => setOptions(b, { note }, now)), 500); });
   $('[data-sheet-close]').addEventListener('click', () => sheet.close());
 
-  account.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target as HTMLFormElement);
-    try { await desk.signIn(String(f.get('email')).trim(), String(f.get('password'))); }
-    catch { accountMsg = 'The email or password is not right.'; draw(); }
-  });
+  wireSignIn(account, { formId: 'qd-signin' });
 
   // ---------- start ----------
   draw();

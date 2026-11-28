@@ -82,35 +82,64 @@ const address = main ? `${site.address.street}, ${site.address.locality}, ${site
             </div>
           )}
         </section>
-        <p class="u-hint u-queue__foot">Times are estimates from the shop’s own screen.</p>
+        <p class="u-hint u-queue__foot">Times are estimates from the shop’s own screen. <a class="u-link" href={`${base}/privacy/`}>Privacy</a><span data-acct-link hidden> · <a class="u-link" href={`${base}/account/`}>My account</a></span></p>
       </div>
     </div>
 
     <dialog class="u-sheet u-join" id="join-dialog" aria-labelledby="join-title">
-      <form class="u-sheet__in" data-join-form>
+      <div class="u-sheet__in">
         <b id="join-title">Join the queue at {shop.name}</b>
-        <p class="u-hint u-join__home">Take a ticket number now, then come in when it’s nearly your turn.</p>
-        <p class="u-hint u-join__door">You’re at the shop, so you go straight into the line. Take a seat and watch the screen for your number.</p>
-        <label class="u-field">Your first name
-          <input class="u-input" name="name" required maxlength="24" autocomplete="given-name" placeholder="e.g. Sam" />
-        </label>
-        <fieldset class="u-pick u-join__home">
-          <legend>How far away are you?</legend>
-          {etas.map(([m, t]) => <label><input type="radio" name="eta" value={m} checked={m === 10} /><span>{t}</span></label>)}
-        </fieldset>
-        <p class="u-hint">We keep only your first name, and only until your cut is done. The shop screen shows your number, never your name. You can leave the queue at any time.</p>
-        <p class="u-msg" data-join-error role="alert" hidden></p>
-        <div class="u-join__btns">
+
+        <div class="u-join__form" data-step="signin" hidden>
+          <p class="u-hint">Sign in or create an account to take a ticket. You only do this once.</p>
+          <div data-si-root></div>
           <button type="button" class="u-btn" data-join-cancel>Cancel</button>
-          <button type="submit" class="u-btn u-btn--primary" data-join-submit>Join the queue</button>
         </div>
-      </form>
+
+        <p class="u-hint" data-step="wait" hidden>One moment…</p>
+
+        <form class="u-join__form" data-step="profile" data-profile-form novalidate hidden>
+          <p class="u-hint">Two details so the shop knows who you are and can reach you about your place.</p>
+          <label class="u-field">Your first name
+            <input class="u-input" name="name" maxlength="24" autocomplete="given-name" placeholder="e.g. Sam" />
+          </label>
+          <label class="u-field">Mobile number
+            <input class="u-input" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="e.g. 07700 900123" />
+          </label>
+          <p class="u-hint">Signed in as <b data-acct-email></b>. We keep your first name, email and mobile, and nothing else. The shop uses them only to run the queue and to contact you about your place. <a class="u-link" href={`${base}/privacy/`}>Privacy notice</a></p>
+          <p class="u-msg" data-profile-error role="alert" hidden></p>
+          <div class="u-join__btns">
+            <button type="button" class="u-btn" data-join-cancel>Cancel</button>
+            <button type="submit" class="u-btn u-btn--primary" data-profile-submit>Save and continue</button>
+          </div>
+        </form>
+
+        <form class="u-join__form" data-step="join" data-join-form novalidate>
+          <p class="u-hint u-join__home">Take a ticket number now, then come in when it’s nearly your turn.</p>
+          <p class="u-hint u-join__door">You’re at the shop, so you go straight into the line. Take a seat and watch the screen for your number.</p>
+          <label class="u-field" data-name-field>Your first name
+            <input class="u-input" name="name" maxlength="24" autocomplete="given-name" placeholder="e.g. Sam" />
+          </label>
+          <p class="u-join__as" data-join-as hidden>Joining as <b></b><button type="button" class="u-link" data-edit-profile>Change my details</button></p>
+          <fieldset class="u-pick u-join__home">
+            <legend>How far away are you?</legend>
+            {etas.map(([m, t]) => <label><input type="radio" name="eta" value={m} checked={m === 10} /><span>{t}</span></label>)}
+          </fieldset>
+          <p class="u-hint">The shop screen shows your number, never your name. You can leave the queue at any time.</p>
+          <p class="u-msg" data-join-error role="alert" hidden></p>
+          <div class="u-join__btns">
+            <button type="button" class="u-btn" data-join-cancel>Cancel</button>
+            <button type="submit" class="u-btn u-btn--primary" data-join-submit>Join the queue</button>
+          </div>
+        </form>
+      </div>
     </dialog>
   </main>
 </Base>
 
 <script>
   import { agoText, arrive, boardView, clockText, join, leave, londonDay, ord, placeOf, runLate, GRACE_MIN, MAX_LINE, QueueError, type Board, type BoardView } from '../../lib/board';
+  import { signInHtml, wireSignIn } from '../../lib/signin';
   import { TICKET_KEY, actLocal, esc, fetchBoards, metresBetween, newId, onDeviceChange, pickBoard, read, setLocalName, write, type Mine } from '../../lib/store';
 
   const root = document.querySelector<HTMLElement>('[data-queue-page]')!;
@@ -145,6 +174,14 @@ const address = main ? `${site.address.street}, ${site.address.locality}, ${site
   let toldLate = false;
   let note = '';
   let joining = false;
+  // The customer's account and details. A real queue needs both; the demo queue on this
+  // device needs neither.
+  let acct: import('../../lib/cloud').Account | null = null;
+  let profile: import('../../lib/cloud').Profile | null = null;
+  let profileKnown = false;
+  let editing = false;
+  let acctKnown = false;
+  let watching = false;
   const pick = (k: string) => pickBoard(k, cloud[k]);
   // This page shows a ticket for its own shop only. One held at another shop gets a link instead.
   const here = () => (mine && mine.shop === shop ? mine : null);
@@ -186,7 +223,7 @@ const address = main ? `${site.address.street}, ${site.address.locality}, ${site
       } else actLocal(shop, (b, now) => fn(b, m.id, now));
       return true;
     } catch (e) {
-      note = e instanceof QueueError ? 'That could not be done. The shop may have moved your ticket on.' : 'Could not reach the shop. Check your connection and try again.';
+      note = e instanceof QueueError ? 'That could not be done. The shop may have moved your ticket on.' : (e as { code?: string }).code === 'signin' ? 'Sign in again to change your ticket: tap “My account” at the bottom of this page.' : 'Could not reach the shop. Check your connection and try again.';
       return false;
     } finally {
       render();
@@ -385,13 +422,69 @@ const address = main ? `${site.address.street}, ${site.address.locality}, ${site
     try { if ((await navigator.permissions.query({ name: 'geolocation' })).state === 'granted') checkIn(true); } catch { /* not supported */ }
   };
 
+  // ---- the customer's account ----
+  const isCloud = () => pick(shop).source === 'cloud';
+  const profileForm = $<HTMLFormElement>('[data-profile-form]'), profileErr = $('[data-profile-error]');
+  $('[data-si-root]').innerHTML = signInHtml({ create: true });
+  wireSignIn(dialog, { create: true });
+  // Signed in on a new phone or after clearing the browser: pick the ticket up again.
+  const adopt = () => {
+    if (!acct || mine) return;
+    for (const s of shops) if (cloud[s.id]?.t[acct.uid]) { setMine({ shop: s.id, id: acct.uid, name: profile?.name ?? '', src: 'cloud', at: Date.now() }); follow(); if (dialog.open) dialog.close(); break; }
+  };
+  const showStep = () => {
+    const step = !isCloud() ? 'join' : !acctKnown ? 'wait' : !acct ? 'signin' : !profileKnown ? 'wait' : !profile || editing ? 'profile' : 'join';
+    dialog.querySelectorAll<HTMLElement>('[data-step]').forEach((el) => { el.hidden = el.dataset.step !== step; });
+    $('[data-name-field]').hidden = isCloud();
+    const as = $('[data-join-as]');
+    as.hidden = !isCloud();
+    say(as.querySelector('b')!, profile ? `${profile.name}, ${profile.mobile}` : '');
+    say($('[data-acct-email]'), acct?.email ?? '');
+    if (step === 'profile' && dialog.open) {
+      const n = profileForm.querySelector<HTMLInputElement>('input[name=name]')!, m = profileForm.querySelector<HTMLInputElement>('input[name=mobile]')!;
+      if (!n.value) n.value = profile?.name || acct?.name.split(' ')[0].slice(0, 24) || '';
+      if (!m.value) m.value = profile?.mobile ?? '';
+    }
+    $('[data-acct-link]').hidden = !acct;
+  };
+  const watchAccount = async () => {
+    if (watching) return;
+    watching = true;
+    try {
+      api ??= await import('../../lib/cloud');
+      const a = api;
+      a.onAccount(async (x) => {
+        acct = x; acctKnown = true; profile = null; profileKnown = !x; editing = false;
+        showStep();
+        if (x) { try { profile = await a.loadProfile(); } catch { /* treated as not filled in yet */ } if (acct?.uid === x.uid) { profileKnown = true; adopt(); } }
+        showStep();
+        render();
+      });
+    } catch { watching = false; }
+  };
+  profileForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!api || !acct) return;
+    const f = new FormData(profileForm);
+    const name = String(f.get('name') ?? '').trim().replace(/\s+/g, ' ').slice(0, 24), mobile = String(f.get('mobile') ?? '');
+    const fail = (t: string) => { profileErr.textContent = t; profileErr.hidden = false; };
+    if (!name) return fail('Please add your first name.');
+    if (!api.validMobile(mobile)) return fail('Please add a mobile number the shop can reach you on, for example 07700 900123.');
+    const btn = $<HTMLButtonElement>('[data-profile-submit]');
+    btn.disabled = true;
+    try { profile = await api.saveProfile({ name, mobile }, profile); editing = false; profileErr.hidden = true; showStep(); }
+    catch { fail('Could not save your details. Check your connection and try again.'); }
+    btn.disabled = false;
+  });
+
   // ---- joining and leaving ----
   const openJoin = () => {
     errEl.hidden = true;
     if (joinBtn.disabled || here() || dialog.open) return;
     dialog.classList.toggle('is-door', atDoor);
+    if (isCloud()) watchAccount();
     dialog.showModal();
-    dialog.querySelector<HTMLInputElement>('input[name="name"]')!.focus();
+    showStep();
   };
   const leaveQueue = async () => {
     const m = here();
@@ -410,6 +503,7 @@ const address = main ? `${site.address.street}, ${site.address.locality}, ${site
     if (t.closest('[data-again]')) { setMine(null); note = ''; render(); openJoin(); }
     else if (t.closest('[data-join]')) openJoin();
     else if (t.closest('[data-join-cancel]')) dialog.close();
+    else if (t.closest('[data-edit-profile]')) { editing = true; showStep(); }
     else if (t.closest('[data-leave]')) leaveQueue();
     else if (t.closest('[data-here]')) checkIn();
     else if (t.closest('[data-late]')) act((b, id, now) => runLate(b, id, now)).then((ok) => { if (ok) { toldLate = false; note = 'Thanks for letting us know. Your place is held 10 minutes longer.'; render(); } });
@@ -421,7 +515,9 @@ const address = main ? `${site.address.street}, ${site.address.locality}, ${site
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
-    const name = String(data.get('name') ?? '').trim().replace(/\s+/g, ' ').slice(0, 24);
+    const real = isCloud();
+    if (real && (!acct || !profile)) { showStep(); return; }
+    const name = real ? profile!.name : String(data.get('name') ?? '').trim().replace(/\s+/g, ' ').slice(0, 24);
     const eta = Number(data.get('eta') ?? 10);
     const src = atDoor ? 'qr' : 'web';
     if (!name) { errEl.textContent = 'Please add your first name.'; errEl.hidden = false; return; }
@@ -469,9 +565,11 @@ const address = main ? `${site.address.street}, ${site.address.locality}, ${site
     const got = await fetchBoards();
     if (got) for (const [k, b] of Object.entries(got)) if (!cloud[k] || b.updatedAt >= cloud[k].updatedAt) cloud = { ...cloud, [k]: b };
     loaded = true;
+    adopt();
     render();
   };
   refresh().then(() => {
+    if (isCloud() || mine?.src === 'cloud') watchAccount();
     const m = here();
     // Scanned the code on the door: check in a ticket already held for this shop, or offer one.
     if (atDoor && m && pick(shop).board.t[m.id]?.s === 'way') act((b, id, now) => arrive(b, id, now)).then((ok) => { if (ok) { note = ''; render(); } });

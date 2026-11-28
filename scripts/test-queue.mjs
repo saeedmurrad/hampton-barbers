@@ -53,8 +53,32 @@ const waitText = async (pg, sel, re, ms = 20000) => {
 const signIn = async (pg, form) => { await setValue(pg, `${form} input[name=email]`, 'owner@test.local'); await setValue(pg, `${form} input[name=password]`, 'test-pass-1'); await submit(pg, form); };
 // The payment step: tap a service, tap Cash or Online, save.
 const pay = async (pg, svc, how) => { await pg.waitForSelector('dialog.pay[open]', { timeout: 6000 }); await tap(pg, `.pay [data-svc="${svc}"]`); await tap(pg, `.pay [data-pay="${how}"]`); await tap(pg, '.pay [data-save]'); };
-// On the queue page: wait until the page knows the queue, open the join step, give a first name.
-const joinAs = async (pg, name) => { await pg.waitForSelector('[data-join]:not([disabled])', { timeout: 15000 }); await tap(pg, '[data-join]'); await setValue(pg, '#join-dialog input[name=name]', name); await submit(pg, '[data-join-form]'); };
+// Customer accounts. In the join step: create an account with an email and password...
+const signUpIn = async (pg, email) => {
+  await pg.waitForSelector('#join-dialog [data-step="signin"]:not([hidden])', { timeout: 15000 });
+  await tap(pg, '#join-dialog [data-si="mode"]');
+  await setValue(pg, '#join-dialog [data-si-form] input[name=email]', email);
+  await setValue(pg, '#join-dialog [data-si-form] input[name=password]', 'test-pass-1');
+  await submit(pg, '#join-dialog [data-si-form]');
+  await pg.waitForSelector('#join-dialog [data-step="profile"]:not([hidden])', { timeout: 15000 });
+};
+// ...then give a first name and a mobile number.
+const giveDetails = async (pg, name, mobile = '07700 900123') => {
+  await setValue(pg, '[data-profile-form] input[name=name]', name);
+  await setValue(pg, '[data-profile-form] input[name=mobile]', mobile);
+  await submit(pg, '[data-profile-form]');
+};
+const joinStep = (pg) => pg.waitForSelector('#join-dialog [data-step="join"]:not([hidden])', { timeout: 15000 });
+// Take a ticket: a new customer signs up on the way, a returning one goes straight through,
+// and on the demo queue (nobody signed in anywhere) a first name is all it takes.
+const joinAs = async (pg, name, email) => {
+  await pg.waitForSelector('[data-join]:not([disabled])', { timeout: 15000 });
+  await tap(pg, '[data-join]');
+  await pg.waitForSelector('#join-dialog [data-step="signin"]:not([hidden]), #join-dialog [data-step="join"]:not([hidden])', { timeout: 15000 });
+  if (await pg.$('#join-dialog [data-step="signin"]:not([hidden])')) { await signUpIn(pg, email); await giveDetails(pg, name); await joinStep(pg); }
+  else if (await pg.$eval('[data-name-field]', (e) => !e.hidden)) await setValue(pg, '[data-join-form] input[name=name]', name);
+  await submit(pg, '[data-join-form]');
+};
 const shot = async (pg, name) => { await pg.bringToFront(); await sleep(700); await pg.screenshot({ path: path.join(OUT, `${name}.jpg`), type: 'jpeg', quality: 80 }); };
 const PHONE = { width: 390, height: 844, isMobile: true, hasTouch: true };
 const LAPTOP = { width: 1366, height: 900 };
@@ -102,7 +126,13 @@ try {
   await C.waitForSelector('#join-dialog[open]', { timeout: 8000 }).catch(() => {});
   ok(await C.$eval('#join-dialog', (d) => d.open) && !C.url().includes('join='), 'customer: the join step opens by itself, once', C.url());
   await shot(C, 'p1-customer-join');
-  await setValue(C, '#join-dialog input[name=name]', 'Sam');
+  ok(await C.$eval('#join-dialog [data-step="signin"]', (e) => !e.hidden) && /Continue with Google/.test(await txt(C, '#join-dialog')) && /Forgot password/.test(await txt(C, '#join-dialog')), 'customer: is asked to sign in first, with Google, email or a forgotten-password link', (await txt(C, '#join-dialog')).slice(0, 120));
+  await signUpIn(C, 'sam.customer@test.local');
+  await giveDetails(C, 'Sam', 'not a number');
+  ok(await waitText(C, '[data-profile-error]', /mobile number/), 'customer: a mobile number that is not a number is refused', await txt(C, '[data-profile-error]'));
+  await giveDetails(C, 'Sam');
+  await joinStep(C);
+  ok(/Sam, 07700900123/.test(await txt(C, '[data-join-as]')), 'customer: the join step shows who is joining', await txt(C, '[data-join-as]'));
   await submit(C, '[data-join-form]');
   ok(await waitText(C, '[data-ticket] .u-pass__n', /^5$/), 'customer: gets ticket number 5 straight away', await txt(C, '[data-ticket] .u-pass__n'));
   ok(/Your ticket/.test(await txt(C, '[data-ticket]')) && /2nd in line/.test(await txt(C, '[data-ticket]')) && /1 person ahead of you/.test(await txt(C, '[data-line-sum]')) && /Hi, Sam/.test(await txt(C, '[data-hi]')), 'customer: is told 2nd in line, 1 person ahead', `${(await txt(C, '[data-ticket]')).slice(0, 90)} | ${await txt(C, '[data-line-sum]')} | ${await txt(C, '[data-hi]')}`);
@@ -114,6 +144,9 @@ try {
   await shot(C, 'p1-customer-way');
   ok(await waitText(A, '[data-queue]', /5 Sam Due [\d:]+ [ap]m On the way/), 'desk: sees number 5, Sam, on the way', (await txt(A, '[data-queue]')).slice(0, 140));
   ok(await waitText(T, '[data-line]', /2 5 On the way/), 'tv: lists number 5 as on the way', await txt(T, '[data-line]'));
+  await tap(A, '[data-queue] li:last-child [data-more]');
+  await tap(A, '[data-sheet] [data-contact]');
+  ok(await waitText(A, '.staff-toast', /Sam: 07700900123 Call/), 'desk: can look up the customer’s mobile number to ring them', await txt(A, '.staff-toast'));
   await tap(C, '[data-late]');
   ok(await waitText(C, '[data-ticket]', /held 10 minutes longer/), 'customer: "Running late" holds the place longer');
   ok(await waitText(A, '[data-queue]', /running late/), 'desk: shows that number 5 is running late');
@@ -244,13 +277,13 @@ try {
 
   // ---------- another customer joins, then leaves; then online joining is paused ----------
   const E = await open(await browser.createBrowserContext(), '/queue/hampton-vale/?emulator', PHONE, 'customer2');
-  await joinAs(E, 'Lee');
+  await joinAs(E, 'Lee', 'lee.customer@test.local');
   ok(await waitText(A, '[data-queue]', /6 Lee Due [\d:]+ [ap]m On the way/), 'desk: sees a second customer, Lee, number 6', await txt(A, '[data-queue]'));
   await tap(E, '[data-leave]');
   ok(await waitText(A, '[data-queue]', /Nobody waiting/), 'desk: Lee leaves and disappears from the queue', await txt(A, '[data-queue]'));
   await setValue(A, '#qd-online', 'off');
   await sleep(1200);
-  await joinAs(E, 'Lee');
+  await joinAs(E, 'Lee', 'lee.customer@test.local');
   ok(await waitText(E, '[data-join-error]', /not open at this shop/), 'customer: cannot join while the shop has paused online joining', await txt(E, '[data-join-error]'));
   ok(await waitText(E, '[data-join-hint]', /not open at this shop/) && await E.$eval('[data-join]', (b) => b.disabled), 'customer: the join button is then switched off, with the reason', await txt(E, '[data-join-hint]'));
 
@@ -263,6 +296,7 @@ try {
   const WD = await open(demo, '/heritage/?emulator', LAPTOP, 'demo-website');
   const CD = await open(demo, '/queue/hampton-vale/?emulator', LAPTOP, 'demo-customer');
   await joinAs(CD, 'Ava');
+  ok((await CD.$$('#join-dialog [data-step="signin"]:not([hidden])')).length === 0, 'demo: the demo queue asks for a first name only, no account');
   ok(await waitText(CD, '[data-ticket] .u-pass__n', /^29$/), 'demo: the customer tab gets number 29', await txt(CD, '[data-ticket] .u-pass__n'));
   ok(await waitText(WD, '[data-my-ticket]', /29 .*Ava/) && await WD.$eval('[data-my-ticket]', (a) => !a.hidden), 'demo: the website tab shows Ava’s ticket strip', await txt(WD, '[data-my-ticket]'));
   ok(await waitText(AD, '[data-queue]', /29 Ava Due [\d:]+ [ap]m On the way/), 'demo: the desk tab sees Ava, number 29', (await txt(AD, '[data-queue]')).slice(-60));

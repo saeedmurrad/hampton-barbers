@@ -1,0 +1,77 @@
+---
+// The privacy notice for the queue. Plain words about what is kept, why, who sees it and how
+// to get it removed. The wording must be checked by someone qualified before real customers
+// rely on it: see the notes Saeed was given with this page.
+import '../../styles/ui.css';
+import Base from '../../layouts/Base.astro';
+import { site } from '../../data/site';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Hampton Barbers: privacy notice" description="What Hampton Barbers keeps when you join the queue, why, who sees it and how to have it removed." themeColor="#0a0c0b">
+  <main id="main" class="ui">
+    <div class="u-phone u-prose">
+      <header class="u-shopbar">
+        <a class="u-brand" href={`${base}/queue/hampton-vale/`}><i>HB</i><span><b>Hampton Barbers</b><small>Privacy notice</small></span></a>
+      </header>
+      <h1>Privacy notice</h1>
+      <p class="u-hint">Last updated 28 November 2026</p>
+
+      <section class="u-panel">
+        <h2>What we keep</h2>
+        <ul>
+          <li><b>Your first name</b>, so the barber knows who is next.</li>
+          <li><b>Your email</b>, which is your sign-in.</li>
+          <li><b>Your mobile number</b>, so the shop can reach you about your place in the queue.</li>
+          <li><b>Your ticket for the day</b>: its number, when you joined and when you arrived.</li>
+        </ul>
+        <p>We do not ask for a date of birth, a home address or card details, and the queue takes no payment.</p>
+      </section>
+
+      <section class="u-panel">
+        <h2>Why we keep it</h2>
+        <p>Only to run the queue you asked to join and to contact you about your place in it. We do not use your details for advertising and we do not sell or share them for marketing.</p>
+      </section>
+
+      <section class="u-panel">
+        <h2>Who can see it</h2>
+        <ul>
+          <li>The shop screen and the website show ticket numbers only, never names.</li>
+          <li>The shop’s staff see your first name next to your ticket. They can look up your mobile number while you are in the queue, to ring you.</li>
+          <li>Sign-in and storage are provided by Google Firebase, which holds the data for us. The queue’s data is stored in Google’s London region.</li>
+        </ul>
+      </section>
+
+      <section class="u-panel">
+        <h2>How long we keep it</h2>
+        <ul>
+          <li>The first name on a ticket is removed when your cut is finished or you leave the queue.</li>
+          <li>Tickets are cleared at the end of each day.</li>
+          <li>Your account details stay until you delete your account.</li>
+          <li>The record of a finished cut (the service, the price and how it was paid) holds no name, email or mobile number.</li>
+        </ul>
+      </section>
+
+      <section class="u-panel">
+        <h2>Your choices</h2>
+        <p>On <a class="u-link" href={`${base}/account/`}>My account</a> you can see and correct your details, download a copy of everything we hold about you, or delete your account.</p>
+        <p>You can also ask the shop: {site.name}, {site.address.street}, {site.address.locality}, {site.address.city} {site.address.postcode}, <a class="u-link" href={site.phoneHref}>{site.phone}</a>.</p>
+        <p>If you are unhappy with how your details are handled, you can complain to the Information Commissioner’s Office at <a class="u-link" href="https://ico.org.uk/make-a-complaint/" rel="noopener">ico.org.uk</a>.</p>
+      </section>
+
+      <section class="u-panel">
+        <h2>On your phone</h2>
+        <p>The page remembers your ticket and your sign-in on your own device so they are still there when you come back. There are no advertising or tracking cookies.</p>
+      </section>
+    </div>
+  </main>
+</Base>
+
+<style is:global>
+  .u-prose h1 { font: 800 clamp(1.8rem, 6vw, 2.4rem)/1.05 var(--display); letter-spacing: -.035em; }
+  .u-prose h2 { margin-bottom: .6rem; font: 750 1.15rem/1.2 var(--display); letter-spacing: -.02em; }
+  .u-prose .u-panel { display: grid; gap: .6rem; font-size: .95rem; color: var(--muted); }
+  .u-prose .u-panel b { color: var(--text); }
+  .u-prose ul { display: grid; gap: .45rem; }
+  .u-prose li { position: relative; padding-left: 1.1rem; }
+  .u-prose li::before { content: ''; position: absolute; left: .15rem; top: .6em; width: .35rem; height: .35rem; border-radius: 50%; background: var(--brass); }
+</style>

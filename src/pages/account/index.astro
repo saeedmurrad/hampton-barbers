@@ -1,0 +1,113 @@
+---
+// "My account" for customers: see and correct their details, download everything held about
+// them, sign out, or delete the account. Staff use the same sign-in but manage nothing here.
+import '../../styles/ui.css';
+import Base from '../../layouts/Base.astro';
+import { shops } from '../../data/site';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base noindex title="Hampton Barbers: my account" description="See, correct, download or delete the details Hampton Barbers holds about you." themeColor="#0a0c0b">
+  <main id="main" class="ui" data-account data-base={base} data-shops={JSON.stringify(shops.map((s) => s.id))}>
+    <div class="u-phone">
+      <header class="u-shopbar">
+        <a class="u-brand" href={`${base}/queue/hampton-vale/`}><i>HB</i><span><b>Hampton Barbers</b><small>My account</small></span></a>
+        <a class="u-link" href={`${base}/queue/hampton-vale/`}>Queue</a>
+      </header>
+      <h1 class="u-acc__h">My account</h1>
+      <p class="u-status" data-status role="status" aria-live="polite">Loading…</p>
+
+      <section class="u-panel" data-signed-out hidden>
+        <div class="u-h"><h2>Sign in</h2></div>
+        <div data-si-root></div>
+      </section>
+
+      <form class="u-panel u-join__form" data-details novalidate hidden>
+        <div class="u-h" style="margin-bottom:0"><h2>My details</h2></div>
+        <label class="u-field">First name <input class="u-input" name="name" maxlength="24" autocomplete="given-name" /></label>
+        <label class="u-field">Mobile number <input class="u-input" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" /></label>
+        <label class="u-field">Email <input class="u-input" name="email" type="email" readonly /></label>
+        <p class="u-hint">This is everything we hold about you: no date of birth, no address, no card details. <a class="u-link" href={`${base}/privacy/`}>Privacy notice</a></p>
+        <p class="u-msg" data-msg role="alert" hidden></p>
+        <button type="submit" class="u-btn u-btn--primary u-btn--lg" data-save>Save my details</button>
+      </form>
+
+      <section class="u-panel u-stack" data-tools hidden>
+        <div class="u-h" style="margin-bottom:0"><h2>My data</h2></div>
+        <button type="button" class="u-btn" data-download>Download my details</button>
+        <button type="button" class="u-btn" data-out>Sign out</button>
+        <button type="button" class="u-btn u-btn--danger" data-delete>Delete my account</button>
+        <p class="u-hint">Deleting removes your details and your sign-in, and gives up any place you hold in a queue. It cannot be undone.</p>
+      </section>
+    </div>
+  </main>
+</Base>
+
+<script>
+  import { signInHtml, wireSignIn } from '../../lib/signin';
+  import { CONNECTED, TICKET_KEY, write } from '../../lib/store';
+
+  const root = document.querySelector<HTMLElement>('[data-account]')!;
+  const shops = JSON.parse(root.dataset.shops!) as string[];
+  const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+  const status = $('[data-status]'), out = $('[data-signed-out]'), form = $<HTMLFormElement>('[data-details]'), tools = $('[data-tools]'), msg = $('[data-msg]');
+  const field = (n: string) => form.querySelector<HTMLInputElement>(`input[name=${n}]`)!;
+  const tell = (t: string) => { msg.textContent = t; msg.hidden = !t; };
+  $('[data-si-root]').innerHTML = signInHtml({ create: true });
+  wireSignIn(root, { create: true });
+
+  if (!CONNECTED) status.textContent = 'Accounts are not available on this copy of the site.';
+  else import('../../lib/cloud').then((api) => {
+    let profile: Awaited<ReturnType<typeof api.loadProfile>> = null;
+    api.onAccount(async (a) => {
+      out.hidden = Boolean(a);
+      form.hidden = tools.hidden = !a;
+      tell('');
+      if (!a) { status.textContent = 'Sign in to see your details.'; return; }
+      status.textContent = `Signed in as ${a.email}.`;
+      field('email').value = a.email;
+      try { profile = await api.loadProfile(); } catch { profile = null; }
+      field('name').value = profile?.name ?? '';
+      field('mobile').value = profile?.mobile ?? '';
+      if (!profile) tell('Add your first name and mobile number to be able to join a queue.');
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = field('name').value.trim(), mobile = field('mobile').value;
+      if (!name) return tell('Please add your first name.');
+      if (!api.validMobile(mobile)) return tell('Please add a mobile number the shop can reach you on, for example 07700 900123.');
+      try { profile = await api.saveProfile({ name, mobile }, profile); field('mobile').value = profile.mobile; tell('Saved.'); }
+      catch { tell('Could not save. Check your connection and try again.'); }
+    });
+    root.addEventListener('click', async (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLElement>('button');
+      if (!t) return;
+      if ('out' in t.dataset) api.accountSignOut();
+      else if ('download' in t.dataset) {
+        try {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([JSON.stringify(await api.exportMine(shops), null, 2)], { type: 'application/json' }));
+          a.download = 'hampton-barbers-my-details.json';
+          a.click();
+          URL.revokeObjectURL(a.href);
+          tell('Your details were downloaded as a file.');
+        } catch { tell('Could not prepare the file. Check your connection and try again.'); }
+      } else if ('delete' in t.dataset) {
+        if (!confirm('Delete your account and everything we hold about you? This cannot be undone.')) return;
+        try {
+          await api.deleteMine(shops);
+          write(TICKET_KEY, null);
+          status.textContent = 'Your account and details have been deleted.';
+        } catch (err) {
+          tell(String((err as { code?: string }).code).includes('requires-recent-login')
+            ? 'Your details were removed. To remove the sign-in itself, sign out, sign in again and press Delete my account once more.'
+            : 'Could not delete the account. Check your connection and try again.');
+        }
+      }
+    });
+  });
+</script>
+
+<style is:global>
+  .u-acc__h { font: 800 clamp(1.7rem, 6vw, 2.2rem)/1.05 var(--display); letter-spacing: -.035em; }
+  [data-account] .u-shopbar > a.u-link { flex: none; font-size: .85rem; color: var(--muted); }
+</style>

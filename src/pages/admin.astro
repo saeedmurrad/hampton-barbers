@@ -53,7 +53,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   import { STORE_KEY, fetchLive } from '../lib/menu';
   import { parseVisit, validOverride, VISIT_DRAFT_KEY, type HoursOverride } from '../lib/visit';
   import { initializeApp } from 'firebase/app';
-  import { getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, type User } from 'firebase/auth';
+  import * as cloud from '../lib/cloud';
+  import { signInHtml, wireSignIn } from '../lib/signin';
   import { getFirestore, connectFirestoreEmulator, doc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
 
   const cfg = {
@@ -62,11 +63,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   };
   const connected = Boolean(cfg.apiKey && cfg.projectId);
   const app = connected ? initializeApp(cfg) : null;
-  const auth = app ? getAuth(app) : null;
   const db = app ? getFirestore(app) : null;
   // Local testing only (never on the real site): add ?emulator to use the Firebase emulators.
-  if (auth && db && /^(localhost|127\.0\.0\.1|.+\.test)$/.test(location.hostname) && new URLSearchParams(location.search).has('emulator')) {
-    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  if (db && /^(localhost|127\.0\.0\.1|.+\.test)$/.test(location.hostname) && new URLSearchParams(location.search).has('emulator')) {
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
   }
 
@@ -87,7 +86,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const hoursEditor = document.getElementById('hours-editor')!;
   let liveVisit = parseVisit();
   let visit = parseVisit();
-  let user: User | null = null;
+  let user: cloud.Account | null = null;
   let ready = false;
   let publishing = false;
   const canPublish = () => Boolean(user) && ready && !publishing;
@@ -287,78 +286,16 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   });
 
   // ---------- Account ----------
-  const authMessage = (err: unknown) => {
-    const code = (err as { code?: string }).code ?? '';
-    if (/invalid-credential|wrong-password|user-not-found/.test(code)) return 'The email or password is not right.';
-    if (code.includes('email-already-in-use')) return 'That email already has an account. Sign in instead.';
-    if (code.includes('weak-password')) return 'Choose a password with at least 6 characters.';
-    if (code.includes('invalid-email')) return 'That does not look like an email address.';
-    if (code.includes('too-many-requests')) return 'Too many tries. Wait a few minutes and try again.';
-    if (code.includes('operation-not-allowed')) return 'Email sign-in is not switched on in Firebase yet.';
-    return 'That did not work. Check your internet connection and try again.';
-  };
-
   const drawAccount = (msg = '') => {
     const note = msg ? `<p class="acct__msg" role="alert">${esc(msg)}</p>` : '';
-    if (!connected) {
-      account.innerHTML = '<p><strong>Not connected.</strong> This copy of the site has no Firebase settings, so drafts stay on this device and cannot be published.</p>';
-    } else if (!user) {
-      account.innerHTML = `
-        <form id="signin" novalidate>
-          <h2>Sign in to publish</h2>
-          <p class="acct__hint">First time? Type your email, choose a password, and press Create my account. No confirmation email is needed.</p>
-          <div class="acct__row">
-            <label>Email<input type="email" name="email" autocomplete="username" required /></label>
-            <label>Password<input type="password" name="password" autocomplete="current-password" required minlength="6" /></label>
-          </div>
-          <div class="acct__btns">
-            <button type="submit" class="primary">Sign in</button>
-            <button type="button" data-acct="create">Create my account</button>
-            <button type="button" data-acct="forgot" class="link">Forgot password</button>
-          </div>
-          ${note}
-        </form>`;
-    } else {
-      account.innerHTML = `<p>Signed in as <strong>${esc(user.email)}</strong>. <button type="button" data-acct="out" class="link">Sign out</button></p>${note}`;
-    }
+    if (!connected) account.innerHTML = '<p><strong>Not connected.</strong> This copy of the site has no Firebase settings, so drafts stay on this device and cannot be published.</p>';
+    else if (!user) account.innerHTML = `<h2>Sign in to publish</h2>${signInHtml({ formId: 'signin' })}${note}`;
+    else account.innerHTML = `<p>Signed in as <strong>${esc(user.email)}</strong>. <button type="button" data-acct="out" class="link">Sign out</button></p>${note}`;
     refresh();
   };
-
-  const creds = () => {
-    const f = document.getElementById('signin') as HTMLFormElement | null;
-    const d = f ? new FormData(f) : null;
-    return { email: String(d?.get('email') ?? '').trim(), password: String(d?.get('password') ?? '') };
-  };
-
-  account.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!auth) return;
-    const { email, password } = creds();
-    if (!email || !password) return drawAccount('Enter your email and password.');
-    try { await signInWithEmailAndPassword(auth, email, password); } catch (err) { drawAccount(authMessage(err)); }
-  });
-
-  account.addEventListener('click', async (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-acct]');
-    if (!b || !auth) return;
-    const act = b.dataset.acct;
-    try {
-      if (act === 'create') {
-        const { email, password } = creds();
-        if (!email || password.length < 6) return drawAccount('Enter your email and a password of at least 6 characters, then press Create my account.');
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else if (act === 'forgot') {
-        const { email } = creds();
-        if (!email) return drawAccount('Type your email first, then press Forgot password.');
-        await sendPasswordResetEmail(auth, email);
-        drawAccount('If that email has an account, a reset link is on its way.');
-      } else if (act === 'out') {
-        await signOut(auth);
-      }
-    } catch (err) { drawAccount(authMessage(err)); }
-  });
-
-  if (auth) onAuthStateChanged(auth, (u) => { user = u; drawAccount(); });
+  wireSignIn(account, { formId: 'signin' });
+  account.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('[data-acct="out"]')) cloud.accountSignOut(); });
+  if (connected) cloud.onAccount((a) => { user = a; drawAccount(); });
   else drawAccount();
 
   // ---------- Start: draft first, otherwise what is on the website now ----------

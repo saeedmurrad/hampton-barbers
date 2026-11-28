@@ -11,6 +11,32 @@ const OUT = path.resolve(process.argv[2] ?? '.check');
 await mkdir(OUT, { recursive: true });
 const browser = await launch();
 const EVIL = '<img src=x onerror=1>'; // would add a picture element to the page if it were not treated as text
+// Customer accounts. In the join step: create an account with an email and password...
+const signUpIn = async (pg, email) => {
+  await pg.waitForSelector('#join-dialog [data-step="signin"]:not([hidden])', { timeout: 15000 });
+  await tap(pg, '#join-dialog [data-si="mode"]');
+  await setValue(pg, '#join-dialog [data-si-form] input[name=email]', email);
+  await setValue(pg, '#join-dialog [data-si-form] input[name=password]', 'test-pass-1');
+  await submit(pg, '#join-dialog [data-si-form]');
+  await pg.waitForSelector('#join-dialog [data-step="profile"]:not([hidden])', { timeout: 15000 });
+};
+// ...then give a first name and a mobile number.
+const giveDetails = async (pg, name, mobile = '07700 900123') => {
+  await setValue(pg, '[data-profile-form] input[name=name]', name);
+  await setValue(pg, '[data-profile-form] input[name=mobile]', mobile);
+  await submit(pg, '[data-profile-form]');
+};
+const joinStep = (pg) => pg.waitForSelector('#join-dialog [data-step="join"]:not([hidden])', { timeout: 15000 });
+// Take a ticket: a new customer signs up on the way, a returning one goes straight through,
+// and on the demo queue (nobody signed in anywhere) a first name is all it takes.
+const joinAs = async (pg, name, email) => {
+  await pg.waitForSelector('[data-join]:not([disabled])', { timeout: 15000 });
+  await tap(pg, '[data-join]');
+  await pg.waitForSelector('#join-dialog [data-step="signin"]:not([hidden]), #join-dialog [data-step="join"]:not([hidden])', { timeout: 15000 });
+  if (await pg.$('#join-dialog [data-step="signin"]:not([hidden])')) { await signUpIn(pg, email); await giveDetails(pg, name); await joinStep(pg); }
+  else if (await pg.$eval('[data-name-field]', (e) => !e.hidden)) await setValue(pg, '[data-join-form] input[name=name]', name);
+  await submit(pg, '[data-join-form]');
+};
 const clean = (pg) => pg.evaluate(() => !document.querySelector('img[src="x"]'));
 const addWalkIn = async (pg, name) => { await setValue(pg, '[data-add] input', name); await submit(pg, '[data-add]'); await sleep(900); };
 const tickets = async () => Object.values((await readBoard())?.t ?? {});
@@ -70,10 +96,7 @@ try {
   const C1 = await open(await browser.createBrowserContext(), '/queue/hampton-vale/?emulator', PHONE, 'customer1');
   const C2 = await open(await browser.createBrowserContext(), '/queue/hampton-vale/?emulator', PHONE, 'customer2');
   for (const pg of [C1, C2]) await pg.waitForSelector('[data-join]:not([disabled])', { timeout: 15000 });
-  await tap(C1, '[data-join]');
-  await setValue(C1, '#join-dialog input[name=name]', EVIL);
-  await tap(C2, '[data-join]');
-  await setValue(C2, '#join-dialog input[name=name]', 'Twin');
+  for (const [pg, name, email] of [[C1, EVIL, 'c1@test.local'], [C2, 'Twin', 'c2@test.local']]) { await tap(pg, '[data-join]'); await signUpIn(pg, email); await giveDetails(pg, name); await joinStep(pg); }
   await Promise.all([submit(C1, '[data-join-form]'), submit(C1, '[data-join-form]'), submit(C2, '[data-join-form]')]);
   await sleep(3500);
   const nums = (await tickets()).map((k) => k.n).sort((x, y) => x - y);
@@ -136,7 +159,7 @@ try {
 
   // ---------- an online customer who never turns up ----------
   await tap(C2, '[data-again]');
-  await setValue(C2, '#join-dialog input[name=name]', 'Late');
+  await joinStep(C2);
   await submit(C2, '[data-join-form]');
   await waitText(C2, '[data-ticket]', /Your ticket/);
   const late = Object.entries((await readBoard()).t).find(([, k]) => k.s === 'way');
@@ -173,10 +196,13 @@ try {
   const qctx = await browser.createBrowserContext();
   const Q = await open(qctx, '/queue/hampton-vale/?join=1&emulator', PHONE, 'ticket-page');
   await Q.waitForSelector('#join-dialog[open]', { timeout: 10000 }).catch(() => {});
-  await setValue(Q, '#join-dialog input[name=name]', '   ');
-  await submit(Q, '[data-join-form]');
-  ok(await waitText(Q, '[data-join-error]', /first name/) && await Q.$eval('#join-dialog', (d) => d.open), 'ticket page: a name of only spaces is refused', await txt(Q, '[data-join-error]'));
-  await setValue(Q, '#join-dialog input[name=name]', 'Quinn');
+  await signUpIn(Q, 'quinn@test.local');
+  await giveDetails(Q, '   ');
+  ok(await waitText(Q, '[data-profile-error]', /first name/) && await Q.$eval('#join-dialog', (d) => d.open), 'ticket page: a name of only spaces is refused', await txt(Q, '[data-profile-error]'));
+  await giveDetails(Q, 'Quinn', '12');
+  ok(await waitText(Q, '[data-profile-error]', /mobile number/), 'ticket page: a two-digit mobile number is refused', await txt(Q, '[data-profile-error]'));
+  await giveDetails(Q, 'Quinn', '+44 7700 900 456');
+  await joinStep(Q);
   await submit(Q, '[data-join-form]');
   ok(await waitText(Q, '[data-ticket]', /Your ticket/) && /Hi, Quinn/.test(await txt(Q, '[data-hi]')), 'ticket page: the link from the website opens the join step and gives a ticket', (await txt(Q, '[data-ticket]')).slice(0, 60));
   const held = (await tickets()).length;
@@ -196,6 +222,53 @@ try {
   await sleep(1500);
   ok(await Q3.$eval('[data-ticket]', (e) => e.hidden) && await Q3.evaluate(() => localStorage.getItem('hb-ticket-v2') === null), 'ticket page: a ticket from an earlier day is forgotten', await txt(Q3, '[data-ticket]'));
   for (const [name, pg] of [['ticket page', Q], ['other shop’s page', Q2]]) ok(await clean(pg), `hostile text: nothing was injected into the ${name}`);
+
+  // ---------- signing in: wrong password, forgotten password, Google, a second phone ----------
+  const gctx = await browser.createBrowserContext();
+  const G = await open(gctx, '/queue/hampton-vale/?join=1&emulator', PHONE, 'google-customer');
+  await G.waitForSelector('#join-dialog [data-step="signin"]:not([hidden])', { timeout: 15000 });
+  await setValue(G, '#join-dialog [data-si-form] input[name=email]', 'quinn@test.local');
+  await setValue(G, '#join-dialog [data-si-form] input[name=password]', 'wrong-password');
+  await submit(G, '#join-dialog [data-si-form]');
+  ok(await waitText(G, '#join-dialog [data-si-msg]', /email or password is not right/), 'sign-in: a wrong password is refused with a plain message', await txt(G, '#join-dialog [data-si-msg]'));
+  await tap(G, '#join-dialog [data-si="forgot"]');
+  ok(await waitText(G, '#join-dialog [data-si-msg]', /link to set a new password is on its way/), 'sign-in: "Forgot password" sends a reset link', await txt(G, '#join-dialog [data-si-msg]'));
+  const mails = await (await fetch('http://127.0.0.1:9099/emulator/v1/projects/hampton-barbers/oobCodes')).json();
+  ok((mails.oobCodes ?? []).some((m) => m.email === 'quinn@test.local' && m.requestType === 'PASSWORD_RESET'), 'sign-in: and the reset email really went out (to the test mailbox)');
+  await setValue(G, '#join-dialog [data-si-form] input[name=email]', 'nobody-here@test.local');
+  await tap(G, '#join-dialog [data-si="forgot"]');
+  ok(await waitText(G, '#join-dialog [data-si-msg]', /If that email has an account/), 'sign-in: "Forgot password" does not reveal whether an email has an account', await txt(G, '#join-dialog [data-si-msg]'));
+  await G.evaluate(() => window.__hbGoogle('gina@test.local', 'Gina Green'));
+  await G.waitForSelector('#join-dialog [data-step="profile"]:not([hidden])', { timeout: 15000 });
+  ok(await G.$eval('[data-profile-form] input[name=name]', (i) => i.value) === 'Gina', 'sign-in: Google signs the customer in and fills in their first name', await G.$eval('[data-profile-form] input[name=name]', (i) => i.value));
+  await giveDetails(G, 'Gina', '07700 900789');
+  await joinStep(G);
+  await submit(G, '[data-join-form]');
+  ok(await waitText(G, '[data-ticket]', /Your ticket/) && /Hi, Gina/.test(await txt(G, '[data-hi]')), 'sign-in: a Google customer takes a ticket', (await txt(G, '[data-ticket]')).slice(0, 50));
+  const G2 = await open(await browser.createBrowserContext(), '/queue/hampton-vale/?join=1&emulator', PHONE, 'second-phone');
+  await G2.waitForSelector('#join-dialog [data-step="signin"]:not([hidden])', { timeout: 15000 });
+  await G2.evaluate(() => window.__hbGoogle('gina@test.local', 'Gina Green'));
+  ok(await waitText(G2, '[data-ticket]', /Your ticket/) && !(await G2.$eval('#join-dialog', (d) => d.open)), 'sign-in: signing in on a second phone brings the same ticket back, not a second one', (await txt(G2, '[data-ticket]')).slice(0, 50));
+
+  // ---------- my account: see, correct, download, delete ----------
+  const M = await open(gctx, '/account/?emulator', PHONE, 'my-account');
+  ok(await waitText(M, '[data-status]', /Signed in as gina@test.local/) && await M.$eval('[data-details] input[name=mobile]', (i) => i.value) === '07700900789', 'my account: shows the details held', await txt(M, '[data-status]'));
+  await setValue(M, '[data-details] input[name=mobile]', 'x');
+  await submit(M, '[data-details]');
+  ok(await waitText(M, '[data-msg]', /mobile number/), 'my account: a bad mobile number is refused', await txt(M, '[data-msg]'));
+  await setValue(M, '[data-details] input[name=mobile]', '07700 900000');
+  await submit(M, '[data-details]');
+  ok(await waitText(M, '[data-msg]', /^Saved\.$/), 'my account: a corrected mobile number is saved', await txt(M, '[data-msg]'));
+  await tap(M, '[data-download]');
+  ok(await waitText(M, '[data-msg]', /downloaded as a file/), 'my account: "Download my details" prepares the file', await txt(M, '[data-msg]'));
+  const before = (await tickets()).length;
+  await tap(M, '[data-delete]');
+  ok(await waitText(M, '[data-status]', /account and details have been deleted/), 'my account: "Delete my account" removes the account', await txt(M, '[data-status]'));
+  await sleep(1200);
+  ok((await tickets()).length === before - 1, 'my account: and gives up the place in the queue', `${before} -> ${(await tickets()).length}`);
+  const left = await (await fetch('http://127.0.0.1:8080/v1/projects/hampton-barbers/databases/(default)/documents/customers?pageSize=50', { headers: { Authorization: 'Bearer owner' } })).json();
+  ok(!(left.documents ?? []).some((d) => d.fields?.email?.stringValue === 'gina@test.local') && (left.documents ?? []).every((d) => Object.keys(d.fields).sort().join() === 'at,email,mobile,name,seen'), 'my account: nothing of theirs is left, and every customer record holds only name, email and mobile', (left.documents ?? []).map((d) => d.fields?.email?.stringValue).join());
+  for (const [name, pg] of [['Google customer’s page', G], ['my account page', M]]) ok(await clean(pg), `hostile text: nothing was injected into the ${name}`);
 } catch (e) {
   res.push('CRASH ' + String(e.stack ?? e.message).slice(0, 500));
 }

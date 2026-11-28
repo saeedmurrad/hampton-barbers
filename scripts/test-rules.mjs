@@ -40,12 +40,15 @@ const BOARD = 'boards/hampton-vale';
 const now = Date.now();
 const owner = await signUp('owner@test.local');
 const other = await signUp('someone-else@test.local');
-const [a, b, c] = [await signUp(), await signUp(), await signUp()];
+// Customers have real accounts now. `anon` is a sign-in with no account at all.
+const anon = await signUp();
+const [a, b, c] = [await signUp('a@test.local'), await signUp('b@test.local'), await signUp('c@test.local')];
+const details = (email, extra = {}) => ({ name: 'Sam', email, mobile: '07700900123', at: now, seen: now, ...extra });
 let seq = 0;
 const ticket = (n, extra = {}) => ({ n, s: 'way', at: now, eta: 10, src: 'web', ...extra });
 const join = (who, t, s = seq + 1) => patch(who, BOARD, { seq: s, t: { [who.uid]: t }, updatedAt: now }, ['seq', f(who.uid), 'updatedAt']);
 
-refused(await put(a, 'site/owner', { uid: a.uid }), 'a visitor cannot make themselves the owner');
+refused(await put(anon, 'site/owner', { uid: anon.uid }), 'a visitor cannot make themselves the owner');
 allowed(await put(owner, 'site/owner', { uid: owner.uid }), 'the first staff account becomes the owner');
 refused(await put(a, BOARD, Q.openToday(null, now)), 'a visitor cannot create a shop queue');
 refused(await put(other, BOARD, Q.openToday(null, now)), 'another email account cannot create a shop queue');
@@ -54,6 +57,22 @@ allowed(await put(owner, BOARD, Q.openToday(null, now)), 'the owner opens today�
 allowed(await get(null, BOARD), 'anyone can read the queue without signing in (it holds no names)');
 
 refused(await patch(null, BOARD, { seq: 1, t: { nobody: ticket(1) }, updatedAt: now }, ['seq', f('nobody'), 'updatedAt']), 'nobody can join without a sign-in');
+refused(await join(anon, ticket(1)), 'an anonymous sign-in can no longer take a ticket');
+refused(await join(a, ticket(1)), 'an account that has not given its details cannot take a ticket');
+refused(await put(a, `customers/${a.uid}`, details('a@test.local', { dob: '1990-01-01' })), 'customer details: a date of birth (or any extra field) is refused');
+refused(await put(a, `customers/${a.uid}`, details('a@test.local', { address: '1 High Street' })), 'customer details: an address is refused');
+refused(await put(a, `customers/${a.uid}`, details('someone-else@test.local')), 'customer details: the email must be the account’s own');
+refused(await put(a, `customers/${a.uid}`, details('a@test.local', { mobile: 'call me' })), 'customer details: the mobile must be a phone number');
+refused(await put(a, `customers/${a.uid}`, details('a@test.local', { name: '' })), 'customer details: a first name is required');
+refused(await put(a, `customers/${b.uid}`, details('a@test.local')), 'customer details: nobody can write another customer’s record');
+refused(await put(anon, `customers/${anon.uid}`, { name: 'X', email: '', mobile: '07700900123', at: now, seen: now }), 'customer details: an anonymous sign-in cannot have a record');
+for (const [who, email] of [[a, 'a@test.local'], [b, 'b@test.local'], [c, 'c@test.local']]) allowed(await put(who, `customers/${who.uid}`, details(email)), `customer details: ${email} saves first name, email and mobile`);
+allowed(await get(a, `customers/${a.uid}`), 'customer details: a customer can read their own');
+refused(await get(b, `customers/${a.uid}`), 'customer details: another customer cannot read them');
+refused(await get(null, `customers/${a.uid}`), 'customer details: nobody signed out can read them');
+allowed(await get(owner, `customers/${a.uid}`), 'customer details: the shop can open one customer’s record');
+refused(await get(owner, 'customers'), 'customer details: not even the owner can list every customer');
+refused(await del(b, `customers/${a.uid}`), 'customer details: nobody else can delete them');
 refused(await join(a, ticket(5)), 'a visitor cannot pick their own ticket number');
 refused(await join(a, ticket(3), 3), 'a visitor cannot skip numbers');
 refused(await join(a, ticket(1, { s: 'chair', b: 'b1' })), 'a visitor cannot put themselves straight in a chair');
@@ -176,6 +195,9 @@ refused(await del(sam, `staff/${sam.uid}`), 'a staff login cannot remove logins'
 allowed(await del(owner, `staff/${sam.uid}`), 'the owner removes the staff login');
 refused(await patch(sam, BOARD, { online: false, updatedAt: now }, ['online', 'updatedAt']), 'and from then on it can no longer run the queue');
 refused(await salesOf(sam, 'b3'), 'or see any sales');
+
+allowed(await del(c, `customers/${c.uid}`), 'customer details: a customer can delete their own record');
+refused(await get(owner, 'customers'), 'customer details: still no listing after that');
 
 console.log(res.join('\n'));
 console.log(`\n${res.filter((r) => r.startsWith('PASS')).length} of ${res.length} passed`);

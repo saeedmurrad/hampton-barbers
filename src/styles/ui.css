@@ -413,3 +413,25 @@ select.u-input { appearance: none; padding-right: 2.2rem; background-image: line
 /* Big desktop monitors and wall screens: everything grows with the window instead of sitting
    small in the middle. Sizes are in rem, so one root size scales the whole screen. */
 @media (min-width: 1700px) { :root:has(main.ui) { font-size: clamp(100%, .45vw + .52rem, 160%); } }
+/* ---------- the sign-in block: Google first, then email and password ---------- */
+.u-si { display: grid; gap: .7rem; min-width: 0; }
+.u-si__g { gap: .7rem; background: #fff; border-color: transparent; color: #1f1f1f; min-height: 3.2rem; font-size: 1rem; }
+.u-si__g:hover { background: #f1f1f1; border-color: transparent; }
+.u-si__or { display: flex; align-items: center; gap: .8rem; font-size: .78rem; color: var(--faint); }
+.u-si__or::before, .u-si__or::after { content: ''; flex: 1; height: 1px; background: var(--line2); }
+.u-si__form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .5rem; }
+.u-si__form .u-input, .u-si__form .u-btn { min-height: 3rem; font-size: 1rem; }
+.u-si__links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; font-size: .88rem; }
+.u-si__links .u-link { color: var(--muted); min-height: 2rem; }
+.u-si__links .u-link:hover { color: var(--text); }
+.u-si button:disabled { opacity: .55; cursor: default; }
+.u-sheet .u-si .u-btn { justify-content: center; }
+.u-acct details .u-si { margin-top: .2rem; }
+/* Pages with their own button styles (reports, prices) must not restyle the sign-in block. */
+.ui .u-si .u-si__g { background: #fff; border-color: transparent; color: #1f1f1f; }
+.ui .u-si .u-btn--primary { background: var(--text); border-color: transparent; color: #0a0c0b; }
+.ui .u-si .u-link { min-height: 2rem; padding: 0; border: 0; background: none; text-decoration: underline; text-underline-offset: 3px; }
+.u-join__form { display: grid; gap: .9rem; min-width: 0; }
+.u-join__as { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem 1rem; padding: .75rem .9rem; border-radius: 14px; background: var(--s2); font-size: .92rem; color: var(--muted); }
+.u-join__as b { color: var(--text); }
+.u-join__as .u-link { font-size: .85rem; color: var(--muted); }

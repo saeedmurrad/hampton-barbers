@@ -5,10 +5,15 @@ service cloud.firestore {
       return /databases/$(database)/documents/site/owner;
     }
     // The owner, or anyone the owner has added to the admins list, may change the price list.
-    // Real accounts only: visitors who join the queue get an anonymous sign-in, which must
-    // never count as the owner or an admin.
+    // Real accounts only (email and password, or Google): an anonymous sign-in never counts.
+    // Customers have real accounts too, so an account alone gives no staff rights: those come
+    // from the owner record and the staff records below.
     function isAccount() {
-      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
+      return request.auth != null && request.auth.token.firebase.sign_in_provider in ['password', 'google.com'];
+    }
+    // A customer who has filled in their details (first name, email, mobile).
+    function isCustomer() {
+      return isAccount() && exists(/databases/$(database)/documents/customers/$(request.auth.uid));
     }
     function isAdmin() {
       return (isAccount()
@@ -64,8 +69,8 @@ service cloud.firestore {
 
     // The live queue: one board per shop. Everyone can read it, and it never holds a name:
     // only ticket numbers, chairs, barbers' first names and times.
-    // Staff can change anything on it. A visitor (anonymous sign-in, no account) can do four
-    // things only, and only to the one ticket filed under their own sign-in:
+    // Staff can change anything on it. A customer can do four things only, and only to the one
+    // ticket filed under their own account. Taking a number needs an account with details:
     // take the next number, mark it arrived, extend it once ("running late"), or remove it.
     match /boards/{shop} {
       function before() { return resource.data; }
@@ -83,7 +88,8 @@ service cloud.firestore {
           && after().updatedAt is int;
       }
       function joins() {
-        return before().online == true
+        return isCustomer()
+          && before().online == true
           && after().diff(before()).affectedKeys().hasOnly(['seq', 't', 'updatedAt'])
           && after().seq == before().seq + 1
           && onlyMyTicket()
@@ -209,6 +215,22 @@ service cloud.firestore {
         && request.resource.data.role in ['barber', 'desk']
         && request.resource.data.at is int;
       allow delete: if isOwner();
+    }
+
+    // A customer's own details: first name, email and mobile, nothing else. Only the customer
+    // can write or delete them. Staff can open one customer's record (to ring someone who is
+    // in the queue) but can never list customers.
+    match /customers/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow list: if false;
+      allow create, update: if isAccount() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'mobile', 'at', 'seen'])
+        && request.resource.data.keys().hasAll(['name', 'email', 'mobile', 'at', 'seen'])
+        && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 24
+        && request.resource.data.email is string && request.resource.data.email == request.auth.token.email
+        && request.resource.data.mobile is string && request.resource.data.mobile.matches('^[+]?[0-9]{9,15}$')
+        && request.resource.data.at is int && request.resource.data.seen is int;
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     match /{document=**} {
