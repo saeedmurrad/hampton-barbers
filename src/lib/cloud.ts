@@ -80,7 +80,7 @@ export async function actCustomer(shop: string, fn: (b: Board, id: string, now: 
   if (!auth.currentUser) await signInAnonymously(auth);
   const id = auth.currentUser!.uid;
   const ref = doc(db, 'boards', shop);
-  const board = await runTransaction(db, async (tx) => {
+  const once = () => runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const now = Date.now();
     const cur = snap.exists() ? cleanBoard(snap.data()) : null;
@@ -97,7 +97,18 @@ export async function actCustomer(shop: string, fn: (b: Board, id: string, now: 
     tx.update(ref, patch);
     return next;
   });
-  return { board, id };
+  // When two customers act in the same second, the database rules can refuse the slower one
+  // (its ticket number is already taken) instead of asking it to try again. Everything the
+  // rules check has already been checked above, so a refusal here means "someone got in
+  // first": read the queue again and retry, a few times, a moment apart.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return { board: await once(), id };
+    } catch (e) {
+      if (!denied(e) || attempt >= 4) throw e;
+      await new Promise((r) => setTimeout(r, 150 + Math.random() * 300 * (attempt + 1)));
+    }
+  }
 }
 
 // ---------- money: sales and the barbers' percentages ----------

@@ -23,6 +23,7 @@ export function createDesk(shops: string[], onChange: () => void) {
   const online: Record<string, boolean> = {};
   const names: Record<string, cloud.Names> = {};
   const noNames = new Set<string>(); // shops whose names could not be read yet
+  const ready = new Set<string>();   // shops whose real queue has arrived since signing in
   const stamp = () => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date());
   const say = (s: string) => { status = s; onChange(); };
   const explain = (e: unknown) => e instanceof QueueError ? SAY[e.code] ?? 'That could not be done.'
@@ -43,9 +44,10 @@ export function createDesk(shops: string[], onChange: () => void) {
   const listen = () => {
     stops.forEach((stop) => stop());
     stops = [];
+    ready.clear();
     if (!email) return;
     for (const shop of shops) {
-      stops.push(cloud.watchBoard(shop, (b, live) => { boards[shop] = b; online[shop] = live; tidy(shop); onChange(); }));
+      stops.push(cloud.watchBoard(shop, (b, live) => { boards[shop] = b; online[shop] = live; ready.add(shop); tidy(shop); onChange(); }));
       watchNames(shop);
     }
   };
@@ -55,6 +57,19 @@ export function createDesk(shops: string[], onChange: () => void) {
     noNames.delete(shop);
     stops.push(cloud.watchNames(shop, (m) => { names[shop] = m; tidy(shop); onChange(); }, () => noNames.add(shop)));
   };
+  // Works out what this login is to the shop. It runs at sign-in, and again after the first
+  // save on a brand-new site, because that save is what makes the login the owner.
+  const checkRole = (announce: boolean) => {
+    const e = email;
+    cloud.whoAmI().then((who) => {
+      if (email !== e) return;
+      role = who.role;
+      mine = who.staff;
+      if (announce && role === 'new') status = 'Signed in. The first change you save makes this login the owner.';
+      if (announce && role === 'none') status = 'This login has not been added to the shop yet. Ask the owner to add it on the queue desk.';
+      onChange();
+    });
+  };
   if (CONNECTED) cloud.onStaff((e) => {
     email = e;
     role = null;
@@ -63,15 +78,7 @@ export function createDesk(shops: string[], onChange: () => void) {
     status = e ? 'Signed in. Every change goes live straight away.' : 'Demo on this device only. Sign in to run the real queue.';
     listen();
     onChange();
-    if (!e) return;
-    cloud.whoAmI().then((who) => {
-      if (email !== e) return;
-      role = who.role;
-      mine = who.staff;
-      if (role === 'new') status = 'Signed in. The first change you save makes this login the owner.';
-      if (role === 'none') status = 'This login has not been added to the shop yet. Ask the owner to add it on the queue desk.';
-      onChange();
-    });
+    if (e) checkRole(true);
   });
   else setDemoDevice(true);
   onDeviceChange(onChange);
@@ -88,6 +95,9 @@ export function createDesk(shops: string[], onChange: () => void) {
     // Today's queue for a shop. Signed in with nothing saved yet today, this is a fresh queue
     // that gets saved (and becomes visible to customers) on the first change.
     board: (shop: string, now = Date.now()): Board => email ? openToday(boards[shop] ?? null, now) : pickBoard(shop, null, now).board,
+    // True for the moment between signing in and the real queue arriving. Screens show
+    // "Loading" then, never an empty queue that could be mistaken for the real one.
+    loading: (shop: string) => Boolean(email) && !ready.has(shop),
     // Whether customers can see this shop's queue yet today.
     opened: (shop: string) => !email || boards[shop]?.day === londonDay(Date.now()),
     offline: (shop: string) => Boolean(email) && online[shop] === false,
@@ -99,6 +109,7 @@ export function createDesk(shops: string[], onChange: () => void) {
           say('Saving…');
           boards[shop] = await cloud.actStaff(shop, run);
           if (noNames.has(shop)) watchNames(shop);
+          if (role === 'new') checkRole(false);
           say(`Live for everyone ✓ ${stamp()}`);
         }
         else { actLocal(shop, run); say(`Saved on this device only ✓ ${stamp()}`); }
@@ -129,7 +140,7 @@ export function createDesk(shops: string[], onChange: () => void) {
         tidy(shop);
         return sale;
       } catch (e) {
-        say(explain(e));
+        say(e instanceof QueueError && e.code === 'none' ? 'That cut was already finished on another screen.' : explain(e));
         return null;
       }
     },

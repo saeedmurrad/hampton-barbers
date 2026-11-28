@@ -74,8 +74,12 @@ export function askPayment(opts: { title: string; services: Service[]; preset?: 
     priceEl.addEventListener('input', () => { typed = priceEl.value.trim() !== ''; errEl.hidden = true; });
     dlg.querySelector('form')!.addEventListener('submit', (e) => {
       e.preventDefault();
-      const price = penceOf(priceEl.value);
-      const problem = !price ? 'Tap what they had or type the price. For a free cut, tap “No charge”.' : !pay ? 'Tap Cash or Online.' : '';
+      // A plain amount only: up to £999.99, with a dot or a comma before the pence.
+      const typedText = priceEl.value.trim();
+      const plain = /^£?\s*\d{1,3}([.,]\d{1,2})?$/.test(typedText);
+      const price = plain ? penceOf(typedText.replace(',', '.')) : 0;
+      const problem = typedText && !plain ? 'Type the price as a number, like 17 or 17.50.'
+        : !price ? 'Tap what they had or type the price. For a free cut, tap “No charge”.' : !pay ? 'Tap Cash or Online.' : '';
       if (problem) { errEl.textContent = problem; errEl.hidden = false; return; }
       end({ svc: names(), price, pay: pay as PayMethod });
     });

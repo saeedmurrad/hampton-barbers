@@ -142,6 +142,7 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
     let toldTurn = false;
     let toldLate = false;
     let note = '';
+    let joining = false;
     const pick = (k: string) => pickBoard(k, cloud[k]);
 
     const notify = (title: string, body: string) => {
@@ -365,6 +366,8 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
       const eta = Number(data.get('eta') ?? 10);
       const src = atDoor ? 'qr' : 'web';
       if (!name) { errEl.textContent = 'Please add your first name.'; errEl.hidden = false; return; }
+      if (joining) return; // a second tap while the first is still being saved
+      joining = true;
       submitBtn.disabled = true; submitBtn.textContent = 'Joining…';
       try {
         const source = pick(s).source;
@@ -395,6 +398,7 @@ const geo = Object.fromEntries(shops.filter((s) => s.geo).map((s) => [s.id, s.ge
           : 'Could not join. Check your connection and try again.';
         errEl.hidden = false;
       } finally {
+        joining = false;
         submitBtn.disabled = false; submitBtn.textContent = 'Join the queue';
       }
     });

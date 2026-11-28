@@ -118,6 +118,12 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     setupEl.hidden = Boolean(s);
     chairEl.hidden = waitingEl.hidden = !s;
 
+    if (desk.loading(me.shop)) {
+      chairEl.hidden = waitingEl.hidden = true;
+      setupEl.hidden = false;
+      fill(setupEl, '<h2>Loading the queue…</h2>');
+      return;
+    }
     if (desk.role() === 'none') {
       chairEl.hidden = waitingEl.hidden = true;
       setupEl.hidden = false;

@@ -283,14 +283,15 @@ export const pageCredits: Record<string, { by: string; byUrl: string }[]> = {
 };
 
 // The owner's three shops. Keys match the live-status keys in src/lib/live.ts.
-// The owner's shops, each with its own queue. The second and third are placeholders until
-// the owner confirms their names and addresses. `geo` (latitude, longitude) lets a customer's
+// The owner's three shops, each with its own queue: Hampton, Orton and Rivergate (all in
+// Peterborough). The Orton and Rivergate entries carry the area name only until the owner
+// confirms each shop's exact name and address. `geo` (latitude, longitude) lets a customer's
 // phone check itself in when it reaches the shop; without it, check-in is by the door code.
 export type Shop = { id: string; name: string; place: string; directionsUrl: string; geo: [number, number] | null };
 export const shops: Shop[] = [
   { id: 'hampton-vale', name: 'Hampton Vale', place: '110 Four Chimneys Crescent', directionsUrl: site.directionsUrl, geo: [site.geo.lat, site.geo.lng] },
-  { id: 'shop-2', name: 'Shop two', place: 'Name and address to come', directionsUrl: '', geo: null },
-  { id: 'shop-3', name: 'Shop three', place: 'Name and address to come', directionsUrl: '', geo: null },
+  { id: 'shop-2', name: 'Orton', place: 'Peterborough · address to come', directionsUrl: '', geo: null },
+  { id: 'shop-3', name: 'Rivergate', place: 'Peterborough · address to come', directionsUrl: '', geo: null },
 ];
 
 export const designs = [

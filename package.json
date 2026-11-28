@@ -15,7 +15,9 @@
     "test:queue": "firebase emulators:exec --only auth,firestore --project hampton-barbers \"node scripts/test-queue.mjs .check\"",
     "test:board": "node scripts/test-board.mjs",
     "test:rules": "firebase emulators:exec --only auth,firestore --project hampton-barbers \"node scripts/test-rules.mjs\"",
-    "test:sales": "node scripts/test-sales.mjs"
+    "test:sales": "node scripts/test-sales.mjs",
+    "test:break": "firebase emulators:exec --only auth,firestore --project hampton-barbers \"node scripts/test-break.mjs .check\"",
+    "coverage": "c8 --reporter=text --include='src/lib/board.ts' --include='src/lib/sales.ts' sh -c \"node scripts/test-board.mjs > /dev/null && node scripts/test-sales.mjs > /dev/null\""
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.6",
@@ -31,6 +33,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
     "axe-core": "^4.14.1",
+    "c8": "^12.0.0",
     "gh-pages": "^6.3.0",
     "puppeteer-core": "^25.18.1",
     "typescript": "^6.0.3"

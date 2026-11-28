@@ -194,11 +194,18 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
       <a href="${base}/queue/${tab}/${q}" target="_blank" rel="noopener">Customer page</a>
       <a href="${base}/queue/${tab}/?here=1${emu ? '&emulator' : ''}" target="_blank" rel="noopener">Door code link</a>
       <a href="${base}/poster/${tab}/" target="_blank" rel="noopener">Door poster</a>`);
-    const closed = signedIn && !desk.opened(tab);
+    const loading = desk.loading(tab);
+    const closed = signedIn && !loading && !desk.opened(tab);
     bannerEl.hidden = !closed;
     if (closed) fill(bannerEl, `Today’s queue for ${esc(shopName(tab))} is not open yet, so customers cannot see or join it. <button type="button" class="primary" data-open>Open today’s queue</button>`);
     summaryEl.textContent = `${v.inShop} in the shop · ${v.onWay} on the way · walk-in wait: ${v.headline === 'No wait' ? 'none' : `${v.headline} ${v.unit}`.trim()}`;
 
+    if (loading) {
+      summaryEl.textContent = '';
+      fill(chairsEl, '<li class="none">Loading the queue…</li>');
+      fill(queueEl, '<li class="empty">Loading the queue…</li>');
+      return;
+    }
     const next = v.line.find((x) => x.s === 'here');
     fill(chairsEl, v.chairs.map((c) => {
       const who = `Chair ${c.chair}${c.name ? ` · ${esc(c.name)}` : ''}`;
@@ -324,7 +331,8 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   modeEl.addEventListener('change', () => { const mode = modeEl.value as LiveMode; desk.act(tab, (b, now) => setOptions(b, { mode }, now)); });
   onlineEl.addEventListener('change', () => { const online = onlineEl.value === 'on'; desk.act(tab, (b, now) => setOptions(b, { online }, now)); });
   let noteTimer: number | undefined;
-  noteEl.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = window.setTimeout(() => { const note = noteEl.value; desk.act(tab, (b, now) => setOptions(b, { note }, now)); }, 500); });
+  // The text and the shop are taken at the moment of typing: the screen may redraw before the save.
+  noteEl.addEventListener('input', () => { const note = noteEl.value, shop = tab; clearTimeout(noteTimer); noteTimer = window.setTimeout(() => desk.act(shop, (b, now) => setOptions(b, { note }, now)), 500); });
 
   account.addEventListener('submit', async (e) => {
     e.preventDefault();

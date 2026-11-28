@@ -68,6 +68,24 @@ ok(JSON.stringify(ex) === JSON.stringify(ex2) && ex.length > 700 && ex.length < 
 ok(ex.every((s) => s.at <= now && s.price > 0) && new Set(ex.map((s) => s.day)).size === 35 && ex.some((s) => s.day === '2026-11-28'), 'they stop at the present moment and cover every day');
 ok(new Set(ex.map((s) => s.id)).size === ex.length, 'every demo sale has its own id');
 
+// ---------- awkward inputs and edge cases ----------
+const empty = S.summarize([], {});
+ok(empty.all.count === 0 && empty.all.total === 0 && empty.byBarber.length === 0 && empty.byDay.length === 0 && empty.voided === 0, 'an empty period adds up to nothing, without errors');
+ok(S.summarize(sales, {}).all.barber === 0 && S.summarize(sales, {}).all.shop === 6300, 'with no percentages set, everything is the shop’s');
+const junkRules = S.cleanRules({ b1: 'oops', b2: [{ from: '2026-11-05', pct: 250 }, { pct: 10 }, null, { from: '2026-11-01', pct: -5 }], b3: [] });
+ok(!junkRules.b1 && junkRules.b2.length === 2 && junkRules.b2[0].from === '2026-11-01' && junkRules.b2[0].pct === 0 && junkRules.b2[1].pct === 100 && S.cleanRules(null).b1 === undefined && S.cleanRules('x').b1 === undefined, 'damaged percentage settings are repaired and put in date order');
+ok(S.pctFor({ b1: [{ from: '2026-11-20', pct: 50 }, { from: '2026-11-01', pct: 40 }] }, 'b1', '2026-11-10') === 40 || S.pctFor(S.cleanRules({ b1: [{ from: '2026-11-20', pct: 50 }, { from: '2026-11-01', pct: 40 }] }), 'b1', '2026-11-10') === 40, 'percentages saved out of order still apply by date');
+ok(S.shareOf(1, 50) === 1 && S.shareOf(0, 50) === 0 && S.shareOf(100000, 100) === 100000 && S.shareOf(333, 33) + (333 - S.shareOf(333, 33)) === 333, 'odd pennies never go missing in the split');
+ok(S.cleanInput({ svc: 'x'.repeat(200), price: 99999999, pay: 'online' }).svc.length === 80 && S.cleanInput({ svc: 'x', price: 99999999, pay: 'online' }).price === 100000 && S.cleanInput({ svc: 'x', price: -50, pay: 'cash' }).price === 0 && S.cleanInput({ svc: 'x', price: NaN, pay: 'cash' }).price === 0, 'a price is kept between £0 and £1,000 and a service name to 80 letters');
+ok(S.penceOf('-5') === 500 && S.penceOf('12.999') === 1300 && S.penceOf('£ 1 7') === 1700 && S.penceOf(null) === 0 && S.penceOf(undefined) === 0 && S.penceOf('12.3.4') === 1230, 'whatever is typed in the price box becomes a sensible amount', `${S.penceOf('-5')} ${S.penceOf('12.999')} ${S.penceOf('12.3.4')}`);
+const voidOnly = S.summarize([mk('s1', '2026-11-25', 'b1', 'Sam', 1700, 'cash', { void: { at: 1, why: 'x' } })], { 'hampton-vale': rules });
+ok(voidOnly.all.count === 0 && voidOnly.voided === 1 && voidOnly.byBarber.length === 0, 'a period with only cancelled sales shows no takings');
+ok(S.exampleSales('x', [], services, now, '2026-11-28').length === 0 && S.exampleSales('x', staff, [], now, '2026-11-28').length === 0, 'no barbers or no price list means no demo figures');
+ok(S.cleanSale({ day: '2026-11-28', b: 'b1', price: '2000', pay: 'weird', svc: '', was: { svc: 'A', price: 5, pay: 'cash' } }, 'z')?.pay === 'none' && S.cleanSale({ day: '2026-11-28', b: 'b1', price: 2000, pay: 'cash', was: { svc: 'A', price: 500, pay: 'online' } }, 'z')?.was?.price === 500 && S.cleanSale(null, 'z') === null && S.cleanSale({ day: 5, b: 'b1' }, 'z') === null, 'stored sales with odd values are tidied or dropped');
+ok(S.period('week', '2026-11-23').from === '2026-11-23' && S.period('week', '2026-11-29').from === '2026-11-23' && S.period('week', '2026-12-31').to === '2027-01-03' && S.period('month', '2026-12-31').to === '2026-12-31' && S.period('month', '2027-02-10').to === '2027-02-28', 'weeks and months are right at the edges of the year');
+const online0 = S.saleFor(Q.callNext(Q.arrive(Q.join(Q.openToday(null, now), 'web1', now, 10, 'web'), 'web1', now + 9 * M), 'b1', now + 15 * M), 'hampton-vale', 'b1', now + 30 * M, { svc: 'Gents Cut', price: 1700, pay: 'cash' });
+ok(online0.src === 'web' && online0.wait === 6 && online0.mins === 15, 'an online customer’s wait counts from when they arrived, not from when they joined', JSON.stringify(online0));
+
 console.log(res.join('\n'));
 console.log(`\n${res.filter((r) => r.startsWith('PASS')).length} of ${res.length} passed`);
 process.exit(res.some((r) => !r.startsWith('PASS')) ? 1 : 0);

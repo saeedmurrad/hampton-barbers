@@ -332,7 +332,11 @@ export function setBarber(b: Board, id: string, patch: Partial<Barber>, now: num
   if (!b.staff[id] && Object.keys(b.staff).length >= 12) fail('full');
   if (serving(b, id) && (patch.on === false || patch.brk === true)) fail('busy');
   const n = copy(b);
-  n.staff[id] = { ...cur, ...patch, name: String(patch.name ?? cur.name).trim().slice(0, 20), chair: int(patch.chair ?? cur.chair, 1, 30, cur.chair) };
+  const chair = int(patch.chair ?? cur.chair, 1, 30, cur.chair);
+  // No two barbers share a chair number: moving to a taken chair swaps the two of them.
+  const clash = Object.entries(b.staff).find(([other, s]) => other !== id && s.chair === chair);
+  if (clash) n.staff[clash[0]] = { ...clash[1], chair: cur.chair };
+  n.staff[id] = { ...cur, ...patch, name: String(patch.name ?? cur.name).trim().slice(0, 20), chair };
   if (!n.staff[id].on) n.staff[id].brk = false;
   return touch(n, now);
 }
