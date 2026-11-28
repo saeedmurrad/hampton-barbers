@@ -2,7 +2,7 @@
 // queue to use (Firebase when signed in, this device otherwise), and saving changes.
 import { expire, finish, londonDay, openToday, QueueError, type Board } from './board';
 import { cleanInput, saleFor, type Sale, type SaleInput } from './sales';
-import { CONNECTED, actLocal, localNames, localSales, newId, onDeviceChange, pickBoard, saveLocalSale, setDemoDevice, setLocalName } from './store';
+import { read, write, CONNECTED, actLocal, localNames, localSales, newId, onDeviceChange, pickBoard, saveLocalSale, setDemoDevice, setLocalName } from './store';
 import * as cloud from './cloud';
 
 const SAY: Record<string, string> = {
@@ -65,6 +65,10 @@ export function createDesk(shops: string[], onChange: () => void) {
       if (email !== e) return;
       role = who.role;
       mine = who.staff;
+      // Once a day, the owner's desk clears out customer details that are past the 24-month limit.
+      if (role === 'owner' && read<string>('hb-retention-day') !== londonDay(Date.now())) {
+        cloud.removeExpiredCustomers().then(() => write('hb-retention-day', londonDay(Date.now())), () => { /* tried again next time */ });
+      }
       if (announce && role === 'new') status = 'Signed in. The first change you save makes this login the owner.';
       if (announce && role === 'none') status = 'This login has not been added to the shop yet. Ask the owner to add it on the queue desk.';
       onChange();

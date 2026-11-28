@@ -199,6 +199,19 @@ refused(await salesOf(sam, 'b3'), 'or see any sales');
 allowed(await del(c, `customers/${c.uid}`), 'customer details: a customer can delete their own record');
 refused(await get(owner, 'customers'), 'customer details: still no listing after that');
 
+// Retention: 24 months after the last sign-in, the owner (and only the owner) can clear a record.
+const YEARS3 = now - 3 * 365 * 86_400_000, MONTHS25 = now - 760 * 86_400_000, MONTHS23 = now - 700 * 86_400_000;
+const oldOnes = (who, before) => call('POST', `${DOCS}:runQuery`, { structuredQuery: { from: [{ collectionId: 'customers' }], where: { fieldFilter: { field: { fieldPath: 'seen' }, op: 'LESS_THAN', value: { integerValue: String(before) } } } } }, who?.token);
+allowed(await put(a, `customers/${a.uid}`, details('a@test.local', { seen: YEARS3 })), 'retention: (set-up) a customer last seen three years ago');
+allowed(await put(b, `customers/${b.uid}`, details('b@test.local', { seen: MONTHS23 })), 'retention: (set-up) a customer last seen 23 months ago');
+allowed(await oldOnes(owner, MONTHS25), 'retention: the owner can look up records unused for more than 24 months');
+refused(await oldOnes(owner, MONTHS23), 'retention: but not records used more recently than that');
+refused(await oldOnes(owner, now + 86_400_000), 'retention: nor every record by asking with a future date');
+refused(await oldOnes(a, MONTHS25), 'retention: a customer cannot look up other people’s old records');
+refused(await del(owner, `customers/${b.uid}`), 'retention: the owner cannot delete a record still inside 24 months');
+refused(await del(b, `customers/${a.uid}`), 'retention: a customer cannot delete someone else’s expired record');
+allowed(await del(owner, `customers/${a.uid}`), 'retention: the owner’s desk removes a record past 24 months');
+
 console.log(res.join('\n'));
 console.log(`\n${res.filter((r) => r.startsWith('PASS')).length} of ${res.length} passed`);
 process.exit(res.some((r) => !r.startsWith('PASS')) ? 1 : 0);

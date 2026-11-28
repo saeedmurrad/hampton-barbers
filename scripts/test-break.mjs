@@ -269,6 +269,23 @@ try {
   const left = await (await fetch('http://127.0.0.1:8080/v1/projects/hampton-barbers/databases/(default)/documents/customers?pageSize=50', { headers: { Authorization: 'Bearer owner' } })).json();
   ok(!(left.documents ?? []).some((d) => d.fields?.email?.stringValue === 'gina@test.local') && (left.documents ?? []).every((d) => Object.keys(d.fields).sort().join() === 'at,email,mobile,name,seen'), 'my account: nothing of theirs is left, and every customer record holds only name, email and mobile', (left.documents ?? []).map((d) => d.fields?.email?.stringValue).join());
   for (const [name, pg] of [['Google customer’s page', G], ['my account page', M]]) ok(await clean(pg), `hostile text: nothing was injected into the ${name}`);
+
+  // ---------- retention: details unused for 24 months are removed by the owner's desk ----------
+  const CUST = 'http://127.0.0.1:8080/v1/projects/hampton-barbers/databases/(default)/documents/customers';
+  const adminHdr = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
+  const plant = (id, daysAgo) => fetch(`${CUST}?documentId=${id}`, { method: 'POST', headers: adminHdr, body: JSON.stringify({ fields: { name: { stringValue: id }, email: { stringValue: `${id}@test.local` }, mobile: { stringValue: '07700900111' }, at: { integerValue: '1' }, seen: { integerValue: String(Date.now() - daysAgo * 86_400_000) } } }) });
+  const kept = async () => ((await (await fetch(`${CUST}?pageSize=100`, { headers: adminHdr })).json()).documents ?? []).map((d) => d.name.split('/').pop());
+  await plant('gone-3-years', 1100);
+  await plant('gone-25-months', 765);
+  await plant('seen-23-months', 700);
+  await plant('seen-last-week', 7);
+  const keptBefore = (await kept()).filter((id) => !id.startsWith('gone-')).length;
+  const RD = await open(await browser.createBrowserContext(), '/admin/live/?emulator', LAPTOP, 'retention-desk');
+  await signIn(RD, '#qd-signin');
+  let ids = await kept();
+  for (let i = 0; i < 40 && ids.some((id) => id.startsWith('gone-')); i++) { await sleep(500); ids = await kept(); }
+  ok(!ids.includes('gone-3-years') && !ids.includes('gone-25-months'), 'retention: the owner’s desk removes details unused for more than 24 months', ids.join());
+  ok(ids.includes('seen-23-months') && ids.includes('seen-last-week') && ids.filter((id) => !id.startsWith('gone-')).length === keptBefore, 'retention: and leaves every record used within 24 months alone', ids.join());
 } catch (e) {
   res.push('CRASH ' + String(e.stack ?? e.message).slice(0, 500));
 }

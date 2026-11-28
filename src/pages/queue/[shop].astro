@@ -456,7 +456,7 @@ const address = main ? `${site.address.street}, ${site.address.locality}, ${site
       a.onAccount(async (x) => {
         acct = x; acctKnown = true; profile = null; profileKnown = !x; editing = false;
         showStep();
-        if (x) { try { profile = await a.loadProfile(); } catch { /* treated as not filled in yet */ } if (acct?.uid === x.uid) { profileKnown = true; adopt(); } }
+        if (x) { try { profile = await a.loadProfile(); if (profile) profile = await a.noteSeen(profile).catch(() => profile); } catch { /* treated as not filled in yet */ } if (acct?.uid === x.uid) { profileKnown = true; adopt(); } }
         showStep();
         render();
       });

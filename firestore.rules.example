@@ -221,8 +221,11 @@ service cloud.firestore {
     // can write or delete them. Staff can open one customer's record (to ring someone who is
     // in the queue) but can never list customers.
     match /customers/{uid} {
+      // Kept for 24 months after the customer last signed in, then removed. The owner's queue
+      // desk does the removing, and may see and delete only records that are past that date.
+      function expired() { return resource.data.seen < request.time.toMillis() - 63072000000; }
       allow get: if request.auth != null && (request.auth.uid == uid || isAdmin());
-      allow list: if false;
+      allow list: if isOwner() && expired();
       allow create, update: if isAccount() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['name', 'email', 'mobile', 'at', 'seen'])
         && request.resource.data.keys().hasAll(['name', 'email', 'mobile', 'at', 'seen'])
@@ -230,7 +233,7 @@ service cloud.firestore {
         && request.resource.data.email is string && request.resource.data.email == request.auth.token.email
         && request.resource.data.mobile is string && request.resource.data.mobile.matches('^[+]?[0-9]{9,15}$')
         && request.resource.data.at is int && request.resource.data.seen is int;
-      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && (request.auth.uid == uid || (isOwner() && expired()));
     }
 
     match /{document=**} {

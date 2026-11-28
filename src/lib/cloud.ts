@@ -273,6 +273,23 @@ export async function customerContact(uid: string): Promise<{ name: string; mobi
   const s = await getDoc(doc(fb().db, 'customers', uid));
   return s.exists() ? { name: String(s.data().name ?? ''), mobile: String(s.data().mobile ?? '') } : null;
 }
+// Retention: a customer's details are kept for 24 months after they last signed in. Signing
+// in counts as use (noted at most once a month, to save writes).
+export const RETENTION_DAYS = 730;
+const DAY = 86_400_000;
+export async function noteSeen(p: Profile): Promise<Profile> {
+  if (Date.now() - p.seen < 30 * DAY) return p;
+  return saveProfile({ name: p.name, mobile: p.mobile }, p);
+}
+// Run from the owner's queue desk: removes the details of customers who have not signed in for
+// 24 months. The database refuses to show or delete any record that is not past that date.
+export async function removeExpiredCustomers(): Promise<number> {
+  const { db } = fb();
+  const snap = await getDocs(query(collection(db, 'customers'), where('seen', '<', Date.now() - (RETENTION_DAYS + 1) * DAY)));
+  let n = 0;
+  for (const d of snap.docs) { await deleteDoc(d.ref).then(() => { n++; }, () => { /* tried again another day */ }); }
+  return n;
+}
 // Everything held about the signed-in customer, for "Download my details".
 export async function exportMine(shops: string[]): Promise<Record<string, unknown>> {
   const { auth, db } = fb();
