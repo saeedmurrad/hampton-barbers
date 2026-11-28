@@ -147,6 +147,36 @@ allowed(await patch(owner, `${SALES}/s3`, { void: { at: now, why: 'entered twice
 refused(await patch(other, `${SALES}/s3`, { pay: 'cash' }, ['pay']), 'a cancelled sale cannot be changed by staff');
 refused(await patch(owner, `${SALES}/s3`, { n: 99 }, ['n']), 'even the owner cannot rewrite which ticket a sale was for');
 
+// ---------- staff logins ----------
+const [sam, lee] = [await signUp('sam@test.local'), await signUp('lee@test.local')];
+const staffDoc = (extra = {}) => ({ email: 'sam@test.local', name: 'Sam', shop: 'hampton-vale', b: 'b3', role: 'barber', at: now, ...extra });
+// Asks for a barber's sales on one day, as the barber panel does.
+const salesOf = (who, b, day = '2026-11-28') => call('POST', `${DOCS}/${BOARD}:runQuery`, { structuredQuery: { from: [{ collectionId: 'sales' }], where: { compositeFilter: { op: 'AND', filters: [
+  { fieldFilter: { field: { fieldPath: 'b' }, op: 'EQUAL', value: { stringValue: b } } },
+  { fieldFilter: { field: { fieldPath: 'day' }, op: 'EQUAL', value: { stringValue: day } } }] } } } }, who?.token);
+refused(await patch(sam, BOARD, { online: true, updatedAt: now }, ['online', 'updatedAt']), 'a new email account cannot run the queue before the owner adds it');
+refused(await put(sam, `staff/${sam.uid}`, staffDoc()), 'nobody can add themselves as staff');
+refused(await put(other, `staff/${sam.uid}`, staffDoc()), 'a staff login cannot add another staff login');
+refused(await put(owner, `staff/${sam.uid}`, staffDoc({ role: 'owner' })), 'a staff login cannot be given a made-up role');
+refused(await put(owner, `staff/${owner.uid}`, staffDoc()), 'the owner cannot be turned into a staff login');
+allowed(await put(owner, `staff/${sam.uid}`, staffDoc()), 'the owner adds a login for the barber on chair 3');
+allowed(await get(sam, `staff/${sam.uid}`), 'that barber can read their own login record');
+refused(await get(lee, `staff/${sam.uid}`), 'someone else cannot read it');
+refused(await get(sam, 'staff'), 'a staff login cannot list the other logins');
+allowed(await get(owner, 'staff'), 'the owner can list the staff logins');
+allowed(await patch(sam, BOARD, { online: true, updatedAt: now }, ['online', 'updatedAt']), 'the new staff login can run the queue');
+allowed(await putSale(sam, `${SALES}/s7`, saleDoc(sam, { b: 'b3' })), 'and record a sale');
+allowed(await salesOf(sam, 'b3'), 'a barber can list their own sales for the day');
+refused(await salesOf(sam, 'b1'), 'but not another barber’s');
+refused(await get(sam, SALES), 'and not every sale');
+refused(await get(sam, `${BOARD}/private/pay`), 'a barber cannot read the percentages');
+refused(await put(sam, `staff/${sam.uid}`, staffDoc({ b: 'b1' })), 'a barber cannot move their own login to another profile');
+refused(await put(sam, 'site/owner', { uid: sam.uid }), 'a staff login cannot take over as owner');
+refused(await del(sam, `staff/${sam.uid}`), 'a staff login cannot remove logins');
+allowed(await del(owner, `staff/${sam.uid}`), 'the owner removes the staff login');
+refused(await patch(sam, BOARD, { online: false, updatedAt: now }, ['online', 'updatedAt']), 'and from then on it can no longer run the queue');
+refused(await salesOf(sam, 'b3'), 'or see any sales');
+
 console.log(res.join('\n'));
 console.log(`\n${res.filter((r) => r.startsWith('PASS')).length} of ${res.length} passed`);
 process.exit(res.some((r) => !r.startsWith('PASS')) ? 1 : 0);

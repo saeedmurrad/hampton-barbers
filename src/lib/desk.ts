@@ -2,7 +2,7 @@
 // queue to use (Firebase when signed in, this device otherwise), and saving changes.
 import { expire, finish, londonDay, openToday, QueueError, type Board } from './board';
 import { cleanInput, saleFor, type Sale, type SaleInput } from './sales';
-import { CONNECTED, actLocal, localNames, newId, onDeviceChange, pickBoard, saveLocalSale, setDemoDevice, setLocalName } from './store';
+import { CONNECTED, actLocal, localNames, localSales, newId, onDeviceChange, pickBoard, saveLocalSale, setDemoDevice, setLocalName } from './store';
 import * as cloud from './cloud';
 
 const SAY: Record<string, string> = {
@@ -15,6 +15,8 @@ const SAY: Record<string, string> = {
 export type Desk = ReturnType<typeof createDesk>;
 export function createDesk(shops: string[], onChange: () => void) {
   let email: string | null = null;
+  let role: cloud.Role | null = null;      // null when signed out, or while it is being checked
+  let mine: cloud.StaffInfo | null = null; // this login's staff record, if it is a staff login
   let status = CONNECTED ? 'Loading…' : 'Not connected. Changes show on this device only.';
   let stops: (() => void)[] = [];
   const boards: Record<string, Board | null> = {};
@@ -55,10 +57,21 @@ export function createDesk(shops: string[], onChange: () => void) {
   };
   if (CONNECTED) cloud.onStaff((e) => {
     email = e;
+    role = null;
+    mine = null;
     setDemoDevice(!e); // used without signing in, this device runs the demo queue
     status = e ? 'Signed in. Every change goes live straight away.' : 'Demo on this device only. Sign in to run the real queue.';
     listen();
     onChange();
+    if (!e) return;
+    cloud.whoAmI().then((who) => {
+      if (email !== e) return;
+      role = who.role;
+      mine = who.staff;
+      if (role === 'new') status = 'Signed in. The first change you save makes this login the owner.';
+      if (role === 'none') status = 'This login has not been added to the shop yet. Ask the owner to add it on the queue desk.';
+      onChange();
+    });
   });
   else setDemoDevice(true);
   onDeviceChange(onChange);
@@ -66,6 +79,9 @@ export function createDesk(shops: string[], onChange: () => void) {
   return {
     connected: CONNECTED,
     email: () => email,
+    // 'owner', 'staff' (a login the owner added), 'new' (a site nobody owns yet) or 'none'.
+    role: () => role,
+    me: () => mine,
     status: () => status,
     signIn: (e: string, p: string) => cloud.staffSignIn(e, p),
     signOut: () => cloud.staffSignOut(),
@@ -129,6 +145,12 @@ export function createDesk(shops: string[], onChange: () => void) {
         say(cloud.denied(e) ? 'Too late to change this here. Ask the owner to correct it in the reports.' : explain(e));
         return null;
       }
+    },
+    // One barber's sales today: for "your takings today" on the barber panel.
+    async takings(shop: string, barberId: string): Promise<Sale[] | null> {
+      const day = londonDay(Date.now());
+      if (!email) return localSales(shop).filter((s) => s.b === barberId && s.day === day);
+      try { return await cloud.loadBarberDay(shop, barberId, day); } catch { return null; } // not this login's to see
     },
     setName(shop: string, id: string, name: string) {
       if (email) cloud.setName(shop, id, name).catch(() => { /* the number still works without a name */ });

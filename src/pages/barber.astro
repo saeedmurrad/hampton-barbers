@@ -37,6 +37,8 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   import { addWalkIn, barberLabel, boardView, callNext, clockText, minsText, removeTicket, setBarber, uncall } from '../lib/board';
   import { createDesk } from '../lib/desk';
   import { finishAndPay, loadServices, type Service } from '../lib/paysheet';
+  import { money, type Sale } from '../lib/sales';
+  import { changePassword } from '../lib/cloud';
   import { BARBER_KEY, esc, newId, read, write } from '../lib/store';
 
   const root = document.querySelector<HTMLElement>('.bp')!;
@@ -58,6 +60,16 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   const setMe = (m: Me) => { me = m; write(BARBER_KEY, m); draw(); };
   let accountMsg = '';
   let drawnFor: string | null | undefined;
+  let pwOpen = false;
+  // This barber's sales today, for "taken today". Reloaded after each finished cut.
+  let takings: Sale[] | null = null;
+  let takingsFor = '';
+  const loadTakings = () => {
+    const key = `${desk.email()}|${desk.role()}|${me.shop}|${me.id}`;
+    takingsFor = key;
+    if (!me.id) { takings = null; return; }
+    desk.takings(me.shop, me.id).then((list) => { if (takingsFor === key) { takings = list; draw(); } });
+  };
 
   const toast = (msg: string, action?: { label: string; run: () => void }) => {
     document.querySelector('.staff-toast')?.remove();
@@ -77,13 +89,14 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
 
   const drawAccount = () => {
     const email = desk.email();
-    if (drawnFor === email && !accountMsg) return;
-    drawnFor = email;
+    const state = `${email}|${pwOpen}`;
+    if (drawnFor === state && !accountMsg) return;
+    drawnFor = state;
     const note = accountMsg ? `<p class="bp__msg" role="alert">${esc(accountMsg)}</p>` : '';
     accountMsg = '';
     if (!desk.connected) { account.innerHTML = '<p><strong>Not connected.</strong> Changes show on this device only.</p>'; return; }
     account.innerHTML = email
-      ? `<p>Signed in as <strong>${esc(email)}</strong>. <button type="button" class="link" data-out>Sign out</button></p>${note}`
+      ? `<p>Signed in as <strong>${esc(email)}</strong>. <button type="button" class="link" data-pw>Change password</button> <button type="button" class="link" data-out>Sign out</button></p>${pwOpen ? '<form id="bp-pw" class="bp__signin"><input type="text" name="pw" minlength="8" required autocomplete="off" placeholder="New password (8 or more characters)" aria-label="New password" /><button type="submit" class="primary">Save password</button></form>' : ''}${note}`
       : `<form id="bp-signin" class="bp__signin"><b>Sign in to run the real queue</b>
           <input type="email" name="email" autocomplete="username" placeholder="Email" required />
           <input type="password" name="password" autocomplete="current-password" placeholder="Password" required />
@@ -93,14 +106,25 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
 
   const draw = () => {
     const now = Date.now();
+    // A barber's own login opens straight on their own profile.
+    const linked = desk.role() === 'staff' && desk.me()?.b ? desk.me()! : null;
+    if (linked && (me.shop !== linked.shop || me.id !== linked.b)) { me = { shop: linked.shop, id: linked.b }; write(BARBER_KEY, me); }
     const b = desk.board(me.shop, now);
     const v = boardView(b, now);
     const s = b.staff[me.id];
     statusEl.textContent = desk.offline(me.shop) ? 'No connection. Showing the last known queue.' : desk.status();
     drawAccount();
+    if (takingsFor !== `${desk.email()}|${desk.role()}|${me.shop}|${me.id}`) loadTakings();
     setupEl.hidden = Boolean(s);
     chairEl.hidden = waitingEl.hidden = !s;
 
+    if (desk.role() === 'none') {
+      chairEl.hidden = waitingEl.hidden = true;
+      setupEl.hidden = false;
+      fill(whoEl, '<b>Barber panel</b>');
+      fill(setupEl, '<h2>This login has not been added yet</h2><p class="bp__hint">Ask the owner to add this email under “Staff logins” on the queue desk. Then sign in here again.</p>');
+      return;
+    }
     if (!s) {
       fill(whoEl, '<b>Barber panel</b>');
       const staff = Object.entries(b.staff).sort((x, y) => x[1].chair - y[1].chair);
@@ -112,7 +136,7 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
       return;
     }
 
-    fill(whoEl, `<b>${esc(barberLabel(s))}</b><span>Chair ${s.chair} · ${esc(shopName(me.shop))}</span><button type="button" class="link" data-switch>Change</button>`);
+    fill(whoEl, `<b>${esc(barberLabel(s))}</b><span>Chair ${s.chair} · ${esc(shopName(me.shop))}</span>${linked ? '' : '<button type="button" class="link" data-switch>Change</button>'}`);
     const mine = v.chairs.find((c) => c.id === me.id);
     const next = v.line.find((x) => x.s === 'here');
     let html: string;
@@ -136,7 +160,10 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
       html = `<p class="bp__state">Your chair is free</p><p class="bp__sub">${v.onWay ? `${v.onWay} on the way, nobody in the shop yet.` : 'Nobody is waiting.'}</p>
         <div class="bp__btns"><button type="button" data-brk="on">Take a break</button><button type="button" data-shift="off">End my shift</button></div>`;
     }
-    fill(chairEl, `${html}<p class="bp__today">Your cuts today: <b>${s.done}</b></p>`);
+    const mineToday = (takings ?? []).filter((x) => !x.void);
+    const sum = (how?: string) => mineToday.filter((x) => !how || x.pay === how).reduce((a, x) => a + x.price, 0);
+    const taken = takings === null ? '' : `<span>Taken today: <b>${money(sum())}</b>${mineToday.length ? ` (cash ${money(sum('cash'))}, online ${money(sum('online'))})` : ''}</span>`;
+    fill(chairEl, `${html}<p class="bp__today"><span>Your cuts today: <b>${s.done}</b></span>${taken}</p>`);
 
     const free = s.on && !s.brk && mine?.state === 'free';
     summaryEl.textContent = `${v.inShop} in the shop · ${v.onWay} on the way`;
@@ -159,7 +186,8 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     else if ('switch' in d) setMe({ shop, id: '' });
     else if ('call' in d) desk.act(shop, (b, now) => callNext(b, id, now));
     else if (d.callId) desk.act(shop, (b, now) => callNext(b, id, now, d.callId));
-    else if ('finish' in d) finishAndPay(desk, shop, id, services, toast);
+    else if ('finish' in d) finishAndPay(desk, shop, id, services, toast).then(loadTakings);
+    else if ('pw' in d) { pwOpen = !pwOpen; draw(); }
     else if (d.uncall) desk.act(shop, (b, now) => uncall(b, d.uncall!, now));
     else if (d.noshow) { if (confirm('Remove this customer from the queue because they didn’t come?')) desk.act(shop, (b, now) => removeTicket(b, d.noshow!, now)); }
     else if (d.brk) desk.act(shop, (b, now) => setBarber(b, id, { brk: d.brk === 'on' }, now));
@@ -178,13 +206,21 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   });
   account.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const f = new FormData(e.target as HTMLFormElement);
+    const form = e.target as HTMLFormElement;
+    const f = new FormData(form);
+    if (form.id === 'bp-pw') {
+      try { await changePassword(String(f.get('pw'))); pwOpen = false; accountMsg = 'Password changed.'; }
+      catch (err) { accountMsg = /recent-login/.test(String((err as { code?: string }).code)) ? 'For safety, sign out, sign in again, and then change the password.' : 'Could not change the password. Use 8 or more characters and try again.'; }
+      draw();
+      return;
+    }
     try { await desk.signIn(String(f.get('email')).trim(), String(f.get('password'))); }
     catch { accountMsg = 'The email or password is not right.'; draw(); }
   });
 
   draw();
   setInterval(draw, 15_000);
+  setInterval(loadTakings, 120_000);
 </script>
 
 <style is:global>
@@ -217,7 +253,7 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   .bp__sub { color: var(--muted); margin-top: .2rem; }
   .bp__btns { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.1rem; }
   .bp__btns button { flex: 1 1 8rem; }
-  .bp__today { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .92rem; }
+  .bp__today { display: grid; gap: .2rem; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .92rem; }
   .bp__today b { color: #15140f; font-size: 1.1rem; }
   .bp__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .2rem 1rem; margin-bottom: .8rem; }
   .bp__head p { font-size: .85rem; color: var(--muted); }

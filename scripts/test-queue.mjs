@@ -185,6 +185,49 @@ try {
   await R.reload({ waitUntil: 'load' });
   ok(await waitText(R, '[data-tiles]', /Customers 2 Takings £40/) && /40% to the barber/.test(await txt(R, '[data-barbers]')), 'reports: the cancellation and the percentage are still there after reloading', await txt(R, '[data-tiles]'));
 
+  // ---------- staff logins: the owner makes one for the barber on chair 3 ----------
+  ok(await waitText(A, '[data-login-list]', /No staff logins yet/), 'desk: the owner sees the staff logins section', await txt(A, '[data-login-list]'));
+  await setValue(A, '[data-new-login] input[name=name]', 'Omar');
+  await setValue(A, '[data-new-login] input[name=email]', 'omar@test.local');
+  await setValue(A, '[data-new-login] input[name=password]', 'barber-pass-1');
+  await setValue(A, '[data-login-for]', 'hampton-vale/b3');
+  await submit(A, '[data-new-login]');
+  ok(await waitText(A, '[data-login-list]', /Omar omar@test\.local · barber at Hampton Vale, chair 3/), 'desk: the owner creates a login for the barber on chair 3', await txt(A, '[data-login-list]'));
+  ok(/Signed in as owner@test\.local/.test(await txt(A, '#qd-account')), 'desk: the owner is still signed in afterwards', await txt(A, '#qd-account'));
+  await A.$eval('.qd__more', (el) => { el.open = true; });
+  await A.$eval('[data-logins]', (el) => el.scrollIntoView({ block: 'start' }));
+  await shot(A, 'p2-desk-logins');
+  await A.setViewport(PHONE);
+  await A.$eval('[data-logins]', (el) => el.scrollIntoView({ block: 'start' }));
+  await shot(A, 'p2-desk-logins-phone');
+  await A.setViewport(LAPTOP);
+  const S = await open(await browser.createBrowserContext(), '/barber/?emulator', PHONE, 'staff');
+  await setValue(S, '#bp-signin input[name=email]', 'omar@test.local');
+  await setValue(S, '#bp-signin input[name=password]', 'barber-pass-1');
+  await submit(S, '#bp-signin');
+  ok(await waitText(S, '[data-who]', /Barber 3 Chair 3 · Hampton Vale/), 'staff: the barber signs in and lands on their own profile', await txt(S, '[data-who]'));
+  ok(!/Change/.test(await txt(S, '[data-who]')), 'staff: a personal login cannot switch to another barber’s profile', await txt(S, '[data-who]'));
+  ok(await waitText(S, '[data-chair]', /In your chair 3 /), 'staff: sees number 3 in their chair', await txt(S, '[data-chair]'));
+  await tap(S, '[data-finish]');
+  await pay(S, 2, 'cash');
+  ok(await waitText(S, '.staff-toast', /Number 3 finished: £20 cash/), 'staff: records a sale with their own login', await txt(S, '.staff-toast'));
+  ok(await waitText(S, '[data-chair]', /Taken today: £20 \(cash £20, online £0\)/), 'staff: sees their own takings today, and only their own', await txt(S, '[data-chair]'));
+  await shot(S, 'p2-staff-phone');
+  const SR = await open(S.browserContext(), '/admin/reports/?emulator', PHONE, 'staff-reports');
+  ok(await waitText(SR, '#rp-account', /for the owner only/), 'staff: is told the reports are for the owner only', await txt(SR, '#rp-account'));
+  ok(await SR.$eval('[data-body]', (el) => el.hidden), 'staff: the takings stay hidden from a staff login');
+  await S.bringToFront();
+  await tap(S, '[data-pw]');
+  await setValue(S, '#bp-pw input[name=pw]', 'my-own-pass-22');
+  await submit(S, '#bp-pw');
+  ok(await waitText(S, '#bp-account', /Password changed/), 'staff: can change the password the owner gave them', await txt(S, '#bp-account'));
+  await R.reload({ waitUntil: 'load' });
+  ok(await waitText(R, '[data-tiles]', /Customers 3 Takings £60/), 'reports: the owner sees the sale the staff login recorded', await txt(R, '[data-tiles]'));
+  await tap(A, '[data-remove-login]');
+  ok(await waitText(A, '[data-login-list]', /No staff logins yet/), 'desk: the owner removes the staff login', await txt(A, '[data-login-list]'));
+  await submit(S, '[data-add]');
+  ok(await waitText(S, '#bp-status', /not allowed/), 'staff: a removed login can no longer change the queue', await txt(S, '#bp-status'));
+
   // ---------- another customer joins, then leaves; then online joining is paused ----------
   const E = await open(await browser.createBrowserContext(), '/club/?emulator', PHONE, 'customer2');
   await joinAs(E, 'Lee');

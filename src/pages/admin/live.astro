@@ -84,6 +84,20 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
           </div>
           <div class="qd__row"><button type="button" data-clear>Clear the queue</button><small>Removes everyone waiting and in the chairs. Ticket numbers carry on.</small></div>
         </div>
+        <div class="qd__logins" data-logins hidden>
+          <h3>Staff logins</h3>
+          <p class="qd__hint">Give each barber their own login, and one for the shop tablet. A staff login can run the queue and record payments. It cannot open the takings, the percentages or this list.</p>
+          <ul class="qd__staff" data-login-list></ul>
+          <form class="qd__newlogin" data-new-login>
+            <input name="name" placeholder="First name" required maxlength="30" autocomplete="off" aria-label="First name" />
+            <input name="email" type="email" placeholder="Their email" required autocomplete="off" aria-label="Their email" />
+            <input name="password" type="text" placeholder="A password for them" required minlength="8" autocomplete="off" aria-label="A password for them, 8 or more characters" />
+            <select name="for" aria-label="Who the login is for" data-login-for></select>
+            <button type="submit" class="primary">Create login</button>
+          </form>
+          <p class="qd__hint">They sign in on the barber panel with that email and password, and can change the password there. No email is sent.</p>
+          <p class="qd__msg" data-login-msg role="status" hidden></p>
+        </div>
       </div>
     </details>
   </main>
@@ -94,6 +108,7 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   import { createDesk } from '../../lib/desk';
   import { finishAndPay, loadServices, type Service } from '../../lib/paysheet';
   import { esc, newId } from '../../lib/store';
+  import * as cloud from '../../lib/cloud';
 
   const root = document.querySelector<HTMLElement>('.qd')!;
   let services = JSON.parse(root.dataset.services || '[]') as Service[];
@@ -113,6 +128,10 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   let accountMsg = '';
   let drawnFor: string | null | undefined;
   const known: Record<string, Set<string>> = {}; // tickets already seen, so new online joiners can be announced
+  let logins: cloud.StaffInfo[] | null = null;   // staff logins, loaded for the owner only
+  let loginsAsked = false;
+  const loginsEl = $('[data-logins]'), loginList = $('[data-login-list]'), loginFor = $<HTMLSelectElement>('[data-login-for]'), loginMsg = $('[data-login-msg]');
+  const reloadLogins = () => { loginsAsked = true; cloud.listStaff().then((list) => { logins = list; draw(); }).catch(() => { logins = []; draw(); }); };
 
   const toast = (msg: string, action?: { label: string; run: () => void }) => {
     document.querySelector('.staff-toast')?.remove();
@@ -216,6 +235,20 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     onlineEl.value = b.online ? 'on' : 'off';
     if (document.activeElement !== noteEl) noteEl.value = b.note;
     $('[data-demo-only]').hidden = signedIn;
+
+    // Staff logins are the owner's business only.
+    const isOwner = desk.role() === 'owner';
+    loginsEl.hidden = !isOwner;
+    if (!isOwner) { logins = null; loginsAsked = false; return; }
+    if (!loginsAsked) reloadLogins();
+    const chairOf = (l: cloud.StaffInfo) => { const x = desk.board(l.shop, now).staff[l.b]; return x ? `chair ${x.chair}${x.name ? `, ${esc(x.name)}` : ''}` : 'a profile that has been removed'; };
+    fill(loginList, logins === null ? '<li class="none">Loading…</li>' : logins.map((l) => `<li><span class="who"><b>${esc(l.name)}</b><small>${esc(l.email)} · ${l.role === 'barber' ? `barber at ${esc(shopName(l.shop))}, ${chairOf(l)}` : 'front desk'}</small></span><button type="button" data-remove-login="${l.uid}" aria-label="Remove the login for ${esc(l.name)}">Remove</button></li>`).join('') || '<li class="none">No staff logins yet. The only login is yours.</li>');
+    if (document.activeElement !== loginFor) {
+      const keep = loginFor.value;
+      fill(loginFor, '<option value="">For the shop tablet (front desk)</option>' + shops.map((sh) => Object.entries(desk.board(sh.id, now).staff).sort((x, y) => x[1].chair - y[1].chair)
+        .map(([id, x]) => `<option value="${sh.id}/${id}">For ${esc(sh.name)}, chair ${x.chair}${x.name ? `, ${esc(x.name)}` : ''}</option>`).join('')).join(''));
+      loginFor.value = [...loginFor.options].some((o) => o.value === keep) ? keep : '';
+    }
   };
 
   // ---------- actions ----------
@@ -243,7 +276,30 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
     else if (d.dropBarber) { if (confirm('Remove this barber from the shop’s list?')) desk.act(tab, (b, now) => dropBarber(b, d.dropBarber!, now)); }
     else if (d.example) { if (confirm(`Replace the demo queue for ${shopName(tab)} with a “${d.example}” example?`)) desk.act(tab, (b, now) => ({ ...exampleBoard(d.example!, now, b), updatedAt: Math.max(now, b.updatedAt + 1) })); }
     else if ('clear' in d) { if (confirm(`Remove everyone from the queue for ${shopName(tab)}? This cannot be undone.`)) desk.act(tab, (b, now) => clearQueue(b, now)); }
+    else if (d.removeLogin) { if (confirm('Remove this staff login? That person will no longer be able to run the queue or record payments.')) cloud.removeStaffLogin(d.removeLogin).then(reloadLogins).catch(() => toast('Could not remove the login. Try again.')); }
     else if ('out' in d) desk.signOut();
+  });
+  $<HTMLFormElement>('[data-new-login]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const f = new FormData(form);
+    const [shop = '', b = ''] = String(f.get('for') ?? '').split('/');
+    const say = (t: string) => { loginMsg.textContent = t; loginMsg.hidden = !t; };
+    say('Creating the login…');
+    try {
+      const made = await cloud.createStaffLogin({ email: String(f.get('email')).trim(), password: String(f.get('password')), name: String(f.get('name')).trim(), shop, b });
+      form.reset();
+      say(`Login created for ${made.name}. They sign in on the barber panel with that email and password.`);
+      reloadLogins();
+    } catch (err) {
+      const code = String((err as { code?: string }).code ?? '');
+      say(code === 'own-login' ? 'That is your own login. Use a different email for staff.'
+        : /wrong-password|invalid-credential|invalid-login/.test(code) ? 'That email already has a login with a different password. Type its current password to link it, or use another email.'
+        : /weak-password/.test(code) ? 'Choose a longer password (8 or more characters).'
+        : /invalid-email/.test(code) ? 'That email address does not look right.'
+        : cloud.denied(err) ? 'Only the owner’s login can add staff logins.'
+        : 'Could not create the login. Check the internet connection and try again.');
+    }
   });
   $<HTMLFormElement>('[data-add]').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -359,6 +415,13 @@ const services = menu.flatMap((c) => c.items.map((i) => ({ name: i.name, price: 
   .qd__staff .done { font-size: .82rem; color: var(--muted); align-self: center; }
   .qd__staff button { min-height: 2.5rem; font-size: .85rem; }
   .qd__opts { display: grid; gap: .8rem; align-content: start; }
+  .qd__logins { grid-column: 1 / -1; display: grid; gap: .6rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+  .qd__logins[hidden] { display: none; }
+  .qd__logins .qd__staff { margin-block: .2rem; }
+  .qd__logins .who { display: grid; flex: 1 1 14rem; min-width: 0; }
+  .qd__logins .who small { font-size: .82rem; color: var(--muted); }
+  .qd__newlogin { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr)); gap: .5rem; }
+  .qd__logins .qd__msg[hidden] { display: none; }
   .qd__step { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 1rem; background: #f7f4ee; border-radius: 14px; }
   .qd__step b { display: block; }
   .qd__step small, .qd__row small { color: var(--muted); font-size: .82rem; }

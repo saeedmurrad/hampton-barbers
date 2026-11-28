@@ -11,10 +11,19 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
     }
     function isAdmin() {
-      return isAccount()
+      return (isAccount()
         && exists(ownerPath())
         && (get(ownerPath()).data.uid == request.auth.uid
-            || request.auth.uid in get(ownerPath()).data.get('admins', []));
+            || request.auth.uid in get(ownerPath()).data.get('admins', [])))
+        || isStaff();
+    }
+    // A staff login: an account the owner has added for a barber or for the shop tablet.
+    // It can run the queue and record sales. It cannot read takings, percentages or other logins.
+    function staffPath() {
+      return /databases/$(database)/documents/staff/$(request.auth.uid);
+    }
+    function isStaff() {
+      return isAccount() && exists(staffPath());
     }
 
     // The owner alone: the account that set the site up. Money (takings, percentages) is for
@@ -152,7 +161,10 @@ service cloud.firestore {
           && !('void' in sale()) && !('was' in sale())
           && sale().ts == request.time; // stamped by the server, not by the phone's clock
         allow get: if isOwner() || (isAdmin() && resource.data.by == request.auth.uid);
-        allow list: if isOwner();
+        // The owner sees every sale. A barber's own login can list that barber's own sales
+        // (to show "your takings today"), and nobody else's.
+        allow list: if isOwner()
+          || (isStaff() && get(staffPath()).data.shop == shop && resource.data.b == get(staffPath()).data.b);
         allow update: if validSale()
           && ((isOwner() && sale().diff(resource.data).affectedKeys().hasOnly(['svc', 'price', 'pay', 'was', 'void']))
             || (isAdmin() && resource.data.by == request.auth.uid
@@ -171,7 +183,7 @@ service cloud.firestore {
     // Who owns the price list. The first signed-in person to publish creates this record
     // and becomes the owner. After that it cannot be replaced or deleted.
     match /site/owner {
-      allow get: if request.auth != null && resource != null && resource.data.uid == request.auth.uid;
+      allow get: if request.auth != null && (resource == null || resource.data.uid == request.auth.uid);
       allow create: if isAccount()
         && request.resource.data.keys().hasOnly(['uid'])
         && request.resource.data.uid == request.auth.uid;
@@ -180,6 +192,23 @@ service cloud.firestore {
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.keys().hasOnly(['uid', 'admins']);
       allow delete: if false;
+    }
+
+    // Staff logins. Only the owner can add, change, list or remove them. A staff member can
+    // read their own record, which says which shop and barber profile the login belongs to.
+    match /staff/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isOwner());
+      allow list: if isOwner();
+      allow create, update: if isOwner()
+        && uid != request.auth.uid
+        && request.resource.data.keys().hasOnly(['email', 'name', 'shop', 'b', 'role', 'at'])
+        && request.resource.data.email is string && request.resource.data.email.size() <= 120
+        && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 30
+        && request.resource.data.shop in ['', 'hampton-vale', 'shop-2', 'shop-3']
+        && request.resource.data.b is string && request.resource.data.b.size() <= 40
+        && request.resource.data.role in ['barber', 'desk']
+        && request.resource.data.at is int;
+      allow delete: if isOwner();
     }
 
     match /{document=**} {

@@ -1,7 +1,7 @@
 // The Firebase side of the queue: sign-in, live updates and safe saves. Loaded only where it
 // is needed: staff pages, the shop TV, and a customer's page once they hold a ticket.
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, connectAuthEmulator, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { initializeApp, getApps, deleteApp } from 'firebase/app';
+import { getAuth, connectAuthEmulator, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, initializeAuth, inMemoryPersistence, updatePassword } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, doc, collection, onSnapshot, runTransaction, setDoc, deleteDoc, deleteField, getDoc, getDocs, query, where, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { cleanBoard, londonDay, openToday, QueueError, type Board } from './board';
 import { cleanRules, cleanSale, type PayRules, type Sale } from './sales';
@@ -139,4 +139,68 @@ export async function amOwner(): Promise<boolean> {
   } catch {
     return false; // the database refuses anyone who is not the owner
   }
+}
+
+// ---------- staff logins ----------
+export type StaffInfo = { uid: string; email: string; name: string; shop: string; b: string; role: 'barber' | 'desk'; at: number };
+export type Role = 'owner' | 'staff' | 'new' | 'none';
+const staffOf = (uid: string, d: Record<string, unknown>): StaffInfo => ({
+  uid, email: String(d.email ?? ''), name: String(d.name ?? ''), shop: String(d.shop ?? ''), b: String(d.b ?? ''), role: d.role === 'barber' ? 'barber' : 'desk', at: Number(d.at ?? 0),
+});
+// What the signed-in account is to the shop: the owner, a staff login the owner added, the
+// first login on a site nobody owns yet ('new'), or an account that has not been added ('none').
+export async function whoAmI(): Promise<{ role: Role; staff: StaffInfo | null }> {
+  const { auth, db } = fb();
+  const uid = auth.currentUser?.uid;
+  if (!uid) return { role: 'none', staff: null };
+  try {
+    const o = await getDoc(doc(db, 'site', 'owner'));
+    if (!o.exists()) return { role: 'new', staff: null };
+    if (o.data().uid === uid) return { role: 'owner', staff: null };
+  } catch { /* the site has an owner, and it is someone else */ }
+  try {
+    const s = await getDoc(doc(db, 'staff', uid));
+    if (s.exists()) return { role: 'staff', staff: staffOf(uid, s.data()) };
+  } catch { /* not a staff login */ }
+  return { role: 'none', staff: null };
+}
+export async function listStaff(): Promise<StaffInfo[]> {
+  const snap = await getDocs(collection(fb().db, 'staff'));
+  const out: StaffInfo[] = [];
+  snap.forEach((d) => out.push(staffOf(d.id, d.data())));
+  return out.sort((x, y) => x.name.localeCompare(y.name));
+}
+// The owner makes a login for a barber or for the shop tablet. The new account is created on
+// a second, temporary connection, so the owner stays signed in. No email is sent to anyone.
+export async function createStaffLogin(input: { email: string; password: string; name: string; shop: string; b: string }): Promise<StaffInfo> {
+  const { auth, db } = fb();
+  const second = initializeApp(cfg, `staff-maker-${Date.now()}`);
+  try {
+    const a2 = initializeAuth(second, { persistence: inMemoryPersistence });
+    if (useEmulator()) connectAuthEmulator(a2, 'http://127.0.0.1:9099', { disableWarnings: true });
+    let uid: string;
+    try {
+      uid = (await createUserWithEmailAndPassword(a2, input.email, input.password)).user.uid;
+    } catch (e) {
+      // The email already has an account: link it, but only if this is its password.
+      if ((e as { code?: string }).code !== 'auth/email-already-in-use') throw e;
+      uid = (await signInWithEmailAndPassword(a2, input.email, input.password)).user.uid;
+    }
+    await signOut(a2);
+    if (uid === auth.currentUser?.uid) throw Object.assign(new Error('own'), { code: 'own-login' });
+    const info = { email: input.email.slice(0, 120), name: input.name.trim().slice(0, 30), shop: input.b ? input.shop : '', b: input.b, role: input.b ? 'barber' as const : 'desk' as const, at: Date.now() };
+    await setDoc(doc(db, 'staff', uid), info);
+    return { ...info, uid };
+  } finally {
+    await deleteApp(second).catch(() => { /* already closed */ });
+  }
+}
+export const removeStaffLogin = (uid: string) => deleteDoc(doc(fb().db, 'staff', uid));
+export const changePassword = (password: string) => updatePassword(fb().auth.currentUser!, password);
+// One barber's sales on one day (their own "takings today"; the rules refuse anyone else's).
+export async function loadBarberDay(shop: string, b: string, day: string): Promise<Sale[]> {
+  const snap = await getDocs(query(collection(fb().db, 'boards', shop, 'sales'), where('b', '==', b), where('day', '==', day)));
+  const out: Sale[] = [];
+  snap.forEach((d) => { const s = cleanSale(d.data(), d.id); if (s) out.push(s); });
+  return out;
 }
