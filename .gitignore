@@ -27,3 +27,6 @@ pnpm-debug.log*
 
 # screenshots from the layout checks
 .check/
+
+# coverage report from "npm run coverage"
+coverage/
